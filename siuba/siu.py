@@ -13,6 +13,39 @@ from ast import Attribute, Name, Load, Call
 # .. .. _
 # .. .. 'b'
 
+# TODO: call formatting
+# Displaying precedence (number of spaces)
+# 1. *, @, /, //, %
+# 2. +, -
+# 3. <<, >>
+# parentheses. &, ^, |
+# parentheses. <, <= etc..
+
+# TODO: symbolic formatting: __add__ -> "+"
+
+BINARY_LEVELS = {
+        "__add__": 2,
+        "__sub__": 2,
+        "__mul__": 1,
+        "__matmul__": 1,
+        "__truediv__": 1,
+        "__floordiv__": 1,
+        "__mod__": 1,
+        "__divmod__": 1,
+        "__pow__": 0,
+        "__lshift__": 3,
+        "__rshift__": 3,
+        "__and__": 4,
+        "__xor__": 4,
+        "__or__": 4,
+        "__gt__": 5,
+        "__lt__": 5,
+        "__eq__": 5,
+        "__ne__": 5,
+        "__ge__": 5,
+        "__getattr__": 0
+        }
+
 BINARY_OPS = {
         "__add__": "+",
         "__sub__": "-",
@@ -32,7 +65,8 @@ BINARY_OPS = {
         "__lt__": "<",
         "__eq__": "==",
         "__ne__": "!=",
-        "__ge__": ">="
+        "__ge__": ">=",
+        "__getattr__": "."
         }
 
 UNARY_OPS = {
@@ -42,10 +76,17 @@ UNARY_OPS = {
         "__abs__": "ABS => "
         }
 
-RIGHT_ASSOC_OPS = {
-        "__pow__"
-        "__lpow__"
+# TODO: can it just be put in binary ops? Special handling in Symbolic class?
+MISC_OPS = {
+        "__getitem__": "["
         }
+
+RIGHT_ASSOC_OPS = {
+        "__pow__": "**",
+        "__lpow__": "**"
+        }
+
+ALL_OPS = {**BINARY_OPS, **UNARY_OPS, **MISC_OPS}
 
 for k, v in {**BINARY_OPS}.items():
     BINARY_OPS[k.replace("__", "__r", 1)] = v
@@ -62,8 +103,11 @@ class Formatter:
         if isinstance(call, Symbolic):
             return self.format(call.source)
 
+        if isinstance(call, MetaArg):
+            return "_"
+
         if isinstance(call, Call):
-            call_str = fmt_block + repr(call.func)
+            call_str = fmt_block + ALL_OPS.get(call.func, repr(call.func))
 
             args_str = (self.format(arg) for arg in call.args)
 
@@ -87,8 +131,14 @@ class Formatter:
 
     @staticmethod
     def fmt_pipe(x, final = False):
-        connector = "\n├ " if not final else "\n  "
-        return "\n├─" + connector.join(x.splitlines())
+        if not final:
+            connector = "\n│ " if not final else "\n  "
+            prefix = "\n├─"
+        else:
+            connector = "\n  "
+            prefix = "\n└─"
+        return prefix + connector.join(x.splitlines())
+
 
         
 
@@ -99,6 +149,7 @@ class Call:
         self.kwargs = kwargs
 
     def __repr__(self):
+        # TODO: format binary, unary, call, associative
         op_repr = BINARY_OPS.get(self.func, None)
         if op_repr:
             fmt = "({args[0]} {func} {args[1]})"
@@ -114,8 +165,8 @@ class Call:
                     )
 
     def __call__(self, x):
-        inst, *rest = (arg(x) if isinstance(arg, Call) else arg for arg in self.args)
-        kwargs = {k: v(x) if isinstance(v, Call) else v for k, v in self.kwargs.items()}
+        inst, *rest = (self.evaluate_calls(arg, x) for arg in self.args)
+        kwargs = {k: self.evaluate_calls(v, x) for k, v in self.kwargs.items()}
         
         # TODO: temporary workaround, for when only __get_attribute__ is defined
         if self.func == "__getattr__":
@@ -123,6 +174,22 @@ class Call:
 
         # in normal case, get method to call, and then call it
         return getattr(inst, self.func)(*rest, **kwargs)
+
+    @staticmethod
+    def evaluate_calls(arg, x):
+        if isinstance(arg, Call): return arg(x)
+
+        return arg
+
+class Lazy(Call):
+    def __init__(self, func):
+        self.func = "<lazy>"
+        self.args = [func]
+        self.kwargs = {}
+
+    def __call__(self, x):
+        return self.args[0]
+
 
 
 class UnaryOp(Call):
@@ -138,10 +205,31 @@ class UnaryOp(Call):
 
 class BinaryOp(Call):
     def __repr__(self):
-        fmt = "({args[0]} {func} {args[1]})"
+        level = BINARY_LEVELS[self.func]
+        spaces = "" if level == 0 else " "
+        #if level < 4:
+        #    spaces = " "*level
+        #    fmt = "{args[0]}{spaces}{func}{spaces}{args[1]}"
+        #else:
+        #    spaces = " "
+        #    fmt = "({args[0]}{spaces}{func}{spaces}{args[1]})"
+        args = self.args
+        arg0 = "({args[0]})" if self.needs_paren(args[0]) else "{args[0]}"
+        arg1 = "({args[1]})" if self.needs_paren(args[1]) else "{args[1]}"
+        fmt = arg0 + "{spaces}{func}{spaces}" + arg1
+
 
         func = BINARY_OPS[self.func]
-        return fmt.format(func = func, args = self.args, kwargs = self.kwargs)
+        return fmt.format(func = func, args = self.args, kwargs = self.kwargs, spaces = spaces)
+
+    def needs_paren(self, x):
+        if isinstance(x, BinaryOp):
+            sub_lvl = BINARY_LEVELS[x.func]
+            level = BINARY_LEVELS[self.func]
+            if sub_lvl != 0 and sub_lvl != level:
+                return True
+
+        return False
 
 
 
@@ -168,7 +256,7 @@ class Symbolic(object):
         # temporary hack working around ipython pretty.py printing
         #if x == "__class__": return Symbolic
 
-        return Symbolic(Call(
+        return Symbolic(BinaryOp(
                 "__getattr__",
                 self.source,
                 strip_symbolic(x)
@@ -238,12 +326,15 @@ def create_unary_op(op_name):
     return _unary_op
 
 for k, v in BINARY_OPS.items():
+    if k in {"__getattr__"}: continue
     rop = k.replace("__", "__r")
     setattr(Symbolic, k, create_binary_op(k))
 
 for k, v in UNARY_OPS.items():
     if k != "__invert__":
         setattr(Symbolic, k, create_unary_op(k))
+
+Lam = Lazy
 
 _ = Symbolic()
 
