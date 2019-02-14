@@ -4,10 +4,11 @@ import pandas as pd
 import numpy as np
 
 from pandas.core.groupby import DataFrameGroupBy
-from .siu import Symbolic, Call, strip_symbolic
+from .siu import Symbolic, Call, strip_symbolic, MetaArg, BinaryOp
 
 
 # General TODO ================================================================
+# * joins
 # * expressions in group_by
 # * distinct
 # * dispatch to partial when passed a single _?
@@ -211,6 +212,14 @@ class Var:
         x.alias = self.name
         return x
 
+    def __call__(self, *args, **kwargs):
+        return Call('__call__',
+                    BinaryOp('__getattr__', MetaArg("_"), self.name),
+                    *args,
+                    **kwargs
+                    )
+
+
     def __repr__(self):
         return "Var('{self.name}', negated = {self.negated}, alias = {self.alias})" \
                     .format(self = self)
@@ -228,24 +237,38 @@ class VarList:
     def __getitem__(self, x):
         return x
 
+
 def var_slice(colnames, x):
-    NotImplementedError()
+    """Return indices in colnames correspnding to start and stop of slice."""
+    if isinstance(x.start, Var):
+        start_indx = (colnames == x.start.name).idxmax()
+    else:
+        start_indx = x.start or 0
+
+    if isinstance(x.stop, Var):
+        stop_indx = (colnames == x.stop.name).idxmax() + 1
+    else:
+        stop_indx = x.stop or len(colnames)
+
+    return start_indx, stop_indx
 
 
 def var_select(colnames, *args):
+    # TODO: don't erase named column if included again
+    colnames = colnames if isinstance(colnames, pd.Series) else pd.Series(colnames)
     cols = OrderedDict()
     everything = None
 
     # Add entries in pandas.rename style {"orig_name": "new_name"}
     for arg in args:
+        # strings are added directly
         if isinstance(arg, str):
             cols[arg] = None
+        # integers add colname at corresponding index
         elif isinstance(arg, int):
             cols[colnames[arg]] = None
-        elif not isinstance(arg, Var):
-            raise Exception("variable must be either a string or Var instance")
-        else:
-            # remove negated Vars, others include them
+        elif isinstance(arg, Var):
+            # remove negated Vars, otherwise include them
             if arg.negated:
                 # first time using negation, apply an implicit everything
                 if everything is None:
@@ -259,6 +282,17 @@ def var_select(colnames, *args):
                     cols.move_to_end(arg.name)
 
                 cols[arg.name] = arg.alias
+        elif isinstance(arg, slice):
+            start, stop = var_slice(colnames, arg)
+            for ii in range(start, stop):
+                cols[colnames[ii]] = None
+        elif callable(arg):
+            # TODO: not sure if this is a good idea...
+            #       basically proxies to pandas str methods (they must return bool array)
+            indx = arg(colnames.str)
+            cols.update((x, None) for x in set(colnames[indx]) - set(cols))
+        else:
+            raise Exception("variable must be either a string or Var instance")
 
     return cols
 
@@ -271,7 +305,7 @@ def select(__data, *args, **kwargs):
 @select.register(DataFrame)
 def _(__data, *args, **kwargs):
     vl = VarList()
-    evaluated = (arg(vl) if callable(arg) else arg for arg in args)
+    evaluated = (strip_symbolic(arg)(vl) if callable(arg) else arg for arg in args)
 
     od = var_select(__data.columns, *evaluated)
 
@@ -279,13 +313,6 @@ def _(__data, *args, **kwargs):
 
     return __data[list(od)].rename(columns = to_rename)
     
-#    df = __data[[*args, *kwargs.values()]]
-#
-#    # pandas uses reverse format from dplyr
-#    col_names = {v: k for k,v in kwargs.items()}
-#
-#    return df.rename(columns = col_names)
-
 @select.register(DataFrameGroupBy)
 def _(__data, *args, **kwargs):
     raise Exception("Selecting columns of grouped DataFrame currently not allowed")
