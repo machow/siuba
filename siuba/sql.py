@@ -1,12 +1,18 @@
-from .tidy import VarList, var_select, select, mutate, filter
+from .tidy import (
+        select, VarList, var_select,
+        mutate,
+        filter,
+        arrange, _call_strip_ascending,
+        summarize,
+        count
+        )
 from sqlalchemy import sql
-from siuba.siu import strip_symbolic
+from siuba.siu import strip_symbolic, Call
 # TODO: currently needed for select, but can we remove pandas?
 from pandas import Series
 
 
 # TODO:
-#   - arrange
 #   - summarize
 #   - case_when
 #   - distinct
@@ -14,10 +20,20 @@ from pandas import Series
 #   - head
 #   - window funcs
 
-def lift_inner_cols(tbl):
+def lift_inner_cols(tbl, monitor = False):
     cols = list(tbl.inner_columns)
     data = {col.key: col for col in cols}
-    return sql.base.ImmutableColumnCollection(data, cols)
+    if monitor:
+        return MonitoredColumns(data, cols)
+    else:
+        return sql.base.ImmutableColumnCollection(data, cols)
+
+def get_labeled_cols(cols):
+    return set(k for k,v in cols.items() if isinstance(v, sql.elements.Label))
+
+
+def is_grouped_sel(select):
+    return False
 
 class LazyTbl:
     def __init__(self, source, tbl, ops = None):
@@ -80,19 +96,76 @@ def _(__data, *args, **kwargs):
 
 @mutate.register(LazyTbl)
 def _(__data, **kwargs):
-    last_op = __data.last_op
-    cols = lift_inner_cols(last_op)
-    
-    if isinstance(last_op, sql.Select):
-        # TODO: could use copy of last_op plus append_column
-        tmp_op = last_op
-        for k, v in kwargs.items():
-            new_col = v(cols).label(k)
-            tmp_op = tmp_op.column(new_col)
+    # Cases
+    #  - work with group by
+    #  - window functions
+    # TODO: can't re-use select, for example if it's following a select() that renames
 
-        return __data.append_op(tmp_op)
+    # track labeled columns in set
+    # 
+    last_op = __data.last_op
+    labs = set(k for k,v in last_op.columns.items() if isinstance(v, sql.elements.Label))
+
+    sel = last_op
+    # TODO: could use copy of last_op plus append_column
+    for colname, func in kwargs.items():
+        inner_cols = lift_inner_cols(sel)
+        replace_col = colname in sel.columns
+        strip_f = strip_symbolic(func)
+        # Call objects let us check whether column expr used a derived column
+        # e.g. SELECT a as b, b + 1 as c raises an error in SQL, so need subquery
+        if isinstance(strip_f, Call) and labs.isdisjoint(strip_f.op_vars()):
+            # New column can also modify existing select
+            if replace_col:
+                new_col = strip_f(inner_cols).label(colname)
+                sel = sel.with_only_columns([v for k,v in inner_cols.items() if k != colname]) \
+                        .column(new_col)
+            # Call is only a function of non-derived columns, so can modify select
+            else:
+                new_col = strip_f(inner_cols).label(colname)
+                sel = sel.column(new_col)
+        else:
+            # anything else requires a subquery
+            new_col = strip_f(sel.columns).label(colname)
+            sel = sql.select([sel, new_col], from_obj = sel)
+        
+        labs.add(colname)
+
+    return __data.append_op(sel)
 
     raise NotImplementedError("Must be select statement")
+
+
+@arrange.register(LazyTbl)
+def _(__data, *args):
+    last_op = __data.last_op
+    cols = lift_inner_cols(last_op)
+
+    sort_cols = []
+    for arg in args:
+        # simple named column
+        if isinstance(arg, str):
+            sort_cols.append(cols[arg])
+        # an expression
+        elif callable(arg):
+            f, asc = _call_strip_ascending(arg)
+            col_op = f(cols) if asc else f(cols).desc()
+            sort_cols.append(col_op)
+        else:
+            raise NotImplementedError("Must be string or callable")
+
+    return __data.append_op(last_op.order_by(*sort_cols))
+
+
+@count.register(LazyTbl)
+def _(__data, *args, sort = False):
+    # TODO: need group_by to do this
+    last_op = __data.last_op
+    __data.append_op(last_op)
     
 
 
+@summarize.register(LazyTbl)
+def _(__data, **kwargs):
+    # https://stackoverflow.com/questions/14754994/why-is-sqlalchemy-count-much-slower-than-the-raw-query
+    pass

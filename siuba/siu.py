@@ -1,5 +1,4 @@
-import ast
-from ast import Attribute, Name, Load, Call
+import itertools
 
 # [
 # .. 'a'
@@ -157,7 +156,10 @@ class Call:
             op_repr = "."
             fmt = "({args[0]}{func}{args[1]})"
         else:
-            fmt = "{func}(\n\t{args},\n\t{kwargs}\n)"
+            op_repr, rest = self.args[0], self.args[1:]
+            arg_str = ", ".join(map(str, rest))
+            kwarg_str = ", ".join(str(k) + " = " + str(v) for k,v in self.kwargs.items())
+            fmt = "{}({}, {})".format(op_repr, arg_str, kwarg_str)
         return fmt.format(
                     func = op_repr or self.func,
                     args = self.args,
@@ -180,6 +182,25 @@ class Call:
         if isinstance(arg, Call): return arg(x)
 
         return arg
+
+    def op_vars(self):
+        varnames = set()
+
+        op_var = self._get_op_var()
+        if op_var is not None:
+            varnames.add(op_var)
+
+        all_args = itertools.chain(self.args, self.kwargs.values())
+        for arg in all_args:
+            if isinstance(arg, Call):
+                varnames.update(arg.op_vars())
+
+        return varnames
+    
+    def _get_op_var(self):
+        if self.func in ("__getattr__", "__getitem__") and isinstance(self.args[1], str):
+            return self.args[1]
+
 
 class Lazy(Call):
     def __init__(self, func):
@@ -344,7 +365,6 @@ _ = Symbolic()
 #        attr = "a",
 #        ctx = Load()
 #        )
-ast.parse("X.a")
 _.a
 
 _(_.a + _.b, 2, 3)

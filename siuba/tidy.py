@@ -16,6 +16,7 @@ from .siu import Symbolic, Call, strip_symbolic, MetaArg, BinaryOp
 # * separate_rows
 # * compare gather/spread with melt, cast
 # * tally
+# * row_number
 from functools import reduce
 
 class Pipeable:
@@ -56,6 +57,7 @@ class Pipeable:
 
         return f
 
+pipe = Pipeable
 
 def _regroup(df):
     # try to regroup, when user kept index (e.g. group_keys = True)
@@ -98,6 +100,7 @@ def group_by(__data, *args):
     return __data.groupby(by = list(args))
 
 
+@Pipeable.add_to_dispatcher
 @singledispatch
 def ungroup(__data):
     # TODO: can we somehow just restore the original df used to construct
@@ -163,7 +166,8 @@ def _(__data, **kwargs):
 
     df = __data.apply(df_summarize, **kwargs)
         
-    return df
+    group_by_lvls = list(range(df.index.nlevels - 1))
+    return df.reset_index(group_by_lvls)
 
 
 
@@ -204,20 +208,19 @@ class Var:
         self.alias = alias
 
     def __neg__(self):
-        self.negated = not self.negated
-        return self
+        return self.to_copy(negated = not self.negated)
 
     def __eq__(self, x):
-        x.negated = False
-        x.alias = self.name
-        return x
+        return self.to_copy(name = x.name, negated = False, alias = self.name)
 
     def __call__(self, *args, **kwargs):
-        return Call('__call__',
+        call = Call('__call__',
                     BinaryOp('__getattr__', MetaArg("_"), self.name),
                     *args,
                     **kwargs
                     )
+
+        return self.to_copy(name = call)
 
 
     def __repr__(self):
@@ -229,28 +232,53 @@ class Var:
         pref = self.alias + " = " if self.alias else ""
         return "{pref}{op}{self.name}".format(pref = pref, op = op, self = self)
 
+    def to_copy(self, **kwargs):
+        return self.__class__(**{**self.__dict__, **kwargs})
+
 
 class VarList:
     def __getattr__(self, x):
         return Var(x)
 
     def __getitem__(self, x):
-        return x
+        return Var(x)
 
 
 def var_slice(colnames, x):
     """Return indices in colnames correspnding to start and stop of slice."""
+    # TODO: produces bahavior similar to df.loc[:, "V1":"V3"], but can reverse
+    # TODO: make DRY
+    # TODO: reverse not including end points
     if isinstance(x.start, Var):
         start_indx = (colnames == x.start.name).idxmax()
+    elif isinstance(x.start, str):
+        start_indx = (colnames == x.start).idxmax()
     else:
         start_indx = x.start or 0
 
     if isinstance(x.stop, Var):
         stop_indx = (colnames == x.stop.name).idxmax() + 1
+    elif isinstance(x.stop, str):
+        stop_indx = (colnames == x.stop).idxmax() + 1
     else:
         stop_indx = x.stop or len(colnames)
 
-    return start_indx, stop_indx
+    if start_indx > stop_indx:
+        return stop_indx, start_indx
+    else:
+        return start_indx, stop_indx
+
+def var_put_cols(name, var, cols):
+    if isinstance(name, list) and var.alias is not None:
+        raise Exception("Cannot assign name to multiple columns")
+    
+    names = [name] if not isinstance(name, list) else name
+
+    for name in names:
+        if var.negated and name in cols: cols.pop(name)
+        elif name in cols: cols.move_to_end(name)
+        else: cols[name] = var.alias
+
 
 
 def var_select(colnames, *args):
@@ -267,30 +295,28 @@ def var_select(colnames, *args):
         # integers add colname at corresponding index
         elif isinstance(arg, int):
             cols[colnames[arg]] = None
+        # general var handling
         elif isinstance(arg, Var):
             # remove negated Vars, otherwise include them
-            if arg.negated:
+            if arg.negated and everything is None:
                 # first time using negation, apply an implicit everything
-                if everything is None:
-                    everything = True
-                    cols.update((x, None) for x in set(colnames) - set(cols))
-                cols.pop(arg.name)
+                everything = True
+                cols.update((x, None) for x in set(colnames) - set(cols))
 
-            else: 
-                # move to end (e.g. if all columns were added earlier)
-                if arg.name in cols:
-                    cols.move_to_end(arg.name)
-
-                cols[arg.name] = arg.alias
-        elif isinstance(arg, slice):
-            start, stop = var_slice(colnames, arg)
-            for ii in range(start, stop):
-                cols[colnames[ii]] = None
-        elif callable(arg):
-            # TODO: not sure if this is a good idea...
-            #       basically proxies to pandas str methods (they must return bool array)
-            indx = arg(colnames.str)
-            cols.update((x, None) for x in set(colnames[indx]) - set(cols))
+            # slicing can refer to single, or range of columns
+            if isinstance(arg.name, slice):
+                start, stop = var_slice(colnames, arg.name)
+                for ii in range(start, stop):
+                    var_put_cols(colnames[ii], arg, cols)
+            # method calls like endswith()
+            elif callable(arg.name):
+                # TODO: not sure if this is a good idea...
+                #       basically proxies to pandas str methods (they must return bool array)
+                indx = arg.name(colnames.str)
+                var_put_cols(colnames[indx].tolist(), arg, cols)
+                #cols.update((x, None) for x in set(colnames[indx]) - set(cols))
+            else:
+                var_put_cols(arg.name, arg, cols)
         else:
             raise Exception("variable must be either a string or Var instance")
 
