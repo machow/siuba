@@ -488,7 +488,7 @@ def count(__data, *args, **kwargs):
 
 @count.register(pd.DataFrame)
 def _(__data, *args, sort = False):
-    # if expr, works like mutate
+    # TODO: if expr, works like mutate
 
     # count col named, n. If that col already exists, add more "n"s...
     crnt_cols = set(__data.columns)

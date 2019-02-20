@@ -329,6 +329,14 @@ def strip_symbolic(symbol):
     return symbol
 
 
+def explain(symbol):
+    """Print representation that resembles code used to create symbol."""
+    if isinstance(symbol, Symbolic):
+        print(symbol.source)
+    else: 
+        print(symbol)
+
+# Do some gnarly method setting -----------------------------------------------
 
 def create_binary_op(op_name):
     def _binary_op(self, x):
