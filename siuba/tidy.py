@@ -19,6 +19,7 @@ from .siu import Symbolic, Call, strip_symbolic, MetaArg, BinaryOp
 # * row_number
 from functools import reduce
 
+# TODO: should be a subclass of Call?
 class Pipeable:
     def __init__(self, f = None, calls = None):
         if f is not None:
@@ -450,6 +451,7 @@ def _(cond, true_vals, false_vals):
 
 
 # case_when
+@Pipeable.add_to_dispatcher
 @singledispatch
 def case_when(__data, *args, **kwargs):
     raise Exception("no")
@@ -568,4 +570,8 @@ def _(__data, key):
     return out.join(long_grp)
 
 
+# Vector funcs ================================================================
+
+def n_distinct(series):
+    return series.unique().len()
 
