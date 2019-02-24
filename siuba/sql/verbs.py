@@ -6,6 +6,7 @@ from siuba.tidy import (
         summarize,
         count,
         group_by, ungroup,
+        case_when,
         Pipeable
         )
 from .translate import sa_modify_window, sa_is_window
@@ -145,7 +146,15 @@ def show_query(tbl):
 @Pipeable.add_to_dispatcher
 @singledispatch
 def collect(tbl):
-    return tbl.source.execute(tbl.last_op).fetchall()
+    # normally can just pass the sql objects to execute, but for some reason
+    # psycopg2 completes about incomplete template.
+    # see https://stackoverflow.com/a/47193568/1144523
+    query = tbl.last_op
+    compiled = query.compile(
+        dialect = tbl.source.dialect,
+        compile_kwargs = {"literal_binds": True}
+    )
+    return tbl.source.execute(compiled).fetchall()
 
 
 @select.register(LazyTbl)
@@ -311,4 +320,29 @@ def _(__data):
     return __data.copy(group_by = None)
 
 
-#@arrange.register(LazyTbl)
+@case_when.register(sql.base.ImmutableColumnCollection)
+def _(__data, cases):
+    # TODO: will need listener to enter case statements, to handle when they use windows
+    if isinstance(cases, Call):
+        cases = cases(__data)
+
+    whens = []
+    case_items = list(cases.items())
+    n_items = len(case_items)
+
+    else_val = None
+    for ii, (expr, val) in enumerate(case_items):
+        # handle where val is a column expr
+        if callable(val):
+            val = val(__data)
+
+        # handle when expressions
+        if ii+1 == n_items and expr is True:
+            else_val = val
+        elif callable(expr):
+            whens.append((expr(__data), val))
+        else:
+            whens.append((expr, val))
+
+    return sql.case(whens, else_ = else_val)
+        

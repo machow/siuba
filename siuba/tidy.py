@@ -450,18 +450,39 @@ def _(cond, true_vals, false_vals):
     return np.array(list(result))
 
 
-# case_when
-@Pipeable.add_to_dispatcher
+# case_when ----------------
+# note that here, we don't use @Pipeable.add_to_dispatcher.
+# because case_when takes a dictionary of cases, we need to wrap cases into
+# a Call, so that it can be handled by call tree visitors, etc..
+# TODO: evaluate this non-table verb approach
+import itertools
+from siuba.siu import DeepCall
+
+    
+
 @singledispatch
-def case_when(__data, *args, **kwargs):
+def case_when(__data, cases):
     raise Exception("no")
+
+
+@case_when.register(Symbolic)
+def _(__data, cases):
+    if not isinstance(cases, dict):
+        raise Exception("Cases must be a dictionary")
+    itertools.chain
+    dict_entries = dict((strip_symbolic(k), strip_symbolic(v)) for k,v in cases.items())
+    cases_arg = DeepCall("__call__", dict, dict_entries)
+    return Symbolic(source = Call( "__call__", case_when, __data.source, cases_arg))
+
 
 @case_when.register(pd.Series)
 @case_when.register(pd.DataFrame)
 def _(__data, cases):
+    if isinstance(cases, Call):
+        cases = cases(__data)
     # TODO: handle when receive list of (k,v) pairs for py < 3.5 compat?
     out = np.repeat(None, len(__data))
-    for k,v in reversed(list(cases.items())):
+    for k, v in reversed(list(cases.items())):
         if callable(k):
             result = k(__data)
             indx = np.where(result)[0]

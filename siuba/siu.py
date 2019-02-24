@@ -161,6 +161,8 @@ class Call:
             arg_str = ", ".join(map(str, rest))
             kwarg_str = ", ".join(str(k) + " = " + str(v) for k,v in self.kwargs.items())
             fmt = "{}({}, {})".format(op_repr, arg_str, kwarg_str)
+            return fmt
+
         return fmt.format(
                     func = op_repr or self.func,
                     args = self.args,
@@ -310,6 +312,34 @@ class BinaryOp(Call):
                 return True
 
         return False
+
+class DeepCall(Call):
+    """evaluates both keys and vals."""
+    @staticmethod
+    def evaluate_calls(arg, x):
+        # TODO: defining a node like this, just to support case when is a bit crazy
+        #       super messy right now
+        if isinstance(arg, Call):
+            return arg(x)
+
+        if isinstance(arg, tuple):
+            entries = []
+            for k,v in arg:
+                eval_k = Call.evaluate_calls(k, x)
+                eval_v = Call.evaluate_calls(v, x)
+                entries.append((eval_k, eval_v))
+            return entries
+
+        elif isinstance(arg, dict):
+            entries = {
+                    Call.evaluate_calls(k, x): Call.evaluate_calls(v, x)
+                    for k,v in arg.items()
+                    }
+        
+            return entries
+        return arg
+
+
 
 #class LocalCall(Call):
 #    def __call__(self, x):
