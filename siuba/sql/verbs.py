@@ -19,12 +19,12 @@ from pandas import Series
 
 # TODO:
 #   - summarize
-#   - case_when
 #   - distinct
-#   - group_by
 #   - head
-#   - window funcs
 #   - annotate functions using sel.prefix_with("\n/*<Mutate Statement>*/\n") ?
+
+
+# Helpers ---------------------------------------------------------------------
 
 class CallListener:
     def enter(self, node):
@@ -87,12 +87,25 @@ def get_labeled_cols(cols):
 def is_grouped_sel(select):
     return False
 
+def has_windows(clause):
+    windows = []
+    append_win = lambda col: windows.append(col)
+
+    sql.util.visitors.traverse(clause, {}, {"over": append_win})
+    if len(windows):
+        return True
+
+    return False
+
+
+
+# Table -----------------------------------------------------------------------
+
 class LazyTbl:
     def __init__(
             self, source, tbl, ops = None,
             group_by = tuple(), order_by = tuple(), funcs = None,
-            CallShaper = CallTreeLocal,
-            WindowReplacer = WindowReplacer
+            CallShaper = CallTreeLocal
             ):
         self.source = source
         self.tbl = tbl
@@ -116,8 +129,12 @@ class LazyTbl:
     def copy(self, **kwargs):
         return self.__class__(**{**self.__dict__, **kwargs})
 
-    def shape_call(self, call):
-        cs = self.CallShaper(self.funcs['window'])
+    def shape_call(self, call, window = True):
+        f_dict1 = self.funcs['scalar']
+        f_dict2 = self.funcs['window' if window else 'aggregate']
+
+        funcs = {**f_dict1, **f_dict2}
+        cs = self.CallShaper(funcs)
         return cs.visit(call)
 
     def track_call_windows(self, call, columns = None, window_cte = None):
@@ -130,6 +147,9 @@ class LazyTbl:
     def last_op(self):
         return self.ops[-1] if len(self.ops) else None
 
+
+# Main Funcs 
+# =============================================================================
 
 @Pipeable.add_to_dispatcher
 @singledispatch
@@ -308,7 +328,42 @@ def _(__data, *args, sort = False):
 @summarize.register(LazyTbl)
 def _(__data, **kwargs):
     # https://stackoverflow.com/questions/14754994/why-is-sqlalchemy-count-much-slower-than-the-raw-query
-    pass
+    # what if windowed mutate or filter has been done? 
+    #   - filter is fine, since it uses a CTE
+    #   - need to detect any window functions...
+    sel = __data.last_op._clone()
+    labs = set(k for k,v in sel.columns.items() if isinstance(v, sql.elements.Label))
+
+    if len(sel._group_by_clause):
+        # current select stmt has window functions, so need to make it subquery
+        cte = sel.alias()
+        columns = cte.columns
+        sel = sql.select(from_obj = cte)
+    else:
+        # otherwise, can alter the existing select statement
+        columns = lift_inner_cols(sel)
+        sel = sel.with_only_columns([])
+
+    # add group by columns to statement
+    group_cols = [columns[k] for k in __data.group_by]
+    sel.append_group_by(*group_cols)
+    for col in group_cols:
+        sel.append_column(col)
+
+    # add each aggregate column
+    # TODO: can't do summarize(b = mean(a), c = b + mean(a))
+    #       since difficult for c to refer to agg and unagg cols in SQL
+    for k, expr in kwargs.items():
+        strip_f = strip_symbolic(expr)
+        new_call = __data.shape_call(strip_f, window = False)
+        col = new_call(columns)
+
+        sel.append_column(col)
+
+    # TODO: is a simple method on __data for doing this...
+    new_data = __data.append_op(sel)
+    new_data.group_by = None
+    return new_data
 
 
 @group_by.register(LazyTbl)
@@ -346,3 +401,4 @@ def _(__data, cases):
 
     return sql.case(whens, else_ = else_val)
         
+

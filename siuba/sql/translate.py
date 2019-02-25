@@ -35,7 +35,7 @@ base_scalar = dict(
         )
 
 base_agg = dict(
-        mean = sql_agg("mean")
+        mean = sql_agg("avg")
         )
 
 base_win = dict(
@@ -73,9 +73,6 @@ base_win = dict(
         #cummin
         #cummax
 
-        # TODO: remove, only for testing
-        startswith = lambda col, x: col.startswith(x),
-        endswith = lambda col, x: col.endswith(x)
         )
 
 funcs = dict(scalar = base_scalar, aggregate = base_agg, window = base_win)
