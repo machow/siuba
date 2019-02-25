@@ -596,3 +596,30 @@ def _(__data, key):
 def n_distinct(series):
     return series.unique().len()
 
+
+# Joins =======================================================================
+from collections.abc import Mapping
+from functools import partial
+
+# TODO: will need to use multiple dispatch
+@Pipeable.add_to_dispatcher
+@singledispatch
+def join(left, right, how, on = None):
+    raise Exception("Unsupported type %s" %type(left))
+
+@join.register(pd.DataFrame)
+def _(left, right, on = None, how = None):
+    if how is None:
+        raise Exception("Must specify how argument")
+
+    if isinstance(on, Mapping):
+        left_on, right_on = zip(*on.items())
+        return left.merge(right, how = how, left_on = left_on, right_on = right_on)
+
+    return left.merge(right, how = how, on = on)
+
+
+left_join = partial(join, how = "left")
+right_join = partial(join, how = "right")
+full_join = partial(join, how = "full")
+inner_join = partial(join, how = "inner")
