@@ -17,6 +17,8 @@ from functools import singledispatch
 # TODO: currently needed for select, but can we remove pandas?
 from pandas import Series
 
+from sqlalchemy.sql import schema
+
 
 # TODO:
 #   - summarize
@@ -97,6 +99,14 @@ def has_windows(clause):
         return True
 
     return False
+
+def compile_el(tbl, el):
+    compiled = el.compile(
+         dialect = tbl.source.dialect,
+         compile_kwargs = {"literal_binds": True}
+    )
+    return compiled
+
 
 
 
@@ -320,9 +330,46 @@ def _(__data, *args):
 
 @count.register(LazyTbl)
 def _(__data, *args, sort = False):
-    # TODO: need group_by to do this
-    last_op = __data.last_op
-    __data.append_op(last_op)
+    # TODO: if already col named n, use name nn, etc.. get logic from tidy.py
+    # similar to filter verb, we need two select statements,
+    # an inner one for derived cols, and outer to group by them
+    sel = __data.last_op.alias()
+    sel_inner = sql.select([sel], from_obj = sel)
+
+    # since we can't append columns to an alias, we need to add them to 
+    # sel_inner below, then alias it after the for loop
+    group_cols = []
+    for arg in args:
+        strip_f = strip_symbolic(arg)
+        col_expr = strip_f(sel.columns) if callable(strip_f) else strip_f
+        if not isinstance(col_expr, schema.Column):
+            # compile, so we can use the expr as its name (e.g. "id + 1")
+            name = str(compile_el(__data, col_expr))
+            label = col_expr.label(name)
+            sel_inner.append_column(label)
+        else:
+            name = str(col_expr)
+
+        group_cols.append(name)
+
+    # now that inner has all needed columns, build outer
+    sel_inner_cte = sel_inner.alias()
+    inner_cols = sel_inner_cte.columns
+    sel_outer = sql.select(from_obj = sel_inner_cte)
+
+    # apply any group vars from a group_by verb call first
+    prev_group_cols = [inner_cols[k] for k in __data.group_by]
+    sel_outer.append_group_by(*prev_group_cols)
+    sel_outer.append_column(*prev_group_cols)
+
+    # now any defined in the count verb call
+    for k in group_cols:
+        sel_outer.append_group_by(inner_cols[name])
+        sel_outer.append_column(inner_cols[name])
+
+    sel_outer.append_column(sql.functions.count().label("n"))
+
+    return __data.append_op(sel_outer)
     
 
 
