@@ -604,7 +604,7 @@ from functools import partial
 # TODO: will need to use multiple dispatch
 @Pipeable.add_to_dispatcher
 @singledispatch
-def join(left, right, how, on = None):
+def join(left, right, on = None, how = None):
     raise Exception("Unsupported type %s" %type(left))
 
 @join.register(pd.DataFrame)

@@ -7,7 +7,8 @@ from siuba.tidy import (
         count,
         group_by, ungroup,
         case_when,
-        Pipeable
+        Pipeable,
+        join, left_join
         )
 from .translate import sa_modify_window, sa_is_window
 from sqlalchemy import sql
@@ -402,3 +403,51 @@ def _(__data, cases):
     return sql.case(whens, else_ = else_val)
         
 
+# Join ------------------------------------------------------------------------
+
+from collections.abc import Mapping
+
+def _joined_cols(left_cols, right_cols):
+    # when left and right cols have same name, suffix with _x / _y
+    shared_labs = set(left_cols.keys()).intersection(right_cols.keys())
+
+    l_labs = _relabeled_cols(left_cols, shared_labs, "_x")
+    r_labs = _relabeled_cols(right_cols, shared_labs, "_y")
+
+    return l_labs + r_labs
+    
+
+
+def _relabeled_cols(columns, keys, suffix):
+    # add a suffix to all columns with names in keys
+    cols = []
+    for k, v in columns.items():
+        new_col = v.label(k + str(suffix)) if k in keys else v
+        cols.append(new_col)
+    return cols
+
+
+@join.register(LazyTbl)
+def _(left, right, on = None, how = None):
+    # Needs to be on the table, not the select
+    left_sel = left.last_op.alias()
+    right_sel = right.last_op.alias()
+    
+    if on is None:
+        raise NotImplementedError("on arg must currently be dict")
+
+    if isinstance(on, Mapping):
+        left_cols  = left_sel.columns  #lift_inner_cols(left_sel)
+        right_cols = right_sel.columns #lift_inner_cols(right_sel)
+
+        conds = []
+        for l, r in on.items():
+            col_expr = left_cols[l] == right_cols[r]
+            conds.append(col_expr)
+
+    bool_clause = sql.and_(*conds)
+    join = left_sel.join(right_sel, onclause = bool_clause)
+    
+    labeled_cols = _joined_cols(left_sel.columns, right_sel.columns)
+    sel = sql.select(labeled_cols, from_obj = join)
+    return left.append_op(sel)
