@@ -8,7 +8,9 @@ from siuba.tidy import (
         group_by, ungroup,
         case_when,
         Pipeable,
-        join, left_join
+        join, left_join, right_join, inner_join,
+        head,
+        rename
         )
 from .translate import sa_modify_window, sa_is_window
 from sqlalchemy import sql
@@ -498,3 +500,31 @@ def _(left, right, on = None, how = None):
     labeled_cols = _joined_cols(left_sel.columns, right_sel.columns)
     sel = sql.select(labeled_cols, from_obj = join)
     return left.append_op(sel)
+
+
+# Head ------------------------------------------------------------------------
+
+@head.register(LazyTbl)
+def _(__data, n):
+    sel = __data.last_op
+    
+    return __data.append_op(sel.limit(n))
+
+
+# Rename-- --------------------------------------------------------------------
+
+@rename.register(LazyTbl)
+def _(__data, **kwargs):
+    sel = __data.last_op
+    columns = lift_inner_cols(sel)
+
+    old_keys = set(kwargs.values())
+    old_labs = [columns[k] for k in old_keys]
+    new_labs = [columns[old].label(new) for new, old in kwargs.items()]
+
+    new_sel = sel.with_only_columns(old_labs)
+    new_sel.append_column(*new_labs)
+
+    return __data.append_op(new_sel)
+
+

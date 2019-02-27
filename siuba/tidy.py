@@ -355,6 +355,7 @@ def rename(__data, *args, **kwargs):
 
 @rename.register(DataFrame)
 def _(__data, **kwargs):
+    # TODO: allow names with spaces, etc..
     col_names = {v:k for k,v in kwargs.items()}
 
     return __data.rename(columns  = col_names)
@@ -623,3 +624,18 @@ left_join = partial(join, how = "left")
 right_join = partial(join, how = "right")
 full_join = partial(join, how = "full")
 inner_join = partial(join, how = "inner")
+
+
+
+# Head ========================================================================
+
+@Pipeable.add_to_dispatcher
+@singledispatch
+def head(__data, n):
+    raise Exception("no")
+
+@head.register(pd.DataFrame)
+def _(__data, n):
+    return __data.head()
+
+
