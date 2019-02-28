@@ -19,6 +19,22 @@ from .siu import Symbolic, Call, strip_symbolic, MetaArg, BinaryOp
 # * row_number
 from functools import reduce
 
+FUNCTIONS = (
+        "select", "mutate", "filter", "group_by", "ungroup", "summarize",
+        "transmute", "count", "tally", "distinct", "nest", "unnest", "join"
+        )
+
+def install_pd_siu():
+    # https://github.com/coursera/pandas-ply/blob/master/pandas_ply/methods.py
+    func_dict = globals()
+    for func_name in func_dict:
+        f = func_dict[func_name]
+
+        method_name = "siu_{}".format(func_name)
+        setattr(pd.DataFrame, method_name, f)
+        setattr(DataFrameGroupBy, method_name, f)
+
+
 # TODO: should be a subclass of Call?
 class Pipeable:
     def __init__(self, f = None, calls = None):
@@ -639,3 +655,6 @@ def _(__data, n):
     return __data.head()
 
 
+# Install Siu =================================================================
+
+install_pd_siu()
