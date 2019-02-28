@@ -18,6 +18,7 @@ from siuba.siu import strip_symbolic, Call, CallTreeLocal
 from functools import singledispatch
 # TODO: currently needed for select, but can we remove pandas?
 from pandas import Series
+import pandas as pd
 
 from sqlalchemy.sql import schema
 
@@ -178,7 +179,8 @@ def show_query(tbl):
 
 @Pipeable.add_to_dispatcher
 @singledispatch
-def collect(tbl):
+def collect(tbl, as_df = True):
+    # TODO: maybe remove as_df options, always return dataframe
     # normally can just pass the sql objects to execute, but for some reason
     # psycopg2 completes about incomplete template.
     # see https://stackoverflow.com/a/47193568/1144523
@@ -187,6 +189,9 @@ def collect(tbl):
         dialect = tbl.source.dialect,
         compile_kwargs = {"literal_binds": True}
     )
+    if as_df:
+        return pd.read_sql(compiled, tbl.source)
+
     return tbl.source.execute(compiled).fetchall()
 
 
