@@ -1,4 +1,5 @@
 from siuba.tidy import (
+        simple_varname,
         select, VarList, var_select,
         mutate,
         filter,
@@ -10,7 +11,8 @@ from siuba.tidy import (
         Pipeable,
         join, left_join, right_join, inner_join,
         head,
-        rename
+        rename,
+        distinct
         )
 from .translate import sa_modify_window, sa_is_window
 from sqlalchemy import sql
@@ -24,9 +26,7 @@ from sqlalchemy.sql import schema
 
 
 # TODO:
-#   - summarize
 #   - distinct
-#   - head
 #   - annotate functions using sel.prefix_with("\n/*<Mutate Statement>*/\n") ?
 
 
@@ -516,7 +516,7 @@ def _(__data, n):
     return __data.append_op(sel.limit(n))
 
 
-# Rename-- --------------------------------------------------------------------
+# Rename ----------------------------------------------------------------------
 
 @rename.register(LazyTbl)
 def _(__data, **kwargs):
@@ -532,4 +532,30 @@ def _(__data, **kwargs):
 
     return __data.append_op(new_sel)
 
+
+# Distinct --------------------------------------------------------------------
+
+@distinct.register(LazyTbl)
+def _(__data, *args, _keep_all = False, **kwargs):
+    if _keep_all:
+        raise NotImplementedError("Distinct in sql requires _keep_all = True")
+
+    inner_sel = mutate(__data, **kwargs).last_op if kwargs else __data.last_op
+
+    # TODO: this is copied from the df distinct version
+    cols = set(simple_varname(strip_symbolic(x)) for x in args)
+    cols.update(kwargs.keys())
+
+    if None in cols:
+        raise Exception("positional arguments must be simple column, "
+                        "e.g. _.colname or _['colname']"
+                        )
+
+    sel_cols = lift_inner_cols(inner_sel)
+    distinct_cols = [sel_cols[k] for k in cols]
+
+    sel = inner_sel.with_only_columns(distinct_cols).distinct()
+    return __data.append_op(sel)
+
+    
 
