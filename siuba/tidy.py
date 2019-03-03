@@ -462,10 +462,7 @@ def distinct(__data, *args, **kwargs):
     raise Exception("no")
 
 @distinct.register(DataFrame)
-def _(__data, *args, _keep = False, **kwargs):
-    if _keep:
-        raise NotImplementedError("_keep argument not yet implemented")
-
+def _(__data, *args, _keep_all = False, **kwargs):
     cols = set(simple_varname(strip_symbolic(x)) for x in args)
     if None in cols:
         raise Exception("positional arguments must be simple column, "
@@ -474,13 +471,16 @@ def _(__data, *args, _keep = False, **kwargs):
 
     # mutate kwargs
     cols.update(kwargs.keys())
-    tmp_data = mutate(__data, **kwargs)
+    tmp_data = mutate(__data, **kwargs).drop_duplicates(cols)
 
-    return tmp_data.drop_duplicates(cols)
+    if not _keep_all:
+        return tmp_data[cols]
+
+    return tmp_data
         
 @distinct.register(DataFrameGroupBy)
-def _(__data, *args, _keep = False, **kwargs):
-    df = __data.apply(lambda x: distinct(x, *args, _keep = False, **kwargs))
+def _(__data, *args, _keep_all = False, **kwargs):
+    df = __data.apply(lambda x: distinct(x, *args, _keep_all = _keep_all, **kwargs))
     return _regroup(df)
 
 
