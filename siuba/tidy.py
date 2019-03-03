@@ -87,6 +87,23 @@ def _regroup(df):
     return df.groupby(level = grp_levels)
 
 
+def simple_varname(call):
+    if isinstance(call, str):
+        return call
+
+    # check for expr like _.some_var or _["some_var"]
+    if (call.func in {"__getitem__", "__getattr__"}
+        and isinstance(call.args[0], MetaArg)
+        and isinstance(call.args[1], str)
+        ):
+        # return variable name
+        return call.args[1]
+
+    return None
+
+
+
+
 
 # Mutate ======================================================================
 
@@ -445,8 +462,26 @@ def distinct(__data, *args, **kwargs):
     raise Exception("no")
 
 @distinct.register(DataFrame)
-def _(__data, *args, **kwargs):
-    raise NotImplementedError("not yet supported; use drop_duplicates")
+def _(__data, *args, _keep = False, **kwargs):
+    if _keep:
+        raise NotImplementedError("_keep argument not yet implemented")
+
+    cols = set(simple_varname(strip_symbolic(x)) for x in args)
+    if None in cols:
+        raise Exception("positional arguments must be simple column, "
+                        "e.g. _.colname or _['colname']"
+                        )
+
+    # mutate kwargs
+    cols.update(kwargs.keys())
+    tmp_data = mutate(__data, **kwargs)
+
+    return tmp_data.drop_duplicates(cols)
+        
+@distinct.register(DataFrameGroupBy)
+def _(__data, *args, _keep = False, **kwargs):
+    df = __data.apply(lambda x: distinct(x, *args, _keep = False, **kwargs))
+    return _regroup(df)
 
 
 # if_else
