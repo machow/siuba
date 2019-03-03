@@ -21,13 +21,13 @@ from functools import reduce
 
 FUNCTIONS = (
         "select", "mutate", "filter", "group_by", "ungroup", "summarize",
-        "transmute", "count", "tally", "distinct", "nest", "unnest", "join"
+        "transmute", "count", "distinct", "nest", "unnest", "join"
         )
 
 def install_pd_siu():
     # https://github.com/coursera/pandas-ply/blob/master/pandas_ply/methods.py
     func_dict = globals()
-    for func_name in func_dict:
+    for func_name in FUNCTIONS:
         f = func_dict[func_name]
 
         method_name = "siu_{}".format(func_name)
