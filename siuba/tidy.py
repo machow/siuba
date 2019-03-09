@@ -34,6 +34,10 @@ def install_pd_siu():
         setattr(pd.DataFrame, method_name, f)
         setattr(DataFrameGroupBy, method_name, f)
 
+    DataFrameGroupBy._repr_html_ = _repr_grouped_df_html_
+
+def _repr_grouped_df_html_(self):
+    return "<div><p>(grouped data frame)</p>" + self._selected_obj._repr_html_() + "</div>"
 
 # TODO: should be a subclass of Call?
 class Pipeable:
@@ -115,7 +119,8 @@ def mutate(__data, **kwargs):
 
 @mutate.register(DataFrame)
 def _(__data, **kwargs):
-    return __data.assign(**kwargs)
+    strip_kwargs = {k: strip_symbolic(v) for k,v in kwargs.items()}
+    return __data.assign(**strip_kwargs)
 
 
 @mutate.register(DataFrameGroupBy)
@@ -130,8 +135,16 @@ def _(__data, **kwargs):
 
 @Pipeable.add_to_dispatcher
 @singledispatch
-def group_by(__data, *args):
-    return __data.groupby(by = list(args))
+def group_by(__data, *args, **kwargs):
+    tmp_df = mutate(__data, **kwargs) if kwargs else __data
+
+    by_vars = list(map(simple_varname, map(strip_symbolic, args)))
+    for ii, name in enumerate(by_vars):
+        if name is None: raise Exception("group by variable %s is not a column name" %ii)
+
+    by_vars.extend(kwargs.keys())
+
+    return tmp_df.groupby(by = by_vars)
 
 
 @Pipeable.add_to_dispatcher
@@ -162,9 +175,16 @@ def filter(__data, *args):
 def _(__data, *args):
     crnt_indx = True
     for arg in args:
-        crnt_indx &= arg(__data) if callable(arg) else arg
+        crnt_indx &= arg(__data) if callable(strip_symbolic(arg)) else arg
 
-    return __data.loc[crnt_indx]
+    # use loc or iloc to subset, depending on crnt_indx ----
+    # the main issue here is that loc can't remove all rows using a slice
+    # and iloc can't use a boolean series
+    if isinstance(crnt_indx, bool) or isinstance(crnt_indx, np.bool_):
+        # iloc can do slice, but not a bool series
+        return __data.iloc[slice(None) if crnt_indx else slice(0),:]
+
+    return __data.loc[crnt_indx,:]
 
 @filter.register(DataFrameGroupBy)
 def _(__data, *args):
@@ -187,7 +207,7 @@ def summarize(__data, **kwargs):
 def _(__data, **kwargs):
     results = {}
     for k, v in kwargs.items():
-        res = v(__data) if callable(v) else v
+        res = strip_symbolic(v)(__data) if callable(v) else v
 
         # TODO: validation?
 
@@ -312,7 +332,7 @@ def var_put_cols(name, var, cols):
 
     for name in names:
         if var.negated and name in cols: cols.pop(name)
-        elif name in cols: cols.move_to_end(name)
+        #elif name in cols: cols.move_to_end(name)
         else: cols[name] = var.alias
 
 
@@ -567,20 +587,23 @@ def count(__data, *args, **kwargs):
     raise Exception("no")
 
 @count.register(pd.DataFrame)
-def _(__data, *args, sort = False):
+def _(__data, *args, sort = False, **kwargs):
     # TODO: if expr, works like mutate
 
+    #group by args
+    counts = group_by(__data, *args, **kwargs).size().reset_index()
+
     # count col named, n. If that col already exists, add more "n"s...
-    crnt_cols = set(__data.columns)
+    crnt_cols = set(counts.columns)
     out_col = "n"
     while out_col in crnt_cols: out_col = out_col + "n"
 
-    #group by args
-    counts = __data.groupby(list(args)).size().reset_index()
-    counts.rename(columns = {counts.columns[-1]: "n"}, inplace = True)
+    # rename the tally column to correct name
+    counts.rename(columns = {counts.columns[-1]: out_col}, inplace = True)
 
-    # .size
-    # ungroup
+    if sort:
+        return counts.sort_values(out_col, ascending = False)
+
     return counts
 
 
@@ -719,7 +742,7 @@ def gather(__data, key = "key", value = "value", *args, drop_na = False, convert
 
 @Pipeable.add_to_dispatcher
 @singledispatch
-def spread(__data, key, value, fill = None):
+def spread(__data, key, value, fill = None, reset_index = True):
     id_cols = [col for col in __data.columns if col not in {key, value}]
     wide = __data.set_index(id_cols + [key]).unstack(level = -1)
     
@@ -728,7 +751,8 @@ def spread(__data, key, value, fill = None):
     
     # remove multi-index from both rows and cols
     wide.columns = wide.columns.droplevel().rename(None)
-    wide.reset_index(inplace = True)
+    if reset_index:
+        wide.reset_index(inplace = True)
     
     return wide
 
