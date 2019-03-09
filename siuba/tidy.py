@@ -691,8 +691,8 @@ def head(__data, n):
     raise Exception("no")
 
 @head.register(pd.DataFrame)
-def _(__data, n):
-    return __data.head()
+def _(__data, n = None):
+    return __data.head(n)
 
 # Gather ======================================================================
 
