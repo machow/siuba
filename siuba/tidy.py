@@ -694,6 +694,43 @@ def head(__data, n):
 def _(__data, n):
     return __data.head()
 
+# Gather ======================================================================
+
+@Pipeable.add_to_dispatcher
+@singledispatch
+def gather(__data, key = "key", value = "value", *args, drop_na = False, convert = False):
+    # TODO: implement var selection over *args
+    if convert:
+        raise NotImplementedError("convert not yet implemented")
+
+    value_vars = list(args) or None
+
+    id_vars = [col for col in __data.columns if col not in args]
+    long = pd.melt(__data, id_vars, value_vars, key, value)
+
+    if drop_na:
+        return long[~long[value].isna()]
+
+    return long
+
+
+
+# Spread ======================================================================
+
+@Pipeable.add_to_dispatcher
+@singledispatch
+def spread(__data, key, value, fill = None):
+    id_cols = [col for col in __data.columns if col not in {key, value}]
+    wide = __data.set_index(id_cols + [key]).unstack(level = -1)
+    
+    if fill is not None:
+        wide.fillna(fill, inplace = True)
+    
+    # remove multi-index from both rows and cols
+    wide.columns = wide.columns.droplevel().rename(None)
+    wide.reset_index(inplace = True)
+    
+    return wide
 
 # Install Siu =================================================================
 
