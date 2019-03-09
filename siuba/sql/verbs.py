@@ -386,6 +386,7 @@ def _(__data, **kwargs):
     sel = __data.last_op._clone()
     labs = set(k for k,v in sel.columns.items() if isinstance(v, sql.elements.Label))
 
+    # create select statement ----
     if len(sel._group_by_clause):
         # current select stmt has window functions, so need to make it subquery
         cte = sel.alias()
@@ -396,19 +397,19 @@ def _(__data, **kwargs):
         columns = lift_inner_cols(sel)
         sel = sel.with_only_columns([])
 
-    # add group by columns to statement
+    # add group by columns ----
     group_cols = [columns[k] for k in __data.group_by]
     sel.append_group_by(*group_cols)
     for col in group_cols:
         sel.append_column(col)
 
-    # add each aggregate column
+    # add each aggregate column ----
     # TODO: can't do summarize(b = mean(a), c = b + mean(a))
     #       since difficult for c to refer to agg and unagg cols in SQL
     for k, expr in kwargs.items():
         strip_f = strip_symbolic(expr)
         new_call = __data.shape_call(strip_f, window = False)
-        col = new_call(columns)
+        col = new_call(columns).label(k)
 
         sel.append_column(col)
 
