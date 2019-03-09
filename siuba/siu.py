@@ -42,6 +42,7 @@ BINARY_LEVELS = {
         "__eq__": 5,
         "__ne__": 5,
         "__ge__": 5,
+        "__le__": "5",
         "__getattr__": 0
         }
 
@@ -65,6 +66,7 @@ BINARY_OPS = {
         "__eq__": "==",
         "__ne__": "!=",
         "__ge__": ">=",
+        "__le__": "<=",
         "__getattr__": "."
         }
 
@@ -315,6 +317,16 @@ class BinaryOp(Call):
 
 class DeepCall(Call):
     """evaluates both keys and vals."""
+
+    def map_subcalls(self, f):
+        # TODO: have descend as in evaluate_calls
+        #       needed for case_when sql
+        new_args = tuple(f(arg) if isinstance(arg, Call) else arg for arg in self.args)
+        new_kwargs = {k: f(v) if isinstance(v, Call) else v for k,v in self.kwargs.items()}
+
+        return new_args, new_kwargs
+
+
     @staticmethod
     def evaluate_calls(arg, x):
         # TODO: defining a node like this, just to support case when is a bit crazy
