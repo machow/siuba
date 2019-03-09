@@ -33,6 +33,7 @@ from sqlalchemy.sql import schema
 # Helpers ---------------------------------------------------------------------
 
 class CallListener:
+    """Generic listener. Each exit is called on a node's copy."""
     def enter(self, node):
         args, kwargs = node.map_subcalls(self.enter)
 
@@ -276,8 +277,6 @@ def _(__data, **kwargs):
 
     return __data.append_op(sel)
 
-    raise NotImplementedError("Must be select statement")
-
 
 def _mutate_select(sel, colname, func, labs, __data):
     """Return select statement containing a new column, func expr as colname.
@@ -307,9 +306,6 @@ def _mutate_select(sel, colname, func, labs, __data):
 
     # evaluate call expr on columns, making sure to use group vars
     new_col, windows = __data.track_call_windows(strip_f, columns)
-
-    #if sa_is_window(new_col) or hasattr(new_col, "over"):
-    #    new_col = sa_modify_window(new_col, columns, group_by)
 
     return sel.column(new_col.label(colname))
 
@@ -343,8 +339,8 @@ def _(__data, *args, sort = False):
     sel = __data.last_op.alias()
     sel_inner = sql.select([sel], from_obj = sel)
 
-    # since we can't append columns to an alias, we need to add them to 
-    # sel_inner below, then alias it after the for loop
+    # inner select ----
+    # holds any mutation style columns
     group_cols = []
     for arg in args:
         strip_f = strip_symbolic(arg)
@@ -359,7 +355,8 @@ def _(__data, *args, sort = False):
 
         group_cols.append(name)
 
-    # now that inner has all needed columns, build outer
+    # outer select ----
+    # holds selected columns and tally (n)
     sel_inner_cte = sel_inner.alias()
     inner_cols = sel_inner_cte.columns
     sel_outer = sql.select(from_obj = sel_inner_cte)
