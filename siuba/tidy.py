@@ -139,6 +139,8 @@ def group_by(__data, *args):
 def ungroup(__data):
     # TODO: can we somehow just restore the original df used to construct
     #       the groupby?
+    if isinstance(__data, pd.DataFrame):
+        return __data
     if isinstance(__data, pd.Series):
         return __data.reset_index()
 
