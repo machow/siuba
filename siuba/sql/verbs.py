@@ -12,7 +12,8 @@ from siuba.tidy import (
         join, left_join, right_join, inner_join,
         head,
         rename,
-        distinct
+        distinct,
+        if_else
         )
 from .translate import sa_modify_window, sa_is_window
 from sqlalchemy import sql
@@ -556,4 +557,11 @@ def _(__data, *args, _keep_all = False, **kwargs):
     return __data.append_op(sel)
 
     
+# if_else ---------------------------------------------------------------------
+
+@if_else.register(sql.elements.ColumnElement)
+def _(cond, true_vals, false_vals):
+    whens = [(cond, true_vals)]
+    return sql.case(whens, else_ = false_vals)
+
 

@@ -491,6 +491,10 @@ def _(__data, *args, _keep_all = False, **kwargs):
 def if_else(__data, *args, **kwargs):
     raise Exception("no")
 
+@if_else.register(Symbolic)
+def _(__data, *args, **kwargs):
+    return Symbolic(Call("__call__", if_else, __data.source, *args, **kwargs))
+
 @if_else.register(pd.Series)
 def _(cond, true_vals, false_vals):
     true_indx = np.where(cond)[0]
@@ -523,7 +527,6 @@ def case_when(__data, cases):
 def _(__data, cases):
     if not isinstance(cases, dict):
         raise Exception("Cases must be a dictionary")
-    itertools.chain
     dict_entries = dict((strip_symbolic(k), strip_symbolic(v)) for k,v in cases.items())
     cases_arg = DeepCall("__call__", dict, dict_entries)
     return Symbolic(source = Call( "__call__", case_when, __data.source, cases_arg))
