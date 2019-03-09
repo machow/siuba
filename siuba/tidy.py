@@ -6,6 +6,9 @@ import numpy as np
 from pandas.core.groupby import DataFrameGroupBy
 from .siu import Symbolic, Call, strip_symbolic, MetaArg, BinaryOp
 
+# TODO: should refactor all dplyr/tidy functions into dply folder
+from .dply.vector import *
+
 
 # General TODO ================================================================
 # * joins
