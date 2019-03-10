@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 
 from pandas.core.groupby import DataFrameGroupBy
-from .siu import Symbolic, Call, strip_symbolic, MetaArg, BinaryOp
+from .siu import Symbolic, Call, strip_symbolic, MetaArg, BinaryOp, create_sym_call
 
 # TODO: should refactor all dplyr/tidy functions into dply folder
 from .dply.vector import *
@@ -128,7 +128,8 @@ def _(__data, **kwargs):
 
 @mutate.register(DataFrameGroupBy)
 def _(__data, **kwargs):
-    df = __data.apply(lambda d: d.assign(**kwargs))
+    strip_kwargs = {k: strip_symbolic(v) for k,v in kwargs.items()}
+    df = __data.apply(lambda d: d.assign(**strip_kwargs))
     
     return _regroup(df)
 
@@ -239,11 +240,15 @@ def transmute(__data, *args, **kwargs):
 
 @transmute.register(DataFrame)
 def _(__data, *args, **kwargs):
+    arg_vars = list(map(simple_varname, map(strip_symbolic, args)))
+    for ii, name in enumerate(arg_vars):
+        if name is None: raise Exception("complex, unnamed expression at pos %s not supported"%ii)
+
     f_mutate = mutate.registry[pd.DataFrame]
 
     df = f_mutate(__data, **kwargs) 
 
-    return df[[*args, *kwargs.keys()]]
+    return df[[*arg_vars, *kwargs.keys()]]
 
 @transmute.register(DataFrameGroupBy)
 def _(__data, *args, **kwargs):
@@ -334,7 +339,8 @@ def var_put_cols(name, var, cols):
     names = [name] if not isinstance(name, list) else name
 
     for name in names:
-        if var.negated and name in cols: cols.pop(name)
+        if var.negated:
+            if name in cols: cols.pop(name)
         #elif name in cols: cols.move_to_end(name)
         else: cols[name] = var.alias
 
@@ -516,7 +522,7 @@ def if_else(__data, *args, **kwargs):
 
 @if_else.register(Symbolic)
 def _(__data, *args, **kwargs):
-    return Symbolic(Call("__call__", if_else, __data.source, *args, **kwargs))
+    return create_sym_call(if_else, __data.source, *args, **kwargs)
 
 @if_else.register(pd.Series)
 def _(cond, true_vals, false_vals):
@@ -524,8 +530,9 @@ def _(cond, true_vals, false_vals):
     false_indx = np.where(~cond)[0]
 
     result = np.repeat(None, len(cond))
-    result[true_indx] = true_vals
-    result[false_indx] = false_vals
+
+    result[true_indx] =  true_vals[true_indx] if np.ndim(true_vals) else true_vals
+    result[false_indx] = false_vals[false_indx] if np.ndim(false_vals) else false_vals
 
     # TODO: inefficient way to downcast?
     return np.array(list(result))
@@ -674,12 +681,6 @@ def _(__data, key):
     return out.join(long_grp)
 
 
-# Vector funcs ================================================================
-
-def n_distinct(series):
-    return series.unique().len()
-
-
 # Joins =======================================================================
 from collections.abc import Mapping
 from functools import partial
@@ -729,9 +730,14 @@ def gather(__data, key = "key", value = "value", *args, drop_na = False, convert
     if convert:
         raise NotImplementedError("convert not yet implemented")
 
-    value_vars = list(args) or None
+    # TODO: copied from nest and select
+    vl = VarList()
+    evaluated = [strip_symbolic(arg)(vl) if callable(arg) else arg for arg in args]
+    od = var_select(__data.columns, *evaluated)
 
-    id_vars = [col for col in __data.columns if col not in args]
+    value_vars = list(od) or None
+
+    id_vars = [col for col in __data.columns if col not in od]
     long = pd.melt(__data, id_vars, value_vars, key, value)
 
     if drop_na:
