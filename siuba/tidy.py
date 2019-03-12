@@ -593,15 +593,22 @@ def _count_group(data, *args):
 
 @Pipeable.add_to_dispatcher
 @singledispatch
-def count(__data, *args, **kwargs):
+def count(__data, *args, wt = False, sort = False, **kwargs):
     raise Exception("no")
 
 @count.register(pd.DataFrame)
-def _(__data, *args, sort = False, **kwargs):
+def _(__data, *args, wt = None, sort = False, **kwargs):
     # TODO: if expr, works like mutate
 
     #group by args
-    counts = group_by(__data, *args, **kwargs).size().reset_index()
+    if wt is None:
+        counts = group_by(__data, *args, **kwargs).size().reset_index()
+    else:
+        wt_col = simple_varname(strip_symbolic(wt))
+        if wt_col is None:
+            raise Exception("wt argument has to be simple column name")
+        counts = group_by(__data, *args, **kwargs)[wt_col].sum().reset_index()
+
 
     # count col named, n. If that col already exists, add more "n"s...
     crnt_cols = set(counts.columns)
