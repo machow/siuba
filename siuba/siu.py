@@ -479,14 +479,7 @@ class Symbolic(object):
         if self.ready_to_call:
             return self.source(*args, **kwargs)
 
-        return Symbolic(Call(
-                "__call__",
-                self.source,
-                *map(strip_symbolic, args),
-                **{k: strip_symbolic(v) for k,v in kwargs.items()}
-                ),
-                ready_to_call = True)
-
+        return create_sym_call(self.source, *args, **kwargs)
 
     def __getitem__(self, *args):
         return Symbolic(Call(
@@ -512,6 +505,14 @@ class Symbolic(object):
         return Formatter().format(self.source)
 
 
+def create_sym_call(source, *args, **kwargs):
+    return Symbolic(Call(
+            "__call__",
+            source,
+            *map(strip_symbolic, args),
+            **{k: strip_symbolic(v) for k,v in kwargs.items()}
+            ),
+            ready_to_call = True)
 
 def strip_symbolic(symbol):
     if isinstance(symbol, Symbolic):
