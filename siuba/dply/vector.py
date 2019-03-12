@@ -1,63 +1,143 @@
 import pandas as pd
 import numpy as np
 from functools import singledispatch
-from ..siu import Symbolic
+from ..siu import Symbolic, create_sym_call,Call
+
 
 def register_symbolic(f):
+    # TODO: don't use singledispatch if it has already been done
+    f = singledispatch(f)
     @f.register(Symbolic)
     def _dispatch_symbol(__data, *args, **kwargs):
-        return cls(Call("__call__", f, __data.source, *args, **kwargs))
+        return create_sym_call(f, __data.source, *args, **kwargs)
 
     return f
 
+def _expand_bool(x, f):
+    return x.expanding().apply(f).astype(bool)
 
-def cumall(): pass
-
-def cumany(): pass
-
-def cummean(): pass
-
-def desc(): pass
-
-def dense_rank(): pass
-
-def percent_rank(): pass
-
-def min_rank(): pass
-
-def cume_dist(): pass
+@register_symbolic
+def cumall(x):
+    return _expand_bool(x, np.all)
 
 
 @register_symbolic
-@singledispatch
+def cumany(x):
+    return _expand_bool(x, np.any)
+
+
+@register_symbolic
+def cummean(x):
+    return x.expanding().mean()
+
+@register_symbolic
+def desc():
+    NotImplementedError("Use minus sign in arrange instead (e.g. -_.somecol)")
+
+
+@register_symbolic
+def dense_rank(x):
+    return x.rank(method = "dense")
+
+
+@register_symbolic
+def percent_rank(x):
+    NotImplementedError("PRs welcome")
+
+
+@register_symbolic
+def min_rank(x):
+    return x.rank(method = "min")
+
+
+@register_symbolic
+def cume_dist(x):
+    return x.rank(method = "max") / x.count()
+
+
+@register_symbolic
 def row_number(x):
-    return pd.Series(np.arange(len(x)))
+    if isinstance(x, pd.DataFrame):
+        n = x.shape[0]
+    else:
+        n = len(x)
+    return np.arange(n)
 
 
-def ntile(): pass
+@register_symbolic
+def ntile(x, n):
+    NotImplementedError("ntile not implemented")
 
-def cume_dist(): pass
 
-def between(): pass
+@register_symbolic
+def between(x, left, right):
+    # note: NA -> False, in tidyverse NA -> NA
+    return x.between(left, right)
+    
 
-def coalesce(): pass
+@register_symbolic
+def coalesce(*args):
+    NotImplementedError("coalesce not implemented")
 
-def lead(): pass
 
-def lag(): pass
+@register_symbolic
+def lead(x, n = 1, default = None):
+    res = x.shift(-1*n)
 
-def n(): pass
+    if default is not None:
+        res.iloc[-n:] = default
 
-def n_distinct(): pass
+    return res
 
-def na_if(): pass
 
-def near(): pass
+@register_symbolic
+def lag():
+    res = x.shift(n)
 
-def nth(): pass
+    if default is not None:
+        res.iloc[:n] = default
 
-def first(): pass
+    return res
 
-def last(): pass
 
-__ALL__ = ["row_number"]
+@register_symbolic
+def n(x):
+    if isinstance(x, pd.DataFrame):
+        return x.shape[0]
+
+    return len(x)
+
+
+@register_symbolic
+def n_distinct(x):
+    return len(x.unique())
+
+
+@register_symbolic
+def na_if(x, y):
+    y = [y] if not np.ndim(y) else y
+
+    tmp_x = x.copy(deep = True)
+    tmp_x[x.isin(y)] = np.nan
+
+    return tmp_x
+
+
+@register_symbolic
+def near():
+    NotImplementedError("near not implemented") 
+
+
+@register_symbolic
+def nth():
+    NotImplementedError("nth not implemented") 
+
+
+@register_symbolic
+def first():
+    NotImplementedError("first not implemented")
+
+
+@register_symbolic
+def last():
+    NotImplementedError("last not implemented")
