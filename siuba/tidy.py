@@ -625,14 +625,17 @@ def _(__data, *args, wt = None, sort = False, **kwargs):
     return counts
 
 
+@Pipeable.add_to_dispatcher
 @singledispatch
-def add_count(__data, *args, **kwargs):
+def add_count(__data, *args, wt = None, sort = False, **kwargs):
     raise Exception("no")
 
 @add_count.register(pd.DataFrame)
-def _(__data, *args):
-    counts = count(__data, *args)
-    return __data.merge(counts, on = list(args))
+def _(__data, *args, wt = None, sort = False, **kwargs):
+    counts = count(__data, *args, wt = wt, sort = sort, **kwargs)
+
+    on = list(counts.columns)[:-1]
+    return __data.merge(counts, on = on)
     
 
 
@@ -789,6 +792,40 @@ def spread(__data, key, value, fill = None, reset_index = True):
         wide.reset_index(inplace = True)
     
     return wide
+
+# Expand/Complete ====================================================================
+from pandas.core.reshape.util import cartesian_product
+
+@Pipeable.add_to_dispatcher
+@singledispatch
+def expand(__data, *args, fill = None):
+    var_names = list(map(simple_varname, map(strip_symbolic, args)))
+    cols = [__data[name] for name in var_names]
+    # see https://stackoverflow.com/a/25636395/1144523
+    cprod = cartesian_product(cols)
+    expanded = pd.DataFrame(np.array(cprod).T)
+    expanded.columns = var_names
+
+    return expanded
+
+
+@Pipeable.add_to_dispatcher
+@singledispatch
+def complete(__data, *args, fill = None):
+    expanded = expand(__data, *args, fill = fill)
+
+    # TODO: should we attempt to coerce cols back to original types?
+    #       e.g. NAs will turn int -> float
+    on_cols = list(expanded.columns)
+    df = __data.merge(expanded, how = "right", on = on_cols)
+    
+    if fill is not None:
+        for col_name, val in fill.items():
+            df[col_name].fillna(val, inplace = True)
+
+    return df
+
+    
 
 # Install Siu =================================================================
 
