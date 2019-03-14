@@ -275,7 +275,8 @@ class Var:
         return self.to_copy(negated = not self.negated)
 
     def __eq__(self, x):
-        return self.to_copy(name = x.name, negated = False, alias = self.name)
+        name = x.name if isinstance(x, Var) else x
+        return self.to_copy(name = name, negated = False, alias = self.name)
 
     def __call__(self, *args, **kwargs):
         call = Call('__call__',
@@ -709,12 +710,29 @@ def _(left, right, on = None, how = None):
 
     return left.merge(right, how = how, on = on)
 
+@Pipeable.add_to_dispatcher
+@singledispatch
+def semi_join(left, right, on = None):
+    if isinstance(on, Mapping):
+        left_on, right_on = zip(*on.items())
+        return left.merge(right[right_on], how = 'inner', left_on = left_on, right_on = right_on)
+
+    if on is None:
+        on_cols = set(left.columns).intersection(set(right.columns))
+        if not len(on_cols):
+            raise Exception("No joining column specified, and no shared column names")
+    elif isinstance(on, str):
+        on_cols = [on]
+    else:
+        on_cols = on
+
+    return left.merge(right.loc[:,on_cols], how = 'inner', on = on_cols)
+
 
 left_join = partial(join, how = "left")
 right_join = partial(join, how = "right")
 full_join = partial(join, how = "full")
 inner_join = partial(join, how = "inner")
-
 
 
 # Head ========================================================================
