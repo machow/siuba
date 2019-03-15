@@ -227,7 +227,10 @@ def _(__data, **kwargs):
     df = __data.apply(df_summarize, **kwargs)
         
     group_by_lvls = list(range(df.index.nlevels - 1))
-    return df.reset_index(group_by_lvls)
+    out = df.reset_index(group_by_lvls)
+    out.index = pd.RangeIndex(df.shape[0])
+
+    return out
 
 
 
