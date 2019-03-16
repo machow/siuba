@@ -31,7 +31,7 @@ def cummean(x):
     return x.expanding().mean()
 
 @register_symbolic
-def desc():
+def desc(x):
     NotImplementedError("Use minus sign in arrange instead (e.g. -_.somecol)")
 
 
