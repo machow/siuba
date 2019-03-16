@@ -112,7 +112,7 @@ def pipe_no_args(f):
     def wrapper(__data, *args, **kwargs):
         return create_pipe_call(f, MetaArg("_"), *args, **kwargs)
 
-    return wrapper
+    return f
 
 
 # option: no args, custom dispatch (e.g. register NoArgs)
@@ -631,7 +631,7 @@ def _(__data, cases):
         raise Exception("Cases must be a dictionary")
     dict_entries = dict((strip_symbolic(k), strip_symbolic(v)) for k,v in cases.items())
     cases_arg = DeepCall("__call__", dict, dict_entries)
-    return Symbolic(source = Call( "__call__", case_when, __data.source, cases_arg))
+    return create_sym_call(case_when, __data, cases_arg)
 
 
 @case_when.register(pd.Series)
