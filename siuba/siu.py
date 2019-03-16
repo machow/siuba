@@ -508,7 +508,7 @@ class Symbolic(object):
 def create_sym_call(source, *args, **kwargs):
     return Symbolic(Call(
             "__call__",
-            source,
+            strip_symbolic(source),
             *map(strip_symbolic, args),
             **{k: strip_symbolic(v) for k,v in kwargs.items()}
             ),
