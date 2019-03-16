@@ -1,4 +1,6 @@
 from siuba.tidy import (
+        singledispatch2,
+        pipe_no_args,
         simple_varname,
         select, VarList, var_select,
         mutate,
@@ -8,7 +10,6 @@ from siuba.tidy import (
         count,
         group_by, ungroup,
         case_when,
-        Pipeable,
         join, left_join, right_join, inner_join,
         head,
         rename,
@@ -17,6 +18,7 @@ from siuba.tidy import (
         )
 from .translate import sa_modify_window, sa_is_window
 from sqlalchemy import sql
+import sqlalchemy
 from siuba.siu import strip_symbolic, Call, CallTreeLocal
 from functools import singledispatch
 # TODO: currently needed for select, but can we remove pandas?
@@ -124,12 +126,19 @@ class LazyTbl:
             CallShaper = CallTreeLocal
             ):
         self.source = source
-        self.tbl = tbl
-        self.ops = [sql.Select([tbl])] if ops is None else ops
+
+        if isinstance(tbl, str):
+            self.tbl = sqlalchemy.Table(tbl, sqlalchemy.MetaData(), autoload_with = source)
+        else:
+            self.tbl = tbl
+
+
+        self.ops = [sql.Select([self.tbl])] if ops is None else ops
         self.group_by = group_by
         self.order_by = order_by
         self.funcs = {} if funcs is None else funcs
         self.CallShaper = CallShaper
+        
 
     def append_op(self, op):
         return self.__class__(
@@ -167,34 +176,58 @@ class LazyTbl:
 # Main Funcs 
 # =============================================================================
 
-@Pipeable.add_to_dispatcher
-@singledispatch
-def show_query(tbl):
-    query = tbl.last_op
-    compiled = query.compile(
-        dialect = tbl.source.dialect,
-        compile_kwargs = {"literal_binds": True}
-    )
-    print(compiled)
+# show query -----------
+
+from sqlalchemy.ext.compiler import compiles, deregister
+from contextlib import contextmanager
+
+@contextmanager
+def use_simple_names():
+    get_col_name = lambda el, *args, **kwargs: str(el.element.name)
+    try:
+        yield compiles(sql.compiler._CompileLabel)(get_col_name)
+    except:
+        pass
+    finally:
+        deregister(sql.compiler._CompileLabel)
+
+@pipe_no_args
+@singledispatch2
+def show_query(tbl, simplify = False):
+    query = tbl.last_op #if not simplify else 
+    compile_query = lambda: query.compile(
+                dialect = tbl.source.dialect,
+                compile_kwargs = {"literal_binds": True}
+            )
+
+
+    if simplify:
+        # try to strip table names and labels where uneccessary
+        with use_simple_names():
+            print(compile_query())
+    else:
+        # use a much more verbose query
+        print(compile_query())
 
     return tbl
 
-@Pipeable.add_to_dispatcher
-@singledispatch
-def collect(tbl, as_df = True):
+# collect ----------
+@pipe_no_args
+@singledispatch2
+def collect(__data, as_df = True):
     # TODO: maybe remove as_df options, always return dataframe
     # normally can just pass the sql objects to execute, but for some reason
     # psycopg2 completes about incomplete template.
     # see https://stackoverflow.com/a/47193568/1144523
-    query = tbl.last_op
+    query = __data.last_op
     compiled = query.compile(
-        dialect = tbl.source.dialect,
+        dialect = __data.source.dialect,
         compile_kwargs = {"literal_binds": True}
     )
     if as_df:
-        return pd.read_sql(compiled, tbl.source)
+        return pd.read_sql(compiled, __data.source)
 
-    return tbl.source.execute(compiled).fetchall()
+    return __data.source.execute(compiled).fetchall()
 
 
 @select.register(LazyTbl)
