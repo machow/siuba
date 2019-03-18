@@ -3,7 +3,7 @@ siuba
 
 [![Build Status](https://travis-ci.org/machow/siuba.svg?branch=master)](https://travis-ci.org/machow/siuba)
 
-**Note: this library is currently in heavy development!**
+**Note: this library is currently in heavy development! For a nice example of siuba in action, see this [example analysis](https://github.com/machow/tidytuesday-py/blob/master/2019-01-08-tv-golden-age.ipynb)**
 
 Installation
 ------------
