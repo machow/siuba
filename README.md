@@ -3,6 +3,8 @@ siuba
 
 [![Build Status](https://travis-ci.org/machow/siuba.svg?branch=master)](https://travis-ci.org/machow/siuba)
 
+**Note: this library is currently in heavy development!**
+
 Installation
 ------------
 
