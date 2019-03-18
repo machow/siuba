@@ -90,10 +90,6 @@ def lift_inner_cols(tbl):
 
     return sql.base.ImmutableColumnCollection(data, cols)
 
-def get_labeled_cols(cols):
-    return set(k for k,v in cols.items() if isinstance(v, sql.elements.Label))
-
-
 def is_grouped_sel(select):
     return False
 
@@ -379,7 +375,7 @@ def _(__data, *args, sort = False):
     for arg in args:
         strip_f = strip_symbolic(arg)
         col_expr = strip_f(sel.columns) if callable(strip_f) else strip_f
-        if not isinstance(col_expr, schema.Column):
+        if not isinstance(col_expr, (schema.Column, str)):
             # compile, so we can use the expr as its name (e.g. "id + 1")
             name = str(compile_el(__data, col_expr))
             label = col_expr.label(name)
@@ -397,13 +393,14 @@ def _(__data, *args, sort = False):
 
     # apply any group vars from a group_by verb call first
     prev_group_cols = [inner_cols[k] for k in __data.group_by]
-    sel_outer.append_group_by(*prev_group_cols)
-    sel_outer.append_column(*prev_group_cols)
+    if prev_group_cols:
+        sel_outer.append_group_by(*prev_group_cols)
+        sel_outer.append_column(*prev_group_cols)
 
     # now any defined in the count verb call
     for k in group_cols:
-        sel_outer.append_group_by(inner_cols[name])
-        sel_outer.append_column(inner_cols[name])
+        sel_outer.append_group_by(inner_cols[k])
+        sel_outer.append_column(inner_cols[k])
 
     sel_outer.append_column(sql.functions.count().label("n"))
 
@@ -493,12 +490,16 @@ def _(__data, cases):
 
 from collections.abc import Mapping
 
-def _joined_cols(left_cols, right_cols):
+def _joined_cols(left_cols, right_cols, shared_keys):
+    # TODO: remove sets, so uses stable ordering
     # when left and right cols have same name, suffix with _x / _y
-    shared_labs = set(left_cols.keys()).intersection(right_cols.keys())
+    shared_labs = set(left_cols.keys()) \
+            .intersection(right_cols.keys()) \
+            .difference(shared_keys)
 
+    right_cols_no_keys = {k: v for k, v in right_cols.items() if k not in shared_keys}
     l_labs = _relabeled_cols(left_cols, shared_labs, "_x")
-    r_labs = _relabeled_cols(right_cols, shared_labs, "_y")
+    r_labs = _relabeled_cols(right_cols_no_keys, shared_labs, "_y")
 
     return l_labs + r_labs
     
@@ -521,20 +522,32 @@ def _(left, right, on = None, how = None):
     
     if on is None:
         raise NotImplementedError("on arg must currently be dict")
+    elif isinstance(on, (list, tuple)):
+        on = dict(zip(on, on))
 
-    if isinstance(on, Mapping):
-        left_cols  = left_sel.columns  #lift_inner_cols(left_sel)
-        right_cols = right_sel.columns #lift_inner_cols(right_sel)
+    if not isinstance(on, Mapping):
+        raise Exception("on must be a Mapping (e.g. dict)")
 
-        conds = []
-        for l, r in on.items():
-            col_expr = left_cols[l] == right_cols[r]
-            conds.append(col_expr)
+    left_cols  = left_sel.columns  #lift_inner_cols(left_sel)
+    right_cols = right_sel.columns #lift_inner_cols(right_sel)
+
+    conds = []
+    for l, r in on.items():
+        col_expr = left_cols[l] == right_cols[r]
+        conds.append(col_expr)
+        
 
     bool_clause = sql.and_(*conds)
     join = left_sel.join(right_sel, onclause = bool_clause)
     
-    labeled_cols = _joined_cols(left_sel.columns, right_sel.columns)
+    # note, shared_keys assumes on is a mapping...
+    shared_keys = [k for k,v in on.items() if k == v]
+    labeled_cols = _joined_cols(
+            left_sel.columns,
+            right_sel.columns,
+            shared_keys = shared_keys
+            )
+
     sel = sql.select(labeled_cols, from_obj = join)
     return left.append_op(sel)
 
@@ -555,12 +568,12 @@ def _(__data, **kwargs):
     sel = __data.last_op
     columns = lift_inner_cols(sel)
 
-    old_keys = set(kwargs.values())
-    old_labs = [columns[k] for k in old_keys]
-    new_labs = [columns[old].label(new) for new, old in kwargs.items()]
+    # old_keys uses dict as ordered set
+    old_to_new = {v:k for k,v in kwargs.items()}
 
-    new_sel = sel.with_only_columns(old_labs)
-    new_sel.append_column(*new_labs)
+    labs = [c.label(old_to_new[k]) if k in old_to_new else c for k,c in columns.items()]
+
+    new_sel = sel.with_only_columns(labs)
 
     return __data.append_op(new_sel)
 
@@ -575,8 +588,9 @@ def _(__data, *args, _keep_all = False, **kwargs):
     inner_sel = mutate(__data, **kwargs).last_op if kwargs else __data.last_op
 
     # TODO: this is copied from the df distinct version
-    cols = set(simple_varname(strip_symbolic(x)) for x in args)
-    cols.update(kwargs.keys())
+    # cols dict below is used as ordered set
+    cols = {simple_varname(strip_symbolic(x)): True for x in args}
+    cols.update(kwargs)
 
     if None in cols:
         raise Exception("positional arguments must be simple column, "
