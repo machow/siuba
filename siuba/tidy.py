@@ -626,13 +626,13 @@ def case_when(__data, cases):
     raise_type_error(case_when)
 
 
-@case_when.register(Call)
-def _(__data, cases):
-    if not isinstance(cases, dict):
-        raise Exception("Cases must be a dictionary")
-    dict_entries = dict((strip_symbolic(k), strip_symbolic(v)) for k,v in cases.items())
-    cases_arg = Lazy(DeepCall("__call__", dict, dict_entries))
-    return create_sym_call(case_when, __data, cases_arg)
+#@case_when.register(Call)
+#def _(__data, cases):
+#    if not isinstance(cases, dict):
+#        raise Exception("Cases must be a dictionary")
+#    dict_entries = dict((strip_symbolic(k), strip_symbolic(v)) for k,v in cases.items())
+#    cases_arg = Lazy(DeepCall("__call__", dict, dict_entries))
+#    return create_sym_call(case_when, __data, cases_arg)
 
 
 @case_when.register(pd.Series)
