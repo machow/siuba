@@ -24,7 +24,8 @@ from functools import reduce
 
 FUNCTIONS = (
         "select", "mutate", "filter", "group_by", "ungroup", "summarize",
-        "transmute", "count", "distinct", "nest", "unnest", "join"
+        "transmute", "count", "distinct", "nest", "unnest", "join",
+        "head", "spread", "gather"
         )
 
 def install_pd_siu():
@@ -442,7 +443,7 @@ def var_select(colnames, *args):
             if arg.negated and everything is None:
                 # first time using negation, apply an implicit everything
                 everything = True
-                cols.update((x, None) for x in set(colnames) - set(cols))
+                cols.update((k, None) for k in colnames if k not in cols)
 
             # slicing can refer to single, or range of columns
             if isinstance(arg.name, slice):
@@ -566,14 +567,14 @@ def distinct(__data, *args, _keep_all = False, **kwargs):
 
 @distinct.register(DataFrame)
 def _(__data, *args, _keep_all = False, **kwargs):
-    cols = set(simple_varname(strip_symbolic(x)) for x in args)
+    cols = {simple_varname(strip_symbolic(x)): True for x in args}
     if None in cols:
         raise Exception("positional arguments must be simple column, "
                         "e.g. _.colname or _['colname']"
                         )
 
     # mutate kwargs
-    cols.update(kwargs.keys())
+    cols.update(kwargs)
     tmp_data = mutate(__data, **kwargs).drop_duplicates(cols)
 
     if not _keep_all:
@@ -630,7 +631,7 @@ def _(__data, cases):
     if not isinstance(cases, dict):
         raise Exception("Cases must be a dictionary")
     dict_entries = dict((strip_symbolic(k), strip_symbolic(v)) for k,v in cases.items())
-    cases_arg = DeepCall("__call__", dict, dict_entries)
+    cases_arg = Lazy(DeepCall("__call__", dict, dict_entries))
     return create_sym_call(case_when, __data, cases_arg)
 
 
@@ -726,7 +727,7 @@ def _(__data, *args, key = "data"):
     od = var_select(__data.columns, *evaluated)
 
     # unselected columns are treated similar to using groupby
-    grp_keys = list(set(__data.columns) - set(od))
+    grp_keys = list(k for k in __data.columns if k not in set(od))
     nest_keys = list(od)
 
     # AFAICT you can't name the col created in the apply here
@@ -808,8 +809,9 @@ inner_join = partial(join, how = "inner")
 # Head ========================================================================
 
 @singledispatch2
-def head(__data, n):
-    return pipe_with_meta(head, __data, n)
+def head(n):
+    # assume __data is the n arg
+    return pipe_with_meta(head, n)
 
 @head.register(pd.DataFrame)
 def _(__data, n = None):
