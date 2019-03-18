@@ -1,4 +1,5 @@
 from sqlalchemy import sql
+from sqlalchemy.sql import sqltypes as types
 from functools import singledispatch
 
 # TODO: must make these take both tbl, col as args, since hard to find window funcs
@@ -29,13 +30,51 @@ def sql_agg(name):
     sa_func = getattr(sql.func, name)
     return lambda col: sa_func(col)
 
+def sql_scalar(name):
+    sa_func = getattr(sql.func, name)
+    return lambda col: sa_func(col)
+
+def sql_colmeth(meth):
+    def f(col, *args):
+        return getattr(col, meth)(*args)
+    return f
+
+def sql_astype(col, _type):
+    mappings = {
+            str: types.Text,
+            int: types.Integer,
+            float: types.Numeric,
+            bool: types.Boolean
+            }
+    sa_type = mappings[_type]
+    return sql.cast(col, sa_type)
 
 base_scalar = dict(
-        startswith = lambda col, x: col.startswith(x)
+        startswith = sql_colmeth("startswith"),
+        endswith = sql_colmeth("endswith"),
+        between = sql_colmeth("between"),
+        isin = sql_colmeth("in_"),
+        abs = sql_scalar("abs"),
+        acos = sql_scalar("acos"),
+        asin = sql_scalar("asin"),
+        atan = sql_scalar("atan"),
+        atan2 = sql_scalar("atan2"),
+        cos = sql_scalar("cos"),
+        cot = sql_scalar("cot"),
+        astype = sql_astype
+        #str.len,
+        #str.upper,
+        #str.lower,
+        #str.replace_all or something similar,
+        #str_detect or similar,
+        #str_trim func to cut text off sides
         )
 
 base_agg = dict(
-        mean = sql_agg("avg")
+        mean = sql_agg("avg"),
+        # TODO: generalize case where doesn't use col
+        # need better handeling of vector funcs
+        len = lambda col: sql.func.count()
         )
 
 base_win = dict(
@@ -52,7 +91,7 @@ base_win = dict(
         #lag
 
         # aggregate functions ---
-        mean = win_agg("mean"),
+        mean = win_agg("avg"),
         var = win_agg("variance"),
         sum = win_agg("sum"),
         min = win_agg("min"),
@@ -63,6 +102,7 @@ base_win = dict(
         #median
 
         # counts ----
+        len = lambda col: sql.func.count().over(),
         #n
         #n_distinct
 
