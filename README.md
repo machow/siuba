@@ -1,6 +1,8 @@
 siuba
 =====
 
+[![Build Status](https://travis-ci.org/machow/siuba.svg?branch=master)](https://travis-ci.org/machow/siuba)
+
 Installation
 ------------
 
