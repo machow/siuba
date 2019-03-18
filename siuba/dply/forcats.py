@@ -15,7 +15,8 @@ def register_symbolic(f):
 @register_symbolic
 @singledispatch
 def fct_reorder(fct, x, func = np.median):
-    s = pd.Series(x.values, index = fct)
+    x_vals = x.values if isinstance(x, pd.Series) else x
+    s = pd.Series(x_vals, index = fct)
 
     # for each cat, calc agg func, make values of ordered the codes
     ordered = s.groupby(level = 0).agg(func).sort_values()
