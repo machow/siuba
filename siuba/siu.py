@@ -42,6 +42,7 @@ BINARY_LEVELS = {
         "__eq__": 5,
         "__ne__": 5,
         "__ge__": 5,
+        "__le__": "5",
         "__getattr__": 0
         }
 
@@ -65,6 +66,7 @@ BINARY_OPS = {
         "__eq__": "==",
         "__ne__": "!=",
         "__ge__": ">=",
+        "__le__": "<=",
         "__getattr__": "."
         }
 
@@ -139,7 +141,8 @@ class Formatter:
         return prefix + connector.join(x.splitlines())
 
 
-        
+# Calls
+# =============================================================================
 
 class Call:
     def __init__(self, func, *args, **kwargs):
@@ -160,6 +163,8 @@ class Call:
             arg_str = ", ".join(map(str, rest))
             kwarg_str = ", ".join(str(k) + " = " + str(v) for k,v in self.kwargs.items())
             fmt = "{}({}, {})".format(op_repr, arg_str, kwarg_str)
+            return fmt
+
         return fmt.format(
                     func = op_repr or self.func,
                     args = self.args,
@@ -183,14 +188,72 @@ class Call:
 
         return arg
 
-    def op_vars(self):
+    def iter_arguments(self):
+        for ii, arg in enumerate(self.args):
+            yield ii, arg
+
+        for k, v in self.kwargs.items():
+            yield k, v
+
+    def map_subcalls(self, f):
+        new_args = tuple(f(arg) if isinstance(arg, Call) else arg for arg in self.args)
+        new_kwargs = {k: f(v) if isinstance(v, Call) else v for k,v in self.kwargs.items()}
+
+        return new_args, new_kwargs
+
+    def to_dagwood(self, local):
+        # make sure to transform subcalls, no matter what happens
+        args, kwargs = self.map_subcalls(lambda x: x.to_dagwood(local))
+
+        # need nodes where call is followed by getattr
+        if self.func != "__call__" or not isinstance(self.args[0], self.__class__):
+            return self.__class__(self.func, *args, **kwargs)
+
+        obj = self.args[0]
+        if obj.func == "__getattr__":
+            # since obj is getting the call we're interested in, we pull the call
+            # from local and replace obj with whatever was earlier on the chain
+            # e.g. _.a.b() has the form <prev_obj>.<obj>(), want <obj>(prev_obj>)
+            attr = obj.args[1]
+
+            try:
+                local_func = local[attr]
+            except KeyError:
+                raise Exception("No local entry %s"% attr)
+
+
+            prev_obj = obj.args[0]
+            return self.__class__(
+                    "__call__",
+                    local_func,
+                    prev_obj.to_dagwood(local),
+                    *args[1:],
+                    **kwargs
+                    )
+
+        # otherwise, just make sure to use transformed child calls
+        return self.__class__(self.func, *args, **kwargs)
+
+
+    def op_vars(self, attr_calls = True):
         varnames = set()
 
         op_var = self._get_op_var()
         if op_var is not None:
             varnames.add(op_var)
 
-        all_args = itertools.chain(self.args, self.kwargs.values())
+        if (not attr_calls
+            and self.func == "__call__"
+            and isinstance(self.args[0], Call)
+            and self.args[0].func == "__getattr__"
+            ):
+            # skip obj, since it fetches an attribute this node is calling
+            prev_obj, prev_attr = self.args[0].args
+            all_args = itertools.chain([prev_obj], self.args[1:], self.kwargs.values())
+        else:
+            all_args = itertools.chain(self.args, self.kwargs.values())
+
+
         for arg in all_args:
             if isinstance(arg, Call):
                 varnames.update(arg.op_vars())
@@ -252,6 +315,53 @@ class BinaryOp(Call):
 
         return False
 
+class DeepCall(Call):
+    """evaluates both keys and vals."""
+
+    def map_subcalls(self, f):
+        # TODO: have descend as in evaluate_calls
+        #       needed for case_when sql
+        new_args = tuple(f(arg) if isinstance(arg, Call) else arg for arg in self.args)
+        new_kwargs = {k: f(v) if isinstance(v, Call) else v for k,v in self.kwargs.items()}
+
+        return new_args, new_kwargs
+
+
+    @staticmethod
+    def evaluate_calls(arg, x):
+        # TODO: defining a node like this, just to support case when is a bit crazy
+        #       super messy right now
+        if isinstance(arg, Call):
+            return arg(x)
+
+        if isinstance(arg, tuple):
+            entries = []
+            for k,v in arg:
+                eval_k = Call.evaluate_calls(k, x)
+                eval_v = Call.evaluate_calls(v, x)
+                entries.append((eval_k, eval_v))
+            return entries
+
+        elif isinstance(arg, dict):
+            entries = {
+                    Call.evaluate_calls(k, x): Call.evaluate_calls(v, x)
+                    for k,v in arg.items()
+                    }
+        
+            return entries
+        return arg
+
+
+
+#class LocalCall(Call):
+#    def __call__(self, x):
+#        inst, *rest = (self.evaluate_calls(arg, x) for arg in self.args)
+#        kwargs = {k: self.evaluate_calls(v, x) for k, v in self.kwargs.items()}
+#        
+#        # in normal case, get method to call, and then call it
+#        f = LOOKUP[self.func]
+#        return f(*rest, **kwargs)
+
 
 
 class MetaArg(Call):
@@ -267,6 +377,87 @@ class MetaArg(Call):
         return x
 
 
+class CallVisitor:
+    """
+    A node visitor base class that walks the call tree and calls a
+    visitor function for every node found.  This function may return a value
+    which is forwarded by the `visit` method.
+
+    Note: essentially a copy of ast.NodeVisitor
+    """
+
+    def visit(self, node):
+        """Visit a node."""
+        method = 'visit_' + node.func
+        visitor = getattr(self, method, self.generic_visit)
+        return visitor(node)
+
+    def generic_visit(self, node):
+        """Called if no explicit visitor function exists for a node."""
+        
+        for field, value in node.iter_arguments():
+            self.visit(value)
+
+
+class CallTreeLocal(CallVisitor):
+    def __init__(self, local):
+        self.local = local
+
+    def generic_visit(self, node):
+        args, kwargs = node.map_subcalls(self.visit)
+
+        return node.__class__(node.func, *args, **kwargs)
+
+    def visit___getattr__(self, node):
+        # remove the str attribute, so we can dispatch pandas str method calls
+        obj, crnt_attr = node.args
+        # e.g. _.str.endswith
+        if obj.func == "__getattr__" and obj.args[1] == "str":
+            prev_obj = obj.args[0]
+            return node.__class__(node.func, self.visit(prev_obj), crnt_attr)
+
+        return self.generic_visit(node)
+
+    def visit___call__(self, node):
+        # make sure to transform subcalls, no matter what happens
+        args, kwargs = node.map_subcalls(self.visit)
+        obj = args[0]
+
+        # need nodes where call is followed by getattr
+        if node.func != "__call__" or not isinstance(obj, node.__class__):
+            return node.__class__(node.func, *args, **kwargs)
+
+        if obj.func == "__getattr__":
+            # since obj is getting the call we're interested in, we pull the call
+            # from local and replace obj with whatever was earlier on the chain
+            # e.g. _.a.b() has the form <prev_obj>.<obj>(), want <obj>(prev_obj>)
+            prev_obj, attr = obj.args
+
+            try:
+                local_func = self.local[attr]
+            except KeyError:
+                raise Exception("No local entry %s"% attr)
+
+
+            return node.__class__(
+                    "__call__",
+                    local_func,
+                    self.visit(prev_obj),
+                    *args[1:],
+                    **kwargs
+                    )
+
+        # otherwise, just make sure to use transformed child calls
+        return node.__class__(node.func, *args, **kwargs)
+
+
+
+
+# Also need NodeTransformer
+
+
+# Symbolic
+# =============================================================================
 
 class Symbolic(object):
     def __init__(self, source = None, ready_to_call = False):
@@ -288,14 +479,7 @@ class Symbolic(object):
         if self.ready_to_call:
             return self.source(*args, **kwargs)
 
-        return Symbolic(Call(
-                "__call__",
-                self.source,
-                *map(strip_symbolic, args),
-                **{k: strip_symbolic(v) for k,v in kwargs.items()}
-                ),
-                ready_to_call = True)
-
+        return create_sym_call(self.source, *args, **kwargs)
 
     def __getitem__(self, *args):
         return Symbolic(Call(
@@ -321,6 +505,14 @@ class Symbolic(object):
         return Formatter().format(self.source)
 
 
+def create_sym_call(source, *args, **kwargs):
+    return Symbolic(Call(
+            "__call__",
+            strip_symbolic(source),
+            *map(strip_symbolic, args),
+            **{k: strip_symbolic(v) for k,v in kwargs.items()}
+            ),
+            ready_to_call = True)
 
 def strip_symbolic(symbol):
     if isinstance(symbol, Symbolic):
