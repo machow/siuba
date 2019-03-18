@@ -18,7 +18,9 @@ Examples
 * [siu expressions](examples/examples-siu.ipynb)
 * [dplyr style pandas](examples/examples-dplyr-funcs.ipynb)
   - [select verb case study](examples/case-iris-select.ipynb)
-* [sql using dplyr style](examples/examples-sql.ipynb)
+* sql using dplyr style
+  - [simple sql statements](examples/examples-sql.ipynb)
+  - [the kitchen sink with postgres](examples/examples-postgres.ipynb)
 * [tidytuesday examples](https://github.com/machow/tidytuesday-py)
   - tidytuesday is a weekly R data analysis project. In order to kick the tires
     on siuba, I've been using it to complete the assignments. More specifically,
