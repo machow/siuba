@@ -188,7 +188,7 @@ def use_simple_names():
         deregister(sql.compiler._CompileLabel)
 
 @pipe_no_args
-@singledispatch2
+@singledispatch2(LazyTbl)
 def show_query(tbl, simplify = False):
     query = tbl.last_op #if not simplify else 
     compile_query = lambda: query.compile(
@@ -209,7 +209,7 @@ def show_query(tbl, simplify = False):
 
 # collect ----------
 @pipe_no_args
-@singledispatch2
+@singledispatch2(LazyTbl)
 def collect(__data, as_df = True):
     # TODO: maybe remove as_df options, always return dataframe
     # normally can just pass the sql objects to execute, but for some reason
@@ -555,7 +555,7 @@ def _(left, right, on = None, how = None):
 # Head ------------------------------------------------------------------------
 
 @head.register(LazyTbl)
-def _(__data, n):
+def _(__data, n = 5):
     sel = __data.last_op
     
     return __data.append_op(sel.limit(n))
