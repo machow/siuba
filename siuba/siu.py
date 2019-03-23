@@ -266,12 +266,18 @@ class Call:
 
 
 class Lazy(Call):
-    def __init__(self, func):
-        self.func = "<lazy>"
-        self.args = [func]
+    def __init__(self, func, arg = None):
+        if arg is None:
+            self.func = "<lazy>"
+            self.args = [func]
+        else:
+            # will happen in generic node calls, e.g. self.__class__(self.func, ...)
+            self.func = func
+            self.args = [arg]
+
         self.kwargs = {}
 
-    def __call__(self, x):
+    def __call__(self, x, *args, **kwargs):
         return self.args[0]
 
 
@@ -315,41 +321,26 @@ class BinaryOp(Call):
 
         return False
 
-class DeepCall(Call):
+class DictCall(Call):
     """evaluates both keys and vals."""
 
+    def __init__(self, f, *args, **kwargs):
+        # TODO: validation, clean up class
+        super().__init__(f, *args, **kwargs)
+        self.args = (dict, dict(self.args[1]))
+
     def map_subcalls(self, f):
-        # TODO: have descend as in evaluate_calls
-        #       needed for case_when sql
-        new_args = tuple(f(arg) if isinstance(arg, Call) else arg for arg in self.args)
-        new_kwargs = {k: f(v) if isinstance(v, Call) else v for k,v in self.kwargs.items()}
+        d = self.args[1]
 
-        return new_args, new_kwargs
+        new_d = {
+                f(k) if isinstance(k, Call) else k: f(v) if isinstance(v, Call) else v
+                        for k,v in d.items()
+                        }
 
+        return (self.args[0], new_d), {}
 
-    @staticmethod
-    def evaluate_calls(arg, x):
-        # TODO: defining a node like this, just to support case when is a bit crazy
-        #       super messy right now
-        if isinstance(arg, Call):
-            return arg(x)
-
-        if isinstance(arg, tuple):
-            entries = []
-            for k,v in arg:
-                eval_k = Call.evaluate_calls(k, x)
-                eval_v = Call.evaluate_calls(v, x)
-                entries.append((eval_k, eval_v))
-            return entries
-
-        elif isinstance(arg, dict):
-            entries = {
-                    Call.evaluate_calls(k, x): Call.evaluate_calls(v, x)
-                    for k,v in arg.items()
-                    }
-        
-            return entries
-        return arg
+    def __call__(self, x, *args, **kwargs):
+        return self.args[1]
 
 
 

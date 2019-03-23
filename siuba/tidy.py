@@ -597,15 +597,18 @@ def _(cond, true_vals, false_vals):
 # a Call, so that it can be handled by call tree visitors, etc..
 # TODO: evaluate this non-table verb approach
 import itertools
-from siuba.siu import DeepCall
+from siuba.siu import DictCall
 
-#@case_when.register(Call)
-#def _(__data, cases):
-#    if not isinstance(cases, dict):
-#        raise Exception("Cases must be a dictionary")
-#    dict_entries = dict((strip_symbolic(k), strip_symbolic(v)) for k,v in cases.items())
-#    cases_arg = Lazy(DeepCall("__call__", dict, dict_entries))
-#    return create_sym_call(case_when, __data, cases_arg)
+@case_when.register(Symbolic)
+@case_when.register(Call)
+def _(__data, cases):
+    if not isinstance(cases, dict):
+        raise Exception("Cases must be a dictionary")
+    dict_entries = dict((strip_symbolic(k), strip_symbolic(v)) for k,v in cases.items())
+    cases_arg = Lazy(DictCall("__call__", dict, dict_entries))
+    strip_data = strip_symbolic(__data)
+    return create_sym_call(case_when, strip_data, cases_arg)
+
 
 
 @singledispatch2((pd.DataFrame,pd.Series))
