@@ -188,13 +188,6 @@ class Call:
 
         return arg
 
-    def iter_arguments(self):
-        for ii, arg in enumerate(self.args):
-            yield ii, arg
-
-        for k, v in self.kwargs.items():
-            yield k, v
-
     def map_subcalls(self, f):
         new_args = tuple(f(arg) if isinstance(arg, Call) else arg for arg in self.args)
         new_kwargs = {k: f(v) if isinstance(v, Call) else v for k,v in self.kwargs.items()}
@@ -386,8 +379,7 @@ class CallVisitor:
     def generic_visit(self, node):
         """Called if no explicit visitor function exists for a node."""
         
-        for field, value in node.iter_arguments():
-            self.visit(value)
+        node.map_subcalls(self.visit)
 
 
 class CallTreeLocal(CallVisitor):
