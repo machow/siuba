@@ -1,25 +1,5 @@
 import itertools
 
-# [
-# .. 'a'
-# .. 'b':'c'
-
-# +
-# .. .
-# .. .. _
-# .. .. 'a'
-# .. .
-# .. .. _
-# .. .. 'b'
-
-# TODO: call formatting
-# Displaying precedence (number of spaces)
-# 1. *, @, /, //, %
-# 2. +, -
-# 3. <<, >>
-# parentheses. &, ^, |
-# parentheses. <, <= etc..
-
 # TODO: symbolic formatting: __add__ -> "+"
 
 BINARY_LEVELS = {
@@ -336,18 +316,6 @@ class DictCall(Call):
         return self.args[1]
 
 
-
-#class LocalCall(Call):
-#    def __call__(self, x):
-#        inst, *rest = (self.evaluate_calls(arg, x) for arg in self.args)
-#        kwargs = {k: self.evaluate_calls(v, x) for k, v in self.kwargs.items()}
-#        
-#        # in normal case, get method to call, and then call it
-#        f = LOOKUP[self.func]
-#        return f(*rest, **kwargs)
-
-
-
 class MetaArg(Call):
     def __init__(self, func, *args, **kwargs):
         self.func = "_"
@@ -541,14 +509,4 @@ for k, v in UNARY_OPS.items():
 Lam = Lazy
 
 _ = Symbolic()
-
-
-#Attribute(
-#        value = Name(id = '_', ctx = Load()),
-#        attr = "a",
-#        ctx = Load()
-#        )
-_.a
-
-_(_.a + _.b, 2, 3)
 
