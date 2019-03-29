@@ -1,6 +1,7 @@
 from sqlalchemy import sql
 from sqlalchemy.sql import sqltypes as types
 from functools import singledispatch
+from .verbs import case_when, if_else
 
 # TODO: must make these take both tbl, col as args, since hard to find window funcs
 def sa_is_window(clause):
@@ -50,10 +51,13 @@ def sql_astype(col, _type):
     return sql.cast(col, sa_type)
 
 base_scalar = dict(
+        # TODO: these methods are sqlalchemy ColumnElement methods, simplify?
+        cast = sql_colmeth("cast"),
         startswith = sql_colmeth("startswith"),
         endswith = sql_colmeth("endswith"),
         between = sql_colmeth("between"),
         isin = sql_colmeth("in_"),
+        # these are methods on sql.funcs ---- 
         abs = sql_scalar("abs"),
         acos = sql_scalar("acos"),
         asin = sql_scalar("asin"),
@@ -61,13 +65,30 @@ base_scalar = dict(
         atan2 = sql_scalar("atan2"),
         cos = sql_scalar("cos"),
         cot = sql_scalar("cot"),
-        astype = sql_astype
+        astype = sql_astype,
+        # I was lazy here and wrote lambdas directly ---
+        # TODO: I think these are postgres specific?
+        hour = lambda col: sql.func.date_trunc('hour', col),
+        week = lambda col: sql.func.date_trunc('week', col),
+        isna = lambda col: col.is_(None),
+        isnull = lambda col: col.is_(None),
+        # dply.vector funcs ----
+        
+        # TODO: string methods
         #str.len,
         #str.upper,
         #str.lower,
         #str.replace_all or something similar,
         #str_detect or similar,
         #str_trim func to cut text off sides
+        # TODO: move to postgres specific
+        n = lambda col: sql.func.count(),
+        sum = sql_scalar("sum"),
+        # TODO: this is to support a DictCall (e.g. used in case_when)
+        dict = dict,
+        # TODO: don't use singledispatch to add sql support to case_when
+        case_when = case_when,
+        if_else = if_else
         )
 
 base_agg = dict(
