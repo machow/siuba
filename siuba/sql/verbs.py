@@ -52,6 +52,8 @@ class WindowReplacer(CallListener):
     Produces 2 important behaviors via the enter method:
       - returns evaluated sql call expression, with labels on all window expressions.
       - stores all labeled window expressions via the windows property.
+
+    TODO: could replace with a sqlalchemy transformer
     """
 
     def __init__(self, columns, group_by, window_cte = None):
@@ -119,7 +121,7 @@ class LazyTbl:
     def __init__(
             self, source, tbl, ops = None,
             group_by = tuple(), order_by = tuple(), funcs = None,
-            CallShaper = CallTreeLocal
+            rm_attr = ('str', 'dt'), call_sub_attr = ('dt',)
             ):
         self.source = source
 
@@ -133,8 +135,8 @@ class LazyTbl:
         self.group_by = group_by
         self.order_by = order_by
         self.funcs = {} if funcs is None else funcs
-        self.CallShaper = CallShaper
-        
+        self.rm_attr = rm_attr
+        self.call_sub_attr = call_sub_attr
 
     def append_op(self, op):
         return self.__class__(
@@ -144,7 +146,8 @@ class LazyTbl:
                 self.group_by,
                 self.order_by,
                 self.funcs,
-                self.CallShaper
+                self.rm_attr,
+                self.call_sub_attr
                 )
 
     def copy(self, **kwargs):
@@ -155,8 +158,13 @@ class LazyTbl:
         f_dict2 = self.funcs['window' if window else 'aggregate']
 
         funcs = {**f_dict1, **f_dict2}
-        cs = self.CallShaper(funcs)
-        return cs.visit(call)
+        call_shaper = CallTreeLocal(
+                funcs,
+                rm_attr = self.rm_attr,
+                call_sub_attr = self.call_sub_attr
+                )
+
+        return call_shaper.enter(call)
 
     def track_call_windows(self, call, columns = None, window_cte = None):
         """Returns tuple of (new column expression, list of window exprs)"""
