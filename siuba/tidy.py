@@ -108,17 +108,23 @@ from functools import wraps
 
 class NoArgs: pass
 
-def pipe_no_args(f):
-    @f.register(NoArgs)
+def pipe_no_args(f, cls = NoArgs):
+    @f.register(cls)
     def wrapper(__data, *args, **kwargs):
         return create_pipe_call(f, MetaArg("_"), *args, **kwargs)
 
     return f
 
+def register_pipe(f, cls):
+    @f.register(cls)
+    def wrapper(*args, **kwargs):
+        return create_pipe_call(f, MetaArg("_"), *args, **kwargs)
+    return f
+
 
 # option: no args, custom dispatch (e.g. register NoArgs)
 # strips symbols
-def singledispatch2(f):
+def singledispatch2(cls, f = None):
     """Wrap singledispatch. Making sure to keep its attributes on the wrapper.
     
     This wrapper has three jobs:
@@ -127,7 +133,18 @@ def singledispatch2(f):
         3. return a Pipeable when the first arg of a call is a symbol
     """
 
+    # classic way of allowing args to a decorator
+    if f is None:
+        return lambda f: singledispatch2(cls, f)
+
+    # initially registers func for object, so need to change to pd.DataFrame
     dispatch_func = singledispatch(f)
+    if isinstance(cls, tuple):
+        for c in cls: dispatch_func.register(c, f)
+    else:
+        dispatch_func.register(cls, f)
+    # then, set the default object dispatcher to create a pipe
+    register_pipe(dispatch_func, object)
 
     # register dispatcher for Call, and NoArgs
     pipe_call(dispatch_func)
@@ -188,12 +205,8 @@ def raise_type_error(f):
 # Mutate ======================================================================
 
 # TODO: support for unnamed args
-@singledispatch2
+@singledispatch2(pd.DataFrame)
 def mutate(__data, **kwargs):
-    raise_type_error(mutate)
-
-@mutate.register(DataFrame)
-def _(__data, **kwargs):
     strip_kwargs = {k: strip_symbolic(v) for k,v in kwargs.items()}
     return __data.assign(**strip_kwargs)
 
@@ -209,14 +222,8 @@ def _(__data, **kwargs):
 
 # Group By ====================================================================
 
-@singledispatch2
+@singledispatch2((pd.DataFrame, DataFrameGroupBy))
 def group_by(__data, *args, **kwargs):
-    return pipe_with_meta(group_by, __data, *args, **kwargs)
-
-
-@group_by.register(DataFrame)
-@group_by.register(DataFrameGroupBy)
-def _(__data, *args, **kwargs):
     tmp_df = mutate(__data, **kwargs) if kwargs else __data
 
     by_vars = list(map(simple_varname, map(strip_symbolic, args)))
@@ -228,7 +235,7 @@ def _(__data, *args, **kwargs):
     return tmp_df.groupby(by = by_vars)
 
 
-@singledispatch2
+@singledispatch2((pd.DataFrame, DataFrameGroupBy))
 def ungroup(__data):
     # TODO: can we somehow just restore the original df used to construct
     #       the groupby?
@@ -245,13 +252,8 @@ def ungroup(__data):
 
 from operator import and_
 
-@singledispatch2
+@singledispatch2(pd.DataFrame)
 def filter(__data, *args):
-    return pipe_with_meta(filter, __data, *args)
-
-
-@filter.register(DataFrame)
-def _(__data, *args):
     crnt_indx = True
     for arg in args:
         crnt_indx &= arg(__data) if callable(strip_symbolic(arg)) else arg
@@ -277,12 +279,8 @@ def _(__data, *args):
 
 # Summarize ===================================================================
 
-@singledispatch2
+@singledispatch2(DataFrame)
 def summarize(__data, **kwargs):
-    raise_type_error(summarize)
-
-@summarize.register(DataFrame)
-def _(__data, **kwargs):
     results = {}
     for k, v in kwargs.items():
         res = strip_symbolic(v)(__data) if callable(v) else v
@@ -310,12 +308,8 @@ def _(__data, **kwargs):
 
 # Transmute ===================================================================
 
-@singledispatch2
+@singledispatch2(DataFrame)
 def transmute(__data, *args, **kwargs):
-    return pipe_with_meta(transmute, __data, *args, **kwargs)
-
-@transmute.register(DataFrame)
-def _(__data, *args, **kwargs):
     arg_vars = list(map(simple_varname, map(strip_symbolic, args)))
     for ii, name in enumerate(arg_vars):
         if name is None: raise Exception("complex, unnamed expression at pos %s not supported"%ii)
@@ -465,12 +459,8 @@ def var_select(colnames, *args):
     return cols
 
 
-@singledispatch2
+@singledispatch2(DataFrame)
 def select(__data, *args, **kwargs):
-    return pipe_with_meta(select, __data, *args, **kwargs)
-
-@select.register(DataFrame)
-def _(__data, *args, **kwargs):
     vl = VarList()
     evaluated = (strip_symbolic(arg)(vl) if callable(arg) else arg for arg in args)
 
@@ -488,12 +478,8 @@ def _(__data, *args, **kwargs):
 
 # Rename ======================================================================
 
-@singledispatch2
+@singledispatch2(DataFrame)
 def rename(__data, **kwargs):
-    raise_type_error(rename)
-
-@rename.register(DataFrame)
-def _(__data, **kwargs):
     # TODO: allow names with spaces, etc..
     col_names = {v:k for k,v in kwargs.items()}
 
@@ -516,12 +502,8 @@ def _call_strip_ascending(f):
 
     return f, True
 
-@singledispatch2
+@singledispatch2(DataFrame)
 def arrange(__data, *args):
-    return pipe_with_meta(arrange, __data, *args, **kwargs)
-
-@arrange.register(DataFrame)
-def _(__data, *args):
     # TODO:
     #   - general handling of stripping Symbolics
     #   - add arguments to pass to sort_values (e.g. ascending, kind)
@@ -561,12 +543,8 @@ def _(__data, *args):
 
 # Distinct ====================================================================
 
-@singledispatch2
+@singledispatch2(DataFrame)
 def distinct(__data, *args, _keep_all = False, **kwargs):
-    return pipe_with_meta(__data, *args, _keep_all = _keep_all, **kwargs)
-
-@distinct.register(DataFrame)
-def _(__data, *args, _keep_all = False, **kwargs):
     cols = {simple_varname(strip_symbolic(x)): True for x in args}
     if None in cols:
         raise Exception("positional arguments must be simple column, "
@@ -589,11 +567,13 @@ def _(__data, *args, _keep_all = False, **kwargs):
 
 
 # if_else
-@singledispatch2
+# TODO: move to vector.py
+@singledispatch
 def if_else(__data, *args, **kwargs):
     raise_type_error(__data)
 
 @if_else.register(Call)
+@if_else.register(Symbolic)
 def _(__data, *args, **kwargs):
     return create_sym_call(if_else, __data, *args, **kwargs)
 
@@ -617,27 +597,10 @@ def _(cond, true_vals, false_vals):
 # a Call, so that it can be handled by call tree visitors, etc..
 # TODO: evaluate this non-table verb approach
 import itertools
-from siuba.siu import DeepCall
+from siuba.siu import DictCall
 
-    
-
-@singledispatch2
+@singledispatch2((pd.DataFrame,pd.Series))
 def case_when(__data, cases):
-    raise_type_error(case_when)
-
-
-#@case_when.register(Call)
-#def _(__data, cases):
-#    if not isinstance(cases, dict):
-#        raise Exception("Cases must be a dictionary")
-#    dict_entries = dict((strip_symbolic(k), strip_symbolic(v)) for k,v in cases.items())
-#    cases_arg = Lazy(DeepCall("__call__", dict, dict_entries))
-#    return create_sym_call(case_when, __data, cases_arg)
-
-
-@case_when.register(pd.Series)
-@case_when.register(pd.DataFrame)
-def _(__data, cases):
     if isinstance(cases, Call):
         cases = cases(__data)
     # TODO: handle when receive list of (k,v) pairs for py < 3.5 compat?
@@ -653,6 +616,18 @@ def _(__data, cases):
 
     return np.array(list(out))
 
+@case_when.register(Symbolic)
+@case_when.register(Call)
+def _(__data, cases):
+    if not isinstance(cases, dict):
+        raise Exception("Cases must be a dictionary")
+    dict_entries = dict((strip_symbolic(k), strip_symbolic(v)) for k,v in cases.items())
+    cases_arg = Lazy(DictCall("__call__", dict, dict_entries))
+    strip_data = strip_symbolic(__data)
+    return create_sym_call(case_when, strip_data, cases_arg)
+
+
+
 
 # Count =======================================================================
 
@@ -664,13 +639,8 @@ def _count_group(data, *args):
     return 
 
 
-@singledispatch2
+@singledispatch2(pd.DataFrame)
 def count(__data, *args, wt = None, sort = False, **kwargs):
-    return pipe_with_meta(count, __data, *args, wt = wt, sort = sort, **kwargs)
-
-
-@count.register(pd.DataFrame)
-def _(__data, *args, wt = None, sort = False, **kwargs):
     # TODO: if expr, works like mutate
 
     #group by args
@@ -697,12 +667,8 @@ def _(__data, *args, wt = None, sort = False, **kwargs):
     return counts
 
 
-@singledispatch2
+@singledispatch2(pd.DataFrame)
 def add_count(__data, *args, wt = None, sort = False, **kwargs):
-    return pipe_with_meta(add_count, __data, *args, wt = wt, sort = sort, **kwargs)
-
-@add_count.register(pd.DataFrame)
-def _(__data, *args, wt = None, sort = False, **kwargs):
     counts = count(__data, *args, wt = wt, sort = sort, **kwargs)
 
     on = list(counts.columns)[:-1]
@@ -714,13 +680,8 @@ def _(__data, *args, wt = None, sort = False, **kwargs):
 
 # Nest ========================================================================
 
-@singledispatch2
-def nest(__data, *args, **kwargs):
-    return pipe_with_meta(nest, __data, *args, **kwargs)
-
-
-@nest.register(pd.DataFrame)
-def _(__data, *args, key = "data"):
+@singledispatch2(pd.DataFrame)
+def nest(__data, *args, key = "data"):
     # TODO: copied from select function
     vl = VarList()
     evaluated = (arg(vl) if callable(arg) else arg for arg in args)
@@ -743,12 +704,8 @@ def _(__data, *args, key = "data"):
 
 # Unnest ======================================================================
 
-@singledispatch2
-def unnest(__data, *args, **kwargs):
-    return pipe_with_meta(unnest, __data, *args, **kwargs)
-
-@unnest.register(pd.DataFrame)
-def _(__data, key):
+@singledispatch2(pd.DataFrame)
+def unnest(__data, key):
     # TODO: currently only takes key, not expressions
     nrows_nested = __data[key].apply(len, convert_dtype = True)
     indx_nested = nrows_nested.index.repeat(nrows_nested)
@@ -767,12 +724,10 @@ from collections.abc import Mapping
 from functools import partial
 
 # TODO: will need to use multiple dispatch
-@singledispatch2
+@singledispatch2(pd.DataFrame)
 def join(left, right, on = None, how = None):
-    raise Exception("Unsupported type %s" %type(left))
-
-@join.register(pd.DataFrame)
-def _(left, right, on = None, how = None):
+    if not isinstance(right, DataFrame):
+        raise Exception("right hand table must be a DataFrame")
     if how is None:
         raise Exception("Must specify how argument")
 
@@ -781,6 +736,12 @@ def _(left, right, on = None, how = None):
         return left.merge(right, how = how, left_on = left_on, right_on = right_on)
 
     return left.merge(right, how = how, on = on)
+
+
+@join.register(object)
+def _(left, right, on = None, how = None):
+    raise Exception("Unsupported type %s" %type(left))
+
 
 @singledispatch2
 def semi_join(left, right = None, on = None):
@@ -808,18 +769,13 @@ inner_join = partial(join, how = "inner")
 
 # Head ========================================================================
 
-@singledispatch2
-def head(n):
-    # assume __data is the n arg
-    return pipe_with_meta(head, n)
-
-@head.register(pd.DataFrame)
-def _(__data, n = None):
+@singledispatch2(pd.DataFrame)
+def head(__data, n = 5):
     return __data.head(n)
 
 # Gather ======================================================================
 
-@singledispatch2
+@singledispatch2(pd.DataFrame)
 def gather(__data, key = "key", value = "value", *args, drop_na = False, convert = False):
     # TODO: implement var selection over *args
     if convert:
@@ -844,7 +800,7 @@ def gather(__data, key = "key", value = "value", *args, drop_na = False, convert
 
 # Spread ======================================================================
 
-@singledispatch2
+@singledispatch2(pd.DataFrame)
 def spread(__data, key, value, fill = None, reset_index = True):
     id_cols = [col for col in __data.columns if col not in {key, value}]
     wide = __data.set_index(id_cols + [key]).unstack(level = -1)
@@ -862,12 +818,8 @@ def spread(__data, key, value, fill = None, reset_index = True):
 # Expand/Complete ====================================================================
 from pandas.core.reshape.util import cartesian_product
 
-@singledispatch2
+@singledispatch2(pd.DataFrame)
 def expand(__data, *args, fill = None):
-    return pipe_with_meta(expand, __data, *args, fill)
-
-@expand.register(pd.DataFrame)
-def _(__data, *args, fill = None):
     var_names = list(map(simple_varname, map(strip_symbolic, args)))
     cols = [__data[name] for name in var_names]
     # see https://stackoverflow.com/a/25636395/1144523
@@ -878,12 +830,8 @@ def _(__data, *args, fill = None):
     return expanded
 
 
-@singledispatch2
+@singledispatch2(pd.DataFrame)
 def complete(__data, *args, fill = None):
-    return pipe_with_meta(complete, __data, *args, fill)
-
-@complete.register(pd.DataFrame)
-def _(__data, *args, fill = None):
     expanded = expand(__data, *args, fill = fill)
 
     # TODO: should we attempt to coerce cols back to original types?

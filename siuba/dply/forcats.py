@@ -93,11 +93,13 @@ def fct_lump(fct, n = None, prop = None, w = None, other_level = "Other", ties =
 def _fct_lump_n_cats(fct, n, w, other_level, ties):
     # TODO: currently always selects n, even if ties
     ascending = n < 0
-    arr = w if w is not None else 1
+    arr = _get_values(w) if w is not None else 1
     ser = pd.Series(arr, index = fct)
     sorted_arr = ser.groupby(level = 0).sum().sort_values(ascending = ascending)
     return sorted_arr.iloc[:abs(n)].index.values
 
-        
-    
+def _get_values(x):
+    # TODO: move into utility, note pandas now encouraging .array method
+    if isinstance(x, pd.Series): return x.values
 
+    return x

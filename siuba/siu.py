@@ -1,25 +1,5 @@
 import itertools
 
-# [
-# .. 'a'
-# .. 'b':'c'
-
-# +
-# .. .
-# .. .. _
-# .. .. 'a'
-# .. .
-# .. .. _
-# .. .. 'b'
-
-# TODO: call formatting
-# Displaying precedence (number of spaces)
-# 1. *, @, /, //, %
-# 2. +, -
-# 3. <<, >>
-# parentheses. &, ^, |
-# parentheses. <, <= etc..
-
 # TODO: symbolic formatting: __add__ -> "+"
 
 BINARY_LEVELS = {
@@ -188,52 +168,11 @@ class Call:
 
         return arg
 
-    def iter_arguments(self):
-        for ii, arg in enumerate(self.args):
-            yield ii, arg
-
-        for k, v in self.kwargs.items():
-            yield k, v
-
     def map_subcalls(self, f):
         new_args = tuple(f(arg) if isinstance(arg, Call) else arg for arg in self.args)
         new_kwargs = {k: f(v) if isinstance(v, Call) else v for k,v in self.kwargs.items()}
 
         return new_args, new_kwargs
-
-    def to_dagwood(self, local):
-        # make sure to transform subcalls, no matter what happens
-        args, kwargs = self.map_subcalls(lambda x: x.to_dagwood(local))
-
-        # need nodes where call is followed by getattr
-        if self.func != "__call__" or not isinstance(self.args[0], self.__class__):
-            return self.__class__(self.func, *args, **kwargs)
-
-        obj = self.args[0]
-        if obj.func == "__getattr__":
-            # since obj is getting the call we're interested in, we pull the call
-            # from local and replace obj with whatever was earlier on the chain
-            # e.g. _.a.b() has the form <prev_obj>.<obj>(), want <obj>(prev_obj>)
-            attr = obj.args[1]
-
-            try:
-                local_func = local[attr]
-            except KeyError:
-                raise Exception("No local entry %s"% attr)
-
-
-            prev_obj = obj.args[0]
-            return self.__class__(
-                    "__call__",
-                    local_func,
-                    prev_obj.to_dagwood(local),
-                    *args[1:],
-                    **kwargs
-                    )
-
-        # otherwise, just make sure to use transformed child calls
-        return self.__class__(self.func, *args, **kwargs)
-
 
     def op_vars(self, attr_calls = True):
         varnames = set()
@@ -264,14 +203,30 @@ class Call:
         if self.func in ("__getattr__", "__getitem__") and isinstance(self.args[1], str):
             return self.args[1]
 
+    def obj_name(self):
+        obj = self.args[0]
+        if isinstance(obj, Call):
+            if obj.func == "__getattr__":
+                return obj.args[0]
+        elif hasattr(obj, '__name__'):
+            return obj.__name__
+
+        return None
+
 
 class Lazy(Call):
-    def __init__(self, func):
-        self.func = "<lazy>"
-        self.args = [func]
+    def __init__(self, func, arg = None):
+        if arg is None:
+            self.func = "<lazy>"
+            self.args = [func]
+        else:
+            # will happen in generic node calls, e.g. self.__class__(self.func, ...)
+            self.func = func
+            self.args = [arg]
+
         self.kwargs = {}
 
-    def __call__(self, x):
+    def __call__(self, x, *args, **kwargs):
         return self.args[0]
 
 
@@ -315,53 +270,26 @@ class BinaryOp(Call):
 
         return False
 
-class DeepCall(Call):
+class DictCall(Call):
     """evaluates both keys and vals."""
 
+    def __init__(self, f, *args, **kwargs):
+        # TODO: validation, clean up class
+        super().__init__(f, *args, **kwargs)
+        self.args = (dict, dict(self.args[1]))
+
     def map_subcalls(self, f):
-        # TODO: have descend as in evaluate_calls
-        #       needed for case_when sql
-        new_args = tuple(f(arg) if isinstance(arg, Call) else arg for arg in self.args)
-        new_kwargs = {k: f(v) if isinstance(v, Call) else v for k,v in self.kwargs.items()}
+        d = self.args[1]
 
-        return new_args, new_kwargs
+        new_d = {
+                f(k) if isinstance(k, Call) else k: f(v) if isinstance(v, Call) else v
+                        for k,v in d.items()
+                        }
 
+        return (self.args[0], new_d), {}
 
-    @staticmethod
-    def evaluate_calls(arg, x):
-        # TODO: defining a node like this, just to support case when is a bit crazy
-        #       super messy right now
-        if isinstance(arg, Call):
-            return arg(x)
-
-        if isinstance(arg, tuple):
-            entries = []
-            for k,v in arg:
-                eval_k = Call.evaluate_calls(k, x)
-                eval_v = Call.evaluate_calls(v, x)
-                entries.append((eval_k, eval_v))
-            return entries
-
-        elif isinstance(arg, dict):
-            entries = {
-                    Call.evaluate_calls(k, x): Call.evaluate_calls(v, x)
-                    for k,v in arg.items()
-                    }
-        
-            return entries
-        return arg
-
-
-
-#class LocalCall(Call):
-#    def __call__(self, x):
-#        inst, *rest = (self.evaluate_calls(arg, x) for arg in self.args)
-#        kwargs = {k: self.evaluate_calls(v, x) for k, v in self.kwargs.items()}
-#        
-#        # in normal case, get method to call, and then call it
-#        f = LOOKUP[self.func]
-#        return f(*rest, **kwargs)
-
+    def __call__(self, x, *args, **kwargs):
+        return self.args[1]
 
 
 class MetaArg(Call):
@@ -395,60 +323,105 @@ class CallVisitor:
     def generic_visit(self, node):
         """Called if no explicit visitor function exists for a node."""
         
-        for field, value in node.iter_arguments():
-            self.visit(value)
+        node.map_subcalls(self.visit)
 
 
-class CallTreeLocal(CallVisitor):
-    def __init__(self, local):
+class CallListener:
+    """Generic listener. Each exit is called on a node's copy."""
+    def enter(self, node):
+        method = 'enter_' + node.func
+        f_enter = getattr(self, method, self.generic_enter)
+
+        return f_enter(node)
+
+    def exit(self, node):
+        method = 'exit_' + node.func
+        f_exit = getattr(self, method, self.generic_exit)
+        return f_exit(node)
+
+    def generic_enter(self, node):
+        args, kwargs = node.map_subcalls(self.enter)
+
+        return self.exit(node.__class__(node.func, *args, **kwargs))
+
+    def generic_exit(self, node):
+        return node
+
+
+class CallTreeLocal(CallListener):
+    def __init__(self, local, rm_attr = None, call_sub_attr = None):
         self.local = local
+        self.rm_attr = set(rm_attr or [])
+        self.call_sub_attr = set(call_sub_attr or [])
 
-    def generic_visit(self, node):
-        args, kwargs = node.map_subcalls(self.visit)
+    def create_local_call(self, name, prev_obj, cls, func_args = None, func_kwargs = None):
+        # need call attr name (arg[0].args[1]) 
+        # need call arg and kwargs
+        func_args = tuple() if func_args is None else func_args
+        func_kwargs = {} if func_kwargs is None else func_kwargs
 
-        return node.__class__(node.func, *args, **kwargs)
+        try:
+            local_func = self.local[name]
+        except KeyError:
+            raise Exception("No local entry %s"% name)
 
-    def visit___getattr__(self, node):
-        # remove the str attribute, so we can dispatch pandas str method calls
+
+        return cls(
+                "__call__",
+                local_func,
+                prev_obj,
+                *func_args,
+                **func_kwargs
+                )
+
+    def enter___getattr__(self, node):
+        obj, attr = node.args
+        if obj.func == "__getattr__" and obj.args[1] in self.call_sub_attr:
+            args, kwargs = node.map_subcalls(self.enter)
+            visited_obj = args[0]
+
+            # TODO: should always call exit?
+            return self.create_local_call(attr, visited_obj, node.__class__)
+
+        return self.generic_enter(node)
+
+    def exit___getattr__(self, node):
+        # remove, e.g. the str attribute, so we can dispatch pandas str method calls
+        if node.args[1] in self.rm_attr:
+            obj = node.args[0]
+            return obj
+
         obj, crnt_attr = node.args
-        # e.g. _.str.endswith
-        if obj.func == "__getattr__" and obj.args[1] == "str":
+        # e.g. _.somecol.str.endswith
+        if obj.func == "__getattr__" and obj.args[1] in self.rm_attr:
             prev_obj = obj.args[0]
-            return node.__class__(node.func, self.visit(prev_obj), crnt_attr)
+            return node.__class__(node.func, prev_obj, crnt_attr)
 
-        return self.generic_visit(node)
+        return self.generic_exit(node)
 
-    def visit___call__(self, node):
+    def exit___call__(self, node):
         # make sure to transform subcalls, no matter what happens
-        args, kwargs = node.map_subcalls(self.visit)
-        obj = args[0]
-
-        # need nodes where call is followed by getattr
-        if node.func != "__call__" or not isinstance(obj, node.__class__):
-            return node.__class__(node.func, *args, **kwargs)
-
-        if obj.func == "__getattr__":
+        obj = node.args[0]
+        call_name = node.obj_name()
+        if isinstance(obj, Call) and obj.func == "__getattr__":
             # since obj is getting the call we're interested in, we pull the call
             # from local and replace obj with whatever was earlier on the chain
             # e.g. _.a.b() has the form <prev_obj>.<obj>(), want <obj>(prev_obj>)
             prev_obj, attr = obj.args
-
-            try:
-                local_func = self.local[attr]
-            except KeyError:
-                raise Exception("No local entry %s"% attr)
-
-
-            return node.__class__(
-                    "__call__",
-                    local_func,
-                    self.visit(prev_obj),
-                    *args[1:],
-                    **kwargs
+            return self.create_local_call(
+                    attr, prev_obj, node.__class__,
+                    node.args[1:], node.kwargs
                     )
-
-        # otherwise, just make sure to use transformed child calls
-        return node.__class__(node.func, *args, **kwargs)
+        elif call_name is not None:
+            # node is calling, e.g., a literal function
+            # use the function's name to replace with local call
+            return self.create_local_call(
+                    call_name, node.args[1], node.__class__,
+                    node.args[2:], node.kwargs
+                    )
+        
+        # otherwise, fall back to copying node
+        return node.__class__(node.func, *node.args, **node.kwargs)
 
 
 
@@ -558,14 +531,4 @@ for k, v in UNARY_OPS.items():
 Lam = Lazy
 
 _ = Symbolic()
-
-
-#Attribute(
-#        value = Name(id = '_', ctx = Load()),
-#        attr = "a",
-#        ctx = Load()
-#        )
-_.a
-
-_(_.a + _.b, 2, 3)
 
