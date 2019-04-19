@@ -4,34 +4,39 @@ import pandas as pd
 import numpy as np
 
 from pandas.core.groupby import DataFrameGroupBy
-from .siu import Symbolic, Call, strip_symbolic, MetaArg, BinaryOp, create_sym_call, Lazy
+from siuba.siu import Symbolic, Call, strip_symbolic, MetaArg, BinaryOp, create_sym_call, Lazy
 
-# TODO: should refactor all dplyr/tidy functions into dply folder
-from .dply.vector import *
+DPLY_FUNCTIONS = (
+        # Dply ----
+        "group_by", "ungroup", 
+        "select", "rename",
+        "mutate", "transmute", "filter", "summarize",
+        "arrange", "distinct",
+        "count", "add_count",
+        "head",
+        # Tidy ----
+        "spread", "gather",
+        "nest", "unnest",
+        "expand", "complete",
+        # Joins ----
+        "join", "left_join", "right_join", "semi_join", "full_join",
+        # TODO: move to vectors
+        "if_else", "case_when",
+        )
+
+__all__ = [*DPLY_FUNCTIONS, "Pipeable"]
 
 
 # General TODO ================================================================
-# * joins
 # * expressions in group_by
-# * distinct
-# * dispatch to partial when passed a single _?
 # * n_distinct?
 # * separate_rows
-# * compare gather/spread with melt, cast
 # * tally
-# * row_number
-from functools import reduce
-
-FUNCTIONS = (
-        "select", "mutate", "filter", "group_by", "ungroup", "summarize",
-        "transmute", "count", "distinct", "nest", "unnest", "join",
-        "head", "spread", "gather"
-        )
 
 def install_pd_siu():
     # https://github.com/coursera/pandas-ply/blob/master/pandas_ply/methods.py
     func_dict = globals()
-    for func_name in FUNCTIONS:
+    for func_name in DPLY_FUNCTIONS:
         f = func_dict[func_name]
 
         method_name = "siu_{}".format(func_name)
@@ -249,8 +254,6 @@ def ungroup(__data):
 
 
 # Filter ======================================================================
-
-from operator import and_
 
 @singledispatch2(pd.DataFrame)
 def filter(__data, *args):
@@ -596,7 +599,6 @@ def _(cond, true_vals, false_vals):
 # because case_when takes a dictionary of cases, we need to wrap cases into
 # a Call, so that it can be handled by call tree visitors, etc..
 # TODO: evaluate this non-table verb approach
-import itertools
 from siuba.siu import DictCall
 
 @singledispatch2((pd.DataFrame,pd.Series))

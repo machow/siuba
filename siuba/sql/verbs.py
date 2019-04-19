@@ -1,4 +1,4 @@
-from siuba.tidy import (
+from siuba.dply.verbs import (
         singledispatch2,
         pipe_no_args,
         simple_varname,
