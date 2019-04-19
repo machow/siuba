@@ -17,6 +17,8 @@ from siuba.dply.verbs import (
         if_else
         )
 from .translate import sa_modify_window, sa_is_window
+from .utils import get_dialect_funcs
+
 from sqlalchemy import sql
 import sqlalchemy
 from siuba.siu import strip_symbolic, Call, CallTreeLocal
@@ -123,18 +125,22 @@ class LazyTbl:
             group_by = tuple(), order_by = tuple(), funcs = None,
             rm_attr = ('str', 'dt'), call_sub_attr = ('dt',)
             ):
+        
+        # connection and dialect specific functions
         self.source = source
+        self.funcs = get_dialect_funcs(source.dialect.name) if funcs is None else funcs
 
         if isinstance(tbl, str):
             self.tbl = sqlalchemy.Table(tbl, sqlalchemy.MetaData(), autoload_with = source)
         else:
             self.tbl = tbl
 
-
+        # important states the query can be in (e.g. grouped)
         self.ops = [sql.Select([self.tbl])] if ops is None else ops
         self.group_by = group_by
         self.order_by = order_by
-        self.funcs = {} if funcs is None else funcs
+
+        # customizations to allow interop with pandas (e.g. handle dt methods)
         self.rm_attr = rm_attr
         self.call_sub_attr = call_sub_attr
 

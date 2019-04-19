@@ -145,12 +145,7 @@ funcs = dict(scalar = base_scalar, aggregate = base_agg, window = base_win)
 # alias to LazyTbl.no_win.dense_rank...
 #          LazyTbl.agg.dense_rank...
 
-def SqlTranslator(base, **rules):
-    # TODO: use actual hierch lookup, rather than quick dict solution?
-    return {**base, **rules}
-
 from collections.abc import Mapping
-from functools import partial
 import itertools
 
 class SqlTranslator(Mapping):
