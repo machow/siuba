@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 setup(
     name='siuba',
     packages=find_packages(),
-    version='0.0.2',
+    version='0.0.3',
     description='Cookiecutter template for a Python package',
     author='Michael Chow',
     license='BSD',

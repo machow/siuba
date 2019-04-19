@@ -151,21 +151,23 @@ def SqlTranslator(base, **rules):
 
 from collections.abc import Mapping
 from functools import partial
+import itertools
 
-class SqlFuncs(Mapping):
-    def __init__(self, tbl, funcs):
-        self._tbl = tbl
-        self._funcs = funcs
+class SqlTranslator(Mapping):
+    def __init__(self, d, **kwargs):
+        self.d = d
+        self.kwargs = kwargs
 
     def __len__(self):
-        return len(self._funcs)
+        return len(set(self.d) + set(self.kwargs))
 
     def __iter__(self):
-        return iter(map(self.__getitem__, self._funcs.values()))
+        old_keys = iter(self.d)
+        new_keys = (k for k in self.kwargs if k not in self.d)
+        return itertools.chain(old_keys, new_keys)
 
     def __getitem__(self, x):
-        return partial(self._funcs[x], self._tbl)
-
-    def __getattr__(self, x):
-        return self.__getitem__(x)
-
+        try:
+            return self.kwargs[x]
+        except KeyError:
+            return self.d[x]

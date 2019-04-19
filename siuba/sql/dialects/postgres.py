@@ -11,8 +11,12 @@ scalar = SqlTranslator(
         round = sql_round
         )
 
-aggregate = base_agg
+aggregate = SqlTranslator(
+        base_agg
+        )
 
-window = base_win
+window = SqlTranslator(
+        base_win
+        )
 
 funcs = dict(scalar = scalar, aggregate = aggregate, window = window)
