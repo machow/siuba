@@ -212,6 +212,21 @@ def raise_type_error(f):
 # TODO: support for unnamed args
 @singledispatch2(pd.DataFrame)
 def mutate(__data, **kwargs):
+    """Assign new variables to a DataFrame, while keeping existing ones.
+
+    Args:
+        ___data: a DataFrame
+        **kwargs: new_col_name=value pairs, where value can be a function taking
+                  a single argument for the data being operated on.
+
+    Examples
+    --------
+
+    ::
+        from siuba.data import mtcars
+        mtcars >> mutate(cyl2 = _.cyl * 2, cyl4 = _.cyl2 * 2)
+        
+    """
     strip_kwargs = {k: strip_symbolic(v) for k,v in kwargs.items()}
     return __data.assign(**strip_kwargs)
 
@@ -257,6 +272,22 @@ def ungroup(__data):
 
 @singledispatch2(pd.DataFrame)
 def filter(__data, *args):
+    """Keep rows where conditions are true.
+
+    Args:
+        ___data: a DataFrame
+        *args: conditions that must be met to keep a column. Multiple conditions
+               are combined using ``&``.
+
+    Examples
+    --------
+
+    ::
+        from siuba.data import mtcars
+        # keep rows where cyl is 4 and mpg is less than 25
+        mtcars >> filter(mtcars, _.cyl ==  4, _.mpg < 25) 
+
+    """
     crnt_indx = True
     for arg in args:
         crnt_indx &= arg(__data) if callable(strip_symbolic(arg)) else arg
@@ -284,6 +315,29 @@ def _(__data, *args):
 
 @singledispatch2(DataFrame)
 def summarize(__data, **kwargs):
+    """Assign variables that are single number summaries of a DataFrame.
+
+
+    Args:
+        ___data: a DataFrame
+        **kwargs: new_col_name=value pairs, where value can be a function taking
+                  a single argument for the data being operated on.
+
+    Note
+    ----
+
+    Grouped DataFrames will produce one row for each group. Ungrouped DataFrames
+    will produce a single row.
+
+
+    Examples
+    --------
+
+    ::
+        from siuba.data import mtcars
+        mtcars >> summarize(mean = _.disp.mean(), n = n(_))
+        
+    """
     results = {}
     for k, v in kwargs.items():
         res = strip_symbolic(v)(__data) if callable(v) else v
