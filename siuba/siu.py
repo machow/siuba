@@ -175,6 +175,11 @@ class Call:
         return new_args, new_kwargs
 
     def op_vars(self, attr_calls = True):
+        """Return set of all variable names used in Call
+        
+        Args:
+            attr_calls: whether to include called attributes (e.g. 'a' from _.a())
+        """
         varnames = set()
 
         op_var = self._get_op_var()
@@ -270,6 +275,7 @@ class BinaryOp(Call):
 
         return False
 
+
 class DictCall(Call):
     """evaluates both keys and vals."""
 
@@ -288,7 +294,7 @@ class DictCall(Call):
 
         return (self.args[0], new_d), {}
 
-    def __call__(self, x, *args, **kwargs):
+    def __call__(self, x):
         return self.args[1]
 
 
@@ -458,7 +464,7 @@ class Symbolic(object):
         return Symbolic(Call(
                 "__getitem__",
                 self.source,
-                *map(strip_symbolic, args)
+                *map(slice_to_call, args)
                 ),
                 ready_to_call = True)
 
@@ -487,11 +493,21 @@ def create_sym_call(source, *args, **kwargs):
             ),
             ready_to_call = True)
 
-def strip_symbolic(symbol):
-    if isinstance(symbol, Symbolic):
-        return symbol.source
 
-    return symbol
+def slice_to_call(x):
+    if isinstance(x, slice):
+        args = map(strip_symbolic, (x.start, x.stop, x.step))
+        return Call("__call__", slice, *args)
+    
+    return x
+
+
+    
+def strip_symbolic(x):
+    if isinstance(x, Symbolic):
+        return x.source
+
+    return x
 
 
 def explain(symbol):
