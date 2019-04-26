@@ -241,7 +241,7 @@ def collect(__data, as_df = True):
 
 
 @select.register(LazyTbl)
-def _(__data, *args, **kwargs):
+def _select(__data, *args, **kwargs):
     # see https://stackoverflow.com/questions/25914329/rearrange-columns-in-sqlalchemy-select-object
     last_op = __data.last_op
     columns = {c.key: c for c in last_op.inner_columns}
@@ -262,7 +262,7 @@ def _(__data, *args, **kwargs):
 
 
 @filter.register(LazyTbl)
-def _(__data, *args, **kwargs):
+def _filter(__data, *args, **kwargs):
     # TODO: aggregate funcs
     # Note: currently always produces 2 additional select statements,
     #       1 for window/aggs, and 1 for the where clause
@@ -301,7 +301,7 @@ def _(__data, *args, **kwargs):
 
 
 @mutate.register(LazyTbl)
-def _(__data, **kwargs):
+def _mutate(__data, **kwargs):
     # Cases
     #  - work with group by
     #  - window functions
@@ -355,7 +355,7 @@ def _mutate_select(sel, colname, func, labs, __data):
 
 
 @arrange.register(LazyTbl)
-def _(__data, *args):
+def _arrange(__data, *args):
     last_op = __data.last_op
     cols = lift_inner_cols(last_op)
 
@@ -376,7 +376,7 @@ def _(__data, *args):
 
 
 @count.register(LazyTbl)
-def _(__data, *args, sort = False):
+def _count(__data, *args, sort = False):
     # TODO: if already col named n, use name nn, etc.. get logic from tidy.py
     # similar to filter verb, we need two select statements,
     # an inner one for derived cols, and outer to group by them
@@ -423,7 +423,7 @@ def _(__data, *args, sort = False):
 
 
 @summarize.register(LazyTbl)
-def _(__data, **kwargs):
+def _summarize(__data, **kwargs):
     # https://stackoverflow.com/questions/14754994/why-is-sqlalchemy-count-much-slower-than-the-raw-query
     # what if windowed mutate or filter has been done? 
     #   - filter is fine, since it uses a CTE
@@ -465,16 +465,16 @@ def _(__data, **kwargs):
 
 
 @group_by.register(LazyTbl)
-def _(__data, *args):
+def _group_by(__data, *args):
     return __data.copy(group_by = args)
 
 @ungroup.register(LazyTbl)
-def _(__data):
+def _ungroup(__data):
     return __data.copy(group_by = None)
 
 
 @case_when.register(sql.base.ImmutableColumnCollection)
-def _(__data, cases):
+def _case_when(__data, cases):
     # TODO: will need listener to enter case statements, to handle when they use windows
     if isinstance(cases, Call):
         cases = cases(__data)
@@ -529,7 +529,7 @@ def _relabeled_cols(columns, keys, suffix):
 
 
 @join.register(LazyTbl)
-def _(left, right, on = None, how = None):
+def _join(left, right, on = None, how = None):
     # Needs to be on the table, not the select
     left_sel = left.last_op.alias()
     right_sel = right.last_op.alias()
@@ -569,7 +569,7 @@ def _(left, right, on = None, how = None):
 # Head ------------------------------------------------------------------------
 
 @head.register(LazyTbl)
-def _(__data, n = 5):
+def _head(__data, n = 5):
     sel = __data.last_op
     
     return __data.append_op(sel.limit(n))
@@ -578,7 +578,7 @@ def _(__data, n = 5):
 # Rename ----------------------------------------------------------------------
 
 @rename.register(LazyTbl)
-def _(__data, **kwargs):
+def _rename(__data, **kwargs):
     sel = __data.last_op
     columns = lift_inner_cols(sel)
 
@@ -595,7 +595,7 @@ def _(__data, **kwargs):
 # Distinct --------------------------------------------------------------------
 
 @distinct.register(LazyTbl)
-def _(__data, *args, _keep_all = False, **kwargs):
+def _distinct(__data, *args, _keep_all = False, **kwargs):
     if _keep_all:
         raise NotImplementedError("Distinct in sql requires _keep_all = True")
 
@@ -621,7 +621,7 @@ def _(__data, *args, _keep_all = False, **kwargs):
 # if_else ---------------------------------------------------------------------
 
 @if_else.register(sql.elements.ColumnElement)
-def _(cond, true_vals, false_vals):
+def _if_else(cond, true_vals, false_vals):
     whens = [(cond, true_vals)]
     return sql.case(whens, else_ = false_vals)
 

@@ -232,7 +232,7 @@ def mutate(__data, **kwargs):
 
 
 @mutate.register(DataFrameGroupBy)
-def _(__data, **kwargs):
+def _mutate(__data, **kwargs):
     strip_kwargs = {k: strip_symbolic(v) for k,v in kwargs.items()}
     df = __data.apply(lambda d: d.assign(**strip_kwargs))
     
@@ -302,7 +302,7 @@ def filter(__data, *args):
     return __data.loc[crnt_indx,:]
 
 @filter.register(DataFrameGroupBy)
-def _(__data, *args):
+def _filter(__data, *args):
     df_filter = filter.registry[pd.DataFrame]
 
     filtered = __data.apply(df_filter, *args)
@@ -350,7 +350,7 @@ def summarize(__data, **kwargs):
 
     
 @summarize.register(DataFrameGroupBy)
-def _(__data, **kwargs):
+def _summarize(__data, **kwargs):
     df_summarize = summarize.registry[pd.DataFrame]
 
     df = __data.apply(df_summarize, **kwargs)
@@ -378,7 +378,7 @@ def transmute(__data, *args, **kwargs):
     return df[[*arg_vars, *kwargs.keys()]]
 
 @transmute.register(DataFrameGroupBy)
-def _(__data, *args, **kwargs):
+def _transmute(__data, *args, **kwargs):
     # Note: not the most efficient function. Selects columns every group.
     f_transmute = transmute.registry[pd.DataFrame]
 
@@ -528,7 +528,7 @@ def select(__data, *args, **kwargs):
     return __data[list(od)].rename(columns = to_rename)
     
 @select.register(DataFrameGroupBy)
-def _(__data, *args, **kwargs):
+def _select(__data, *args, **kwargs):
     raise Exception("Selecting columns of grouped DataFrame currently not allowed")
 
 
@@ -543,7 +543,7 @@ def rename(__data, **kwargs):
     return __data.rename(columns  = col_names)
 
 @rename.register(DataFrameGroupBy)
-def _(__data, **kwargs):
+def _rename(__data, **kwargs):
     raise Exception("Selecting columns of grouped DataFrame currently not allowed")
 
 
@@ -618,7 +618,7 @@ def distinct(__data, *args, _keep_all = False, **kwargs):
     return tmp_data
         
 @distinct.register(DataFrameGroupBy)
-def _(__data, *args, _keep_all = False, **kwargs):
+def _distinct(__data, *args, _keep_all = False, **kwargs):
     df = __data.apply(lambda x: distinct(x, *args, _keep_all = _keep_all, **kwargs))
     return _regroup(df)
 
@@ -631,11 +631,11 @@ def if_else(__data, *args, **kwargs):
 
 @if_else.register(Call)
 @if_else.register(Symbolic)
-def _(__data, *args, **kwargs):
+def _if_else(__data, *args, **kwargs):
     return create_sym_call(if_else, __data, *args, **kwargs)
 
 @if_else.register(pd.Series)
-def _(cond, true_vals, false_vals):
+def _if_else(cond, true_vals, false_vals):
     true_indx = np.where(cond)[0]
     false_indx = np.where(~cond)[0]
 
@@ -674,7 +674,7 @@ def case_when(__data, cases):
 
 @case_when.register(Symbolic)
 @case_when.register(Call)
-def _(__data, cases):
+def _case_when(__data, cases):
     if not isinstance(cases, dict):
         raise Exception("Cases must be a dictionary")
     dict_entries = dict((strip_symbolic(k), strip_symbolic(v)) for k,v in cases.items())
@@ -795,7 +795,7 @@ def join(left, right, on = None, how = None):
 
 
 @join.register(object)
-def _(left, right, on = None, how = None):
+def _join(left, right, on = None, how = None):
     raise Exception("Unsupported type %s" %type(left))
 
 
