@@ -21,8 +21,7 @@ from .utils import get_dialect_funcs
 
 from sqlalchemy import sql
 import sqlalchemy
-from siuba.siu import strip_symbolic, Call, CallTreeLocal
-from functools import singledispatch
+from siuba.siu import Call, CallTreeLocal
 # TODO: currently needed for select, but can we remove pandas?
 from pandas import Series
 import pandas as pd
@@ -249,7 +248,7 @@ def _select(__data, *args, **kwargs):
     # same as for DataFrame
     colnames = Series(list(columns))
     vl = VarList()
-    evaluated = (strip_symbolic(arg)(vl) if callable(arg) else arg for arg in args)
+    evaluated = (arg(vl) if callable(arg) else arg for arg in args)
     od = var_select(colnames, *evaluated)
 
     col_list = []
@@ -272,7 +271,7 @@ def _filter(__data, *args, **kwargs):
 
     conds = []
     windows = []
-    for arg in map(strip_symbolic, args):
+    for arg in args:
         if isinstance(arg, Call):
             new_call = __data.shape_call(arg)
             var_cols = new_call.op_vars(attr_calls = False)
@@ -313,8 +312,7 @@ def _mutate(__data, **kwargs):
 
     # evaluate each call
     for colname, func in kwargs.items():
-        strip_f = strip_symbolic(func)
-        new_call = __data.shape_call(strip_f)
+        new_call = __data.shape_call(func)
 
         sel = _mutate_select(sel, colname, new_call, labs, __data)
         labs.add(colname)
@@ -331,11 +329,10 @@ def _mutate_select(sel, colname, func, labs, __data):
     """
     #colname, func
     replace_col = colname in sel.columns
-    strip_f = strip_symbolic(func)
     # Call objects let us check whether column expr used a derived column
     # e.g. SELECT a as b, b + 1 as c raises an error in SQL, so need subquery
-    call_vars = strip_f.op_vars(attr_calls = False)
-    if isinstance(strip_f, Call) and labs.isdisjoint(call_vars):
+    call_vars = func.op_vars(attr_calls = False)
+    if isinstance(func, Call) and labs.isdisjoint(call_vars):
         # New column may be able to modify existing select
         columns = lift_inner_cols(sel)
         # replacing an existing column, so strip it from select statement
@@ -349,7 +346,7 @@ def _mutate_select(sel, colname, func, labs, __data):
         sel = sql.select([cte], from_obj = cte)
 
     # evaluate call expr on columns, making sure to use group vars
-    new_col, windows = __data.track_call_windows(strip_f, columns)
+    new_col, windows = __data.track_call_windows(func, columns)
 
     return sel.column(new_col.label(colname))
 
@@ -387,8 +384,7 @@ def _count(__data, *args, sort = False):
     # holds any mutation style columns
     group_cols = []
     for arg in args:
-        strip_f = strip_symbolic(arg)
-        col_expr = strip_f(sel.columns) if callable(strip_f) else strip_f
+        col_expr = arg(sel.columns) if callable(arg) else arg
         if not isinstance(col_expr, (schema.Column, str)):
             # compile, so we can use the expr as its name (e.g. "id + 1")
             name = str(compile_el(__data, col_expr))
@@ -452,8 +448,7 @@ def _summarize(__data, **kwargs):
     # TODO: can't do summarize(b = mean(a), c = b + mean(a))
     #       since difficult for c to refer to agg and unagg cols in SQL
     for k, expr in kwargs.items():
-        strip_f = strip_symbolic(expr)
-        new_call = __data.shape_call(strip_f, window = False)
+        new_call = __data.shape_call(expr, window = False)
         col = new_call(columns).label(k)
 
         sel.append_column(col)
@@ -603,7 +598,7 @@ def _distinct(__data, *args, _keep_all = False, **kwargs):
 
     # TODO: this is copied from the df distinct version
     # cols dict below is used as ordered set
-    cols = {simple_varname(strip_symbolic(x)): True for x in args}
+    cols = {simple_varname(x): True for x in args}
     cols.update(kwargs)
 
     if None in cols:

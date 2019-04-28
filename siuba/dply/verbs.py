@@ -227,14 +227,13 @@ def mutate(__data, **kwargs):
         mtcars >> mutate(cyl2 = _.cyl * 2, cyl4 = _.cyl2 * 2)
         
     """
-    strip_kwargs = {k: strip_symbolic(v) for k,v in kwargs.items()}
-    return __data.assign(**strip_kwargs)
+    
+    return __data.assign(**kwargs)
 
 
 @mutate.register(DataFrameGroupBy)
 def _mutate(__data, **kwargs):
-    strip_kwargs = {k: strip_symbolic(v) for k,v in kwargs.items()}
-    df = __data.apply(lambda d: d.assign(**strip_kwargs))
+    df = __data.apply(lambda d: d.assign(**kwargs))
     
     return _regroup(df)
 
@@ -246,7 +245,7 @@ def _mutate(__data, **kwargs):
 def group_by(__data, *args, **kwargs):
     tmp_df = mutate(__data, **kwargs) if kwargs else __data
 
-    by_vars = list(map(simple_varname, map(strip_symbolic, args)))
+    by_vars = list(map(simple_varname, args))
     for ii, name in enumerate(by_vars):
         if name is None: raise Exception("group by variable %s is not a column name" %ii)
 
@@ -290,7 +289,7 @@ def filter(__data, *args):
     """
     crnt_indx = True
     for arg in args:
-        crnt_indx &= arg(__data) if callable(strip_symbolic(arg)) else arg
+        crnt_indx &= arg(__data) if callable(arg) else arg
 
     # use loc or iloc to subset, depending on crnt_indx ----
     # the main issue here is that loc can't remove all rows using a slice
@@ -340,7 +339,7 @@ def summarize(__data, **kwargs):
     """
     results = {}
     for k, v in kwargs.items():
-        res = strip_symbolic(v)(__data) if callable(v) else v
+        res = v(__data) if callable(v) else v
 
         # TODO: validation?
 
@@ -367,7 +366,7 @@ def _summarize(__data, **kwargs):
 
 @singledispatch2(DataFrame)
 def transmute(__data, *args, **kwargs):
-    arg_vars = list(map(simple_varname, map(strip_symbolic, args)))
+    arg_vars = list(map(simple_varname, args))
     for ii, name in enumerate(arg_vars):
         if name is None: raise Exception("complex, unnamed expression at pos %s not supported"%ii)
 
@@ -519,7 +518,7 @@ def var_select(colnames, *args):
 @singledispatch2(DataFrame)
 def select(__data, *args, **kwargs):
     vl = VarList()
-    evaluated = (strip_symbolic(arg)(vl) if callable(arg) else arg for arg in args)
+    evaluated = (arg(vl) if callable(arg) else arg for arg in args)
 
     od = var_select(__data.columns, *evaluated)
 
@@ -602,7 +601,7 @@ def arrange(__data, *args):
 
 @singledispatch2(DataFrame)
 def distinct(__data, *args, _keep_all = False, **kwargs):
-    cols = {simple_varname(strip_symbolic(x)): True for x in args}
+    cols = {simple_varname(x): True for x in args}
     if None in cols:
         raise Exception("positional arguments must be simple column, "
                         "e.g. _.colname or _['colname']"
@@ -679,8 +678,7 @@ def _case_when(__data, cases):
         raise Exception("Cases must be a dictionary")
     dict_entries = dict((strip_symbolic(k), strip_symbolic(v)) for k,v in cases.items())
     cases_arg = Lazy(DictCall("__call__", dict, dict_entries))
-    strip_data = strip_symbolic(__data)
-    return create_sym_call(case_when, strip_data, cases_arg)
+    return create_sym_call(case_when, __data, cases_arg)
 
 
 
@@ -703,7 +701,7 @@ def count(__data, *args, wt = None, sort = False, **kwargs):
     if wt is None:
         counts = group_by(__data, *args, **kwargs).size().reset_index()
     else:
-        wt_col = simple_varname(strip_symbolic(wt))
+        wt_col = simple_varname(wt)
         if wt_col is None:
             raise Exception("wt argument has to be simple column name")
         counts = group_by(__data, *args, **kwargs)[wt_col].sum().reset_index()
@@ -839,7 +837,7 @@ def gather(__data, key = "key", value = "value", *args, drop_na = False, convert
 
     # TODO: copied from nest and select
     vl = VarList()
-    evaluated = [strip_symbolic(arg)(vl) if callable(arg) else arg for arg in args]
+    evaluated = [arg(vl) if callable(arg) else arg for arg in args]
     od = var_select(__data.columns, *evaluated)
 
     value_vars = list(od) or None
@@ -876,7 +874,7 @@ from pandas.core.reshape.util import cartesian_product
 
 @singledispatch2(pd.DataFrame)
 def expand(__data, *args, fill = None):
-    var_names = list(map(simple_varname, map(strip_symbolic, args)))
+    var_names = list(map(simple_varname, args))
     cols = [__data[name] for name in var_names]
     # see https://stackoverflow.com/a/25636395/1144523
     cprod = cartesian_product(cols)
