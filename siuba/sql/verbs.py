@@ -238,6 +238,11 @@ def collect(__data, as_df = True):
 
     return __data.source.execute(compiled).fetchall()
 
+@collect.register(pd.DataFrame)
+def _collect(__data, *args, **kwargs):
+    # simply return DataFrame, since requires no execution
+    return __data
+
 
 @select.register(LazyTbl)
 def _select(__data, *args, **kwargs):
@@ -461,7 +466,16 @@ def _summarize(__data, **kwargs):
 
 @group_by.register(LazyTbl)
 def _group_by(__data, *args):
-    return __data.copy(group_by = args)
+    cols = __data.last_op.columns
+    groups = [simple_varname(arg) for arg in args]
+    if None in groups:
+        raise NotImplementedError("Complex expressions not supported in sql group_by")
+
+    unmatched = set(groups) - set(cols.keys())
+    if unmatched:
+        raise KeyError("group_by specifies columns missing from table: %s" %unmatched)
+
+    return __data.copy(group_by = groups)
 
 @ungroup.register(LazyTbl)
 def _ungroup(__data):
