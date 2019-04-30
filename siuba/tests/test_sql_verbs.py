@@ -1,4 +1,4 @@
-from siuba.sql import mutate, LazyTbl, collect
+from siuba.sql import group_by, mutate, LazyTbl, collect
 from siuba.siu import _
 from siuba.sql.translate import funcs
 
@@ -25,7 +25,7 @@ addresses = Table('addresses', metadata,
 )
 
 
-@pytest.fixture
+@pytest.fixture(scope = "module")
 def db():
     engine = create_engine('sqlite:///:memory:', echo=False)
 
@@ -42,6 +42,7 @@ def db():
     yield conn
 
 
+# mutate ----------------------------------------------------------------------
 
 def test_sql_mutate(db):
     tbl = LazyTbl(db, addresses, funcs = funcs)
@@ -51,5 +52,26 @@ def test_sql_mutate(db):
 
     assert_frame_equal(out1, out2)
 
-    
 
+# group_by --------------------------------------------------------------------
+
+@pytest.mark.parametrize("group_vars", [
+    ["id",],                                # string syntax
+    ["id", "user_id"],                      # string syntax multiple
+    [_.id],                                 # _ syntax
+    [_.id, _.user_id],                      # _ syntax multiple
+    ])
+def test_sql_group_by(db, group_vars):
+    tbl = LazyTbl(db, addresses, funcs = funcs)
+    group_by(tbl, *group_vars)
+
+
+@pytest.mark.parametrize("group_var, error", [
+    (_.id + 1, NotImplementedError),        # complex expressions
+    (_.notacol, KeyError)                   # missing columns
+    ])
+def tets_sql_group_by_fail(db, group_var, error):
+    tbl = LazyTbl(db, addresses, funcs = funcs)
+    with pytest.raises(error):
+        group_by(tbl, group_var)
+    
