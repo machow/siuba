@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 setup(
     name='siuba',
     packages=find_packages(),
-    version='0.0.5',
+    version='0.0.6',
     description='A package for quick, scrappy analyses with pandas and SQL',
     author='Michael Chow',
     license='BSD',
