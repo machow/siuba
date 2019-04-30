@@ -181,6 +181,19 @@ class LazyTbl:
     def last_op(self):
         return self.ops[-1] if len(self.ops) else None
 
+    def __repr__(self):
+        tbl_small = self.append_op(self.last_op.limit(5))
+
+        # makes sure to get engine, even if sqlalchemy connection obj
+        engine = self.source.engine
+
+        return ("# Source: lazy query\n"
+                "# DB Conn: {}\n"
+                "# Preview:\n{}\n"
+                "# .. may have more rows"
+                    .format(repr(engine), repr(collect(tbl_small)))
+                )
+
 
 # Main Funcs 
 # =============================================================================
