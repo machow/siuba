@@ -1,3 +1,7 @@
+# version ---------------------------------------------------------------------
+__version__ = "0.0.6"
+
+# default imports--------------------------------------------------------------
 from .siu import _, Lam
 from .dply.verbs import *
 from .dply.verbs import __all__ as ALL_DPLY
