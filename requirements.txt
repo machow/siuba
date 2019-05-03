@@ -9,3 +9,4 @@ nbval==0.9.1
 scikit-learn==0.20.2
 # used for docs
 nbsphinx==0.4.2
+jupytext==1.1.1
