@@ -2,8 +2,8 @@
     :maxdepth: 3
     :hidden:
 
-    intro.ipynb
-    intro_sql.ipynb
+    intro.Rmd
+    intro_sql.Rmd
 
 .. toctree::
     :caption: Core One-table Verbs

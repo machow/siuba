@@ -66,7 +66,14 @@ html_theme_options = {
     "github_button": False
     }
 
-# -- Binder ---------------------------------------------------------------
+# -- nbsphinx customization ---------------------------------------------------
+
+import jupytext
+
+nbsphinx_custom_formats = {
+    '.Rmd': lambda s: jupytext.reads(s, '.Rmd'),
+}
+
 # This is processed by Jinja2 and inserted before each notebook
 nbsphinx_epilog = r"""
 {% set docname = env.doc2path(env.docname, base='doc') %}

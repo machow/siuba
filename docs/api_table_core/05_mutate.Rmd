@@ -1,0 +1,43 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.1'
+      jupytext_version: 1.1.1
+  kernelspec:
+    display_name: Python 3
+    language: python
+    name: python3
+---
+
+```{python nbsphinx=hidden}
+import pandas as pd
+pd.set_option("display.max_rows", 5)
+```
+
+## Mutate
+
+```{python}
+from siuba import _, mutate
+from siuba.data import mtcars
+```
+
+### Example 1: Assign new column
+
+```{python}
+mutate(mtcars, cyl2 = _.cyl * 2)
+```
+
+### Example 2: Reference new column in mutate
+
+```{python}
+mutate(mtcars, cyl2 = _.cyl * 2, cyl4 = _.cyl2 * 2)
+```
+
+### Example 3: Assign new column from multiple
+
+```{python}
+mutate(mtcars, hp_per_wt = _.hp / _.wt)
+```
