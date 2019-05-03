@@ -1,5 +1,7 @@
 NOTEBOOK_TESTS=$(addprefix examples/, examples-dplyr-funcs.ipynb case-iris-select.ipynb examples-postgres.ipynb examples-varspec.ipynb)
 
+.PHONY: docs
+
 test:
 	py.test --nbval $(NOTEBOOK_TESTS)
 	py.test
@@ -11,3 +13,6 @@ test-travis:
 examples/%.ipynb:
 	jupyter nbconvert --to notebook --inplace --execute $@
 	jupytext --sync $@
+
+docs:
+	cd docs && sphinx-autobuild . ./_build/html

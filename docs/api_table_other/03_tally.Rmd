@@ -1,0 +1,43 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.1'
+      jupytext_version: 1.1.1
+  kernelspec:
+    display_name: Python 3
+    language: python
+    name: python3
+---
+
+```{python nbsphinx=hidden}
+import pandas as pd
+pd.set_option("display.max_rows", 5)
+```
+
+## Tally
+
+```{python}
+from siuba import _
+from siuba.data import mtcars
+```
+
+### Example 1: 
+
+```{python}
+
+```
+
+### Example 2: 
+
+```{python}
+
+```
+
+### Example 3: 
+
+```{python}
+
+```

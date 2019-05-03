@@ -1,8 +1,21 @@
 from setuptools import setup, find_packages
+
+# parse version ---------------------------------------------------------------
+
+import re
+import ast
+_version_re = re.compile(r'__version__\s+=\s+(.*)')
+
+with open('siuba/__init__.py', 'rb') as f:
+    version = str(ast.literal_eval(_version_re.search(
+        f.read().decode('utf-8')).group(1)))
+
+# setup -----------------------------------------------------------------------
+
 setup(
     name='siuba',
     packages=find_packages(),
-    version='0.0.6',
+    version=version,
     description='A package for quick, scrappy analyses with pandas and SQL',
     author='Michael Chow',
     license='BSD',
