@@ -51,8 +51,11 @@ except Exception:
 
 # -- Options for HTML output ----------------------------------------------
 
+import alabaster
+
 html_title = project + ' version ' + release
-#html_theme = 'sphinx_rtd_theme'
+
+html_theme = 'alabaster'
 
 html_theme_options = {
     #"description": "",
