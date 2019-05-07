@@ -499,7 +499,7 @@ def slice_to_call(x):
         args = map(strip_symbolic, (x.start, x.stop, x.step))
         return Call("__call__", slice, *args)
     
-    return x
+    return strip_symbolic(x)
 
 
     
