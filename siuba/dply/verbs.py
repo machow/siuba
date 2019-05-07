@@ -19,12 +19,12 @@ DPLY_FUNCTIONS = (
         "nest", "unnest",
         "expand", "complete",
         # Joins ----
-        "join", "left_join", "right_join", "semi_join", "full_join",
+        "join", "inner_join", "left_join", "right_join", "semi_join", "full_join",
         # TODO: move to vectors
         "if_else", "case_when",
         )
 
-__all__ = [*DPLY_FUNCTIONS, "Pipeable"]
+__all__ = [*DPLY_FUNCTIONS, "Pipeable", "pipe"]
 
 
 # General TODO ================================================================
@@ -797,7 +797,7 @@ def _join(left, right, on = None, how = None):
     raise Exception("Unsupported type %s" %type(left))
 
 
-@singledispatch2
+@singledispatch2(pd.DataFrame)
 def semi_join(left, right = None, on = None):
     if isinstance(on, Mapping):
         left_on, right_on = zip(*on.items())
