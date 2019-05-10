@@ -756,6 +756,23 @@ def add_count(__data, *args, wt = None, sort = False, **kwargs):
 
 @singledispatch2(pd.DataFrame)
 def nest(__data, *args, key = "data"):
+    """Nest columns within a DataFrame.
+    
+
+    Args:
+        ___data: a DataFrame
+        *args: the names of columns to be nested. May use any syntax used by
+               the ``select`` function.
+        key: the name of the column that will hold the nested columns.
+
+    Examples
+    --------
+
+    ::
+        from siuba.data import mtcars
+        mtcars >> nest(-_.cyl)
+        
+    """
     # TODO: copied from select function
     var_list = var_create(*args)
     od = var_select(__data.columns, *var_list)
@@ -789,6 +806,21 @@ def _nest(__data, *args, key = "data"):
 
 @singledispatch2(pd.DataFrame)
 def unnest(__data, key = "data"):
+    """Unnest a column holding nested data (e.g. Series of lists or DataFrames).
+    
+    Args:
+        ___data: a DataFrame
+        key: the name of the column to be unnested.
+
+    Examples
+    --------
+
+    ::
+        import pandas as pd
+        df = pd.DataFrame({'id': [1,2], 'data': [['a', 'b'], ['c', 'd']]})
+        df >> unnest()
+        
+    """
     # TODO: currently only takes key, not expressions
     nrows_nested = __data[key].apply(len, convert_dtype = True)
     indx_nested = nrows_nested.index.repeat(nrows_nested)
