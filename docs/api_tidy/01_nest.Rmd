@@ -1,0 +1,61 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.1'
+      jupytext_version: 1.1.1
+  kernelspec:
+    display_name: Python 3
+    language: python
+    name: python3
+---
+
+```{python nbsphinx=hidden}
+import pandas as pd
+pd.set_option("display.max_rows", 5)
+```
+
+## Nest
+
+```{python}
+from siuba import _, nest, unnest, group_by
+from gapminder import gapminder
+```
+
+### Example 1: 
+
+```{python}
+gap_country = nest(gapminder, -_.country)
+gap_country
+```
+
+```{python}
+# unnest is its inverse (except for some sorting!)
+unnest(gap_country, "data")
+```
+
+### Example 2: 
+
+```{python}
+# specifying columns to nest directly
+df = pd.DataFrame({
+    'group': ['a', 'a', 'b', 'b'],
+    'value': [1,2,3,4]
+})
+
+df >> nest(_.value)
+```
+
+### Example 3: 
+
+```{python}
+# equivalent to
+# gapminder >> nest(-_.country, -_.continent)
+
+(gapminder
+  >> group_by(_.country, _.continent)
+  >> nest()
+  )
+```

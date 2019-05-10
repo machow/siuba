@@ -390,6 +390,7 @@ def _transmute(__data, *args, **kwargs):
 # Select ======================================================================
 
 from collections import OrderedDict
+from itertools import chain
 
 class Var:
     def __init__(self, name, negated = False, alias = None):
@@ -471,6 +472,13 @@ def var_put_cols(name, var, cols):
         #elif name in cols: cols.move_to_end(name)
         else: cols[name] = var.alias
 
+def flatten_var(var):
+    if isinstance(var, Var) and isinstance(var.name, (tuple, list)):
+        return [var.to_copy(name = x) for x in var.name]
+    
+    return [var]
+            
+
 
 
 def var_select(colnames, *args):
@@ -479,8 +487,11 @@ def var_select(colnames, *args):
     cols = OrderedDict()
     everything = None
 
+    #flat_args = var_flatten(args)
+    all_vars = chain(*map(flatten_var, args))
+
     # Add entries in pandas.rename style {"orig_name": "new_name"}
-    for arg in args:
+    for arg in all_vars:
         # strings are added directly
         if isinstance(arg, str):
             cols[arg] = None
@@ -514,13 +525,22 @@ def var_select(colnames, *args):
 
     return cols
 
+def var_create(*args):
+    vl = VarList()
+    all_vars = []
+    for arg in args:
+        if callable(arg) and not isinstance(arg, Var):
+            all_vars.append(arg(vl))
+        else:
+            all_vars.append(arg)
+     
+    return all_vars
 
 @singledispatch2(DataFrame)
 def select(__data, *args, **kwargs):
-    vl = VarList()
-    evaluated = (arg(vl) if callable(arg) else arg for arg in args)
+    var_list = var_create(*args)
 
-    od = var_select(__data.columns, *evaluated)
+    od = var_select(__data.columns, *var_list)
 
     to_rename = {k: v for k,v in od.items() if v is not None}
 
@@ -737,9 +757,8 @@ def add_count(__data, *args, wt = None, sort = False, **kwargs):
 @singledispatch2(pd.DataFrame)
 def nest(__data, *args, key = "data"):
     # TODO: copied from select function
-    vl = VarList()
-    evaluated = (arg(vl) if callable(arg) else arg for arg in args)
-    od = var_select(__data.columns, *evaluated)
+    var_list = var_create(*args)
+    od = var_select(__data.columns, *var_list)
 
     # unselected columns are treated similar to using groupby
     grp_keys = list(k for k in __data.columns if k not in set(od))
@@ -755,22 +774,32 @@ def nest(__data, *args, key = "data"):
 
     return out
 
+@nest.register(DataFrameGroupBy)
+def _nest(__data, *args, key = "data"):
+    grp_keys = [x.name for x in __data.grouper.groupings]
+    if None in grp_keys:
+        raise NotImplementedError("All groupby variables must be named when using nest")
+
+    return nest(__data.obj, -Var(grp_keys), *args, key = key)
+
+
+
 
 # Unnest ======================================================================
 
 @singledispatch2(pd.DataFrame)
-def unnest(__data, key):
+def unnest(__data, key = "data"):
     # TODO: currently only takes key, not expressions
     nrows_nested = __data[key].apply(len, convert_dtype = True)
     indx_nested = nrows_nested.index.repeat(nrows_nested)
 
     grp_keys = list(__data.columns[__data.columns != key])
 
-    out = pd.concat(__data[key].tolist(), ignore_index = True)
+    long_data = pd.concat(__data[key].tolist(), ignore_index = True)
     # may be a better approach using a multi-index
     long_grp = __data.loc[indx_nested, grp_keys].reset_index(drop = True)
     
-    return out.join(long_grp)
+    return long_grp.join(long_data)
 
 
 # Joins =======================================================================
@@ -836,9 +865,8 @@ def gather(__data, key = "key", value = "value", *args, drop_na = False, convert
         raise NotImplementedError("convert not yet implemented")
 
     # TODO: copied from nest and select
-    vl = VarList()
-    evaluated = [arg(vl) if callable(arg) else arg for arg in args]
-    od = var_select(__data.columns, *evaluated)
+    var_list = var_create(*args)
+    od = var_select(__data.columns, *var_list)
 
     value_vars = list(od) or None
 
