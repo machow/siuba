@@ -795,11 +795,21 @@ def unnest(__data, key = "data"):
 
     grp_keys = list(__data.columns[__data.columns != key])
 
-    long_data = pd.concat(__data[key].tolist(), ignore_index = True)
+    # flatten nested data
+    data_entries = map(_convert_nested_entry, __data[key])
+    long_data = pd.concat(data_entries, ignore_index = True)
+    long_data.name = key
+
     # may be a better approach using a multi-index
     long_grp = __data.loc[indx_nested, grp_keys].reset_index(drop = True)
     
     return long_grp.join(long_data)
+
+def _convert_nested_entry(x):
+    if isinstance(x, (tuple, list)):
+        return pd.Series(x)
+    
+    return x
 
 
 # Joins =======================================================================

@@ -96,3 +96,12 @@ def test_nest_unnest(df1):
     sorted_df = df1.sort_values(["repo"]).reset_index(drop = True)
     assert_frame_equal(out, sorted_df)
 
+def test_unnest_lists():
+    df = pd.DataFrame({'id': [1,2], 'data': [['a'], ['x', 'y']]})
+    out = unnest(df)
+    assert_frame_equal(
+            out,
+            pd.DataFrame({'id': [1,2,2], 'data': ['a','x','y']})
+            )
+
+

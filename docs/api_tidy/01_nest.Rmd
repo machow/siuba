@@ -14,7 +14,7 @@ jupyter:
 
 ```{python nbsphinx=hidden}
 import pandas as pd
-pd.set_option("display.max_rows", 5)
+pd.set_option("display.max_rows", 20)
 ```
 
 ## Nest
@@ -57,5 +57,28 @@ df >> nest(_.value)
 (gapminder
   >> group_by(_.country, _.continent)
   >> nest()
+  )
+```
+
+### Splitting sentences into words
+
+
+For context, see [this Stack Overflow post](https://stackoverflow.com/questions/30885005/pandas-series-of-lists-to-one-series).
+
+```{python}
+from siuba import _, unnest, mutate
+
+sent = pd.DataFrame({
+    'id': ['1', '2'],
+    'sentence': ['a b c d e', 'x y z']
+})
+
+sent
+```
+
+```{python}
+(sent
+  >> mutate(data = _.sentence.str.split(" "))
+  >> unnest()
   )
 ```
