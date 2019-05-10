@@ -29,3 +29,79 @@ def test_dply_mutate_sym(df1):
 
     assert_frame_equal(out1, out2)
 
+# VarList and friends ------
+
+from siuba.dply.verbs import flatten_var, Var, VarList
+
+def test_flatten_vars():
+    v_a, v_b = flatten_var(-Var(["a", "b"]))
+    assert v_a.name == "a"
+    assert v_b.name == "b"
+    assert all([v_a.negated, v_b.negated])
+
+@pytest.mark.parametrize("x", [
+    ["x"],
+    [Var("x")],
+    [slice(0,1)]
+    ])
+def test_flatten_vars_noop(x):
+    assert x is flatten_var(x)[0]
+
+def test_VarList_getitem_siu():
+    vl = VarList()
+    f = lambda _: _[_.a, _.b]
+    var = f(vl)
+    v_a, v_b = var.name
+    assert v_a.name == "a"
+    assert v_b.name == "b"
+
+def test_VarList_getitem():
+    vl = VarList()
+    var = vl["a":"b", "c"]
+    assert isinstance(var.name[0], slice)
+    assert var.name[1] == "c"
+
+
+
+# Select ----------------------------------------------------------------------
+
+from siuba.dply.verbs import select
+
+def test_varlist_multi_slice(df1):
+    out = select(df1, lambda _: _["repo", "owner"])
+    assert out.columns.tolist() == ["repo", "owner"]
+
+def test_varlist_multi_slice_negate(df1):
+    out = select(df1, lambda _: -_["repo", "owner"])
+    assert out.columns.tolist() == ["language", "stars", "x"]
+
+
+# Nest ------------------------------------------------------------------------
+
+from siuba.dply.verbs import nest, unnest
+
+def test_nest_grouped(df1):
+    out = nest(df1.groupby("language"))
+    assert out.columns[0] == "language"
+
+    entry = out.loc[0, "data"]
+    assert isinstance(entry, pd.DataFrame)
+    assert entry.shape == (2, df1.shape[1] - 1)
+    
+def test_nest_unnest(df1):
+    # important that repo is first column, since grouping vars moved to front
+    out = unnest(nest(df1, -Var("repo")))
+
+    # since a nest implies grouping, we need to sort before comparing
+    sorted_df = df1.sort_values(["repo"]).reset_index(drop = True)
+    assert_frame_equal(out, sorted_df)
+
+def test_unnest_lists():
+    df = pd.DataFrame({'id': [1,2], 'data': [['a'], ['x', 'y']]})
+    out = unnest(df)
+    assert_frame_equal(
+            out,
+            pd.DataFrame({'id': [1,2,2], 'data': ['a','x','y']})
+            )
+
+

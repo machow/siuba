@@ -26,6 +26,13 @@
 
     api_table_two/*
 
+.. toctree::
+    :caption: Tidy Verbs
+    :hidden:
+    :glob:
+
+    api_tidy/*
+
 
 Siuba
 =====
