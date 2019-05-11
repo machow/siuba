@@ -93,9 +93,6 @@ def lift_inner_cols(tbl):
 
     return sql.base.ImmutableColumnCollection(data, cols)
 
-def is_grouped_sel(select):
-    return False
-
 def has_windows(clause):
     windows = []
     append_win = lambda col: windows.append(col)
@@ -618,8 +615,8 @@ def _rename(__data, **kwargs):
 
 @distinct.register(LazyTbl)
 def _distinct(__data, *args, _keep_all = False, **kwargs):
-    if _keep_all:
-        raise NotImplementedError("Distinct in sql requires _keep_all = True")
+    if (args or kwargs) and _keep_all:
+        raise NotImplementedError("Distinct with variables specified in sql requires _keep_all = False")
 
     inner_sel = mutate(__data, **kwargs).last_op if kwargs else __data.last_op
 
@@ -632,6 +629,8 @@ def _distinct(__data, *args, _keep_all = False, **kwargs):
         raise Exception("positional arguments must be simple column, "
                         "e.g. _.colname or _['colname']"
                         )
+
+    if not cols: cols = list(inner_sel.columns.keys())
 
     sel_cols = lift_inner_cols(inner_sel)
     distinct_cols = [sel_cols[k] for k in cols]
