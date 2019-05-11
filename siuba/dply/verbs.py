@@ -621,6 +621,7 @@ def arrange(__data, *args):
 
 @singledispatch2(DataFrame)
 def distinct(__data, *args, _keep_all = False, **kwargs):
+    # using dict as ordered set
     cols = {simple_varname(x): True for x in args}
     if None in cols:
         raise Exception("positional arguments must be simple column, "
@@ -629,10 +630,14 @@ def distinct(__data, *args, _keep_all = False, **kwargs):
 
     # mutate kwargs
     cols.update(kwargs)
-    tmp_data = mutate(__data, **kwargs).drop_duplicates(cols)
+
+    # special case: use all variables when none are specified
+    if not len(cols): cols = __data.columns
+
+    tmp_data = mutate(__data, **kwargs).drop_duplicates(list(cols)).reset_index(drop = True)
 
     if not _keep_all:
-        return tmp_data[cols]
+        return tmp_data[list(cols)]
 
     return tmp_data
         

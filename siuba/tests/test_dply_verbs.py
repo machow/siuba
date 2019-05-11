@@ -76,6 +76,15 @@ def test_varlist_multi_slice_negate(df1):
     assert out.columns.tolist() == ["language", "stars", "x"]
 
 
+# Distinct --------------------------------------------------------------------
+
+from siuba.dply.verbs import distinct
+
+def test_distinct_no_args():
+    df =pd.DataFrame({'x': [1,1,2], 'y': [1,1,2]})
+    assert_frame_equal(distinct(df), df.drop_duplicates().reset_index(drop = True))
+
+
 # Nest ------------------------------------------------------------------------
 
 from siuba.dply.verbs import nest, unnest
