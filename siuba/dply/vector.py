@@ -32,7 +32,7 @@ def cummean(x):
 
 @register_symbolic
 def desc(x):
-    NotImplementedError("Use minus sign in arrange instead (e.g. -_.somecol)")
+    return x.sort_values()
 
 
 @register_symbolic

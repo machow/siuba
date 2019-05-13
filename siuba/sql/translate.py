@@ -9,23 +9,61 @@ def sa_is_window(clause):
             or isinstance(clause, sql.elements.WithinGroup)
 
 
-def sa_modify_window(clause, columns, group_by = None, order_by = None):
-    cls = clause.__class__ if sa_is_window(clause) else getattr(clause, "over")
+def sa_modify_window(clause, group_by = None, order_by = None):
     if group_by:
-        partition_by = [columns[name] for name in group_by]
-        return cls(**{**clause.__dict__, 'partition_by': partition_by})
+        group_cols = [columns[name] for name in group_by]
+        partition_by = sql.elements.ClauseList(*group_cols)
+        clone = clause._clone()
+        clone.partition_by = partition_by
+
+        return clone
 
     return clause
 
+from sqlalchemy.sql.elements import Over
+# windowed agg (group by)
+# agg
+# windowed scalar
+# ordered set agg
+
+class CustomOverClause: pass
+
+class AggOver(Over, CustomOverClause):
+    def set_over(self, group_by, order_by = None):
+        self.partition_by = group_by
+        return self
+
+
+class RankOver(Over, CustomOverClause): 
+    def set_over(self, group_by, order_by = None):
+        self.partition_by = group_by
+        return self
+
+
+class CumlOver(Over, CustomOverClause):
+    def set_over(self, group_by, order_by):
+        self.partition_by = group_by
+        self.order_by = order_by
+        return self
+
+
+def win_absent(name):
+    def not_implemented(*args, **kwargs):
+        raise NotImplementedError("SQL dialect does not support {}.".format(name))
+    
+    return not_implemented
 
 def win_over(name):
     sa_func = getattr(sql.func, name)
-    return lambda col: sa_func().over(order_by = col)
+    return lambda col: RankOver(sa_func(), order_by = col)
 
+def win_cumul(name):
+    sa_func = getattr(sql.func, name)
+    return lambda col: CumlOver(sa_func(col), rows = (None,0))
 
 def win_agg(name):
     sa_func = getattr(sql.func, name)
-    return lambda col: sa_func(col).over()
+    return lambda col: AggOver(sa_func(col))
 
 def sql_agg(name):
     sa_func = getattr(sql.func, name)
@@ -73,6 +111,7 @@ base_scalar = dict(
         isna = lambda col: col.is_(None),
         isnull = lambda col: col.is_(None),
         # dply.vector funcs ----
+        desc = lambda col: col.desc(),
         
         # TODO: string methods
         #str.len,
@@ -130,10 +169,45 @@ base_win = dict(
         # cumulative funcs ---
         #avg("id") OVER (PARTITION BY "email" ORDER BY "id" ROWS UNBOUNDED PRECEDING)
         #cummean = win_agg("
-        #cumsum
+        cumsum = win_cumul("sum")
         #cummin
         #cummax
 
+        )
+
+# based on https://github.com/tidyverse/dbplyr/blob/master/R/backend-.R
+base_nowin = dict(
+        row_number   = win_absent("ROW_NUMBER"),
+        min_rank     = win_absent("RANK"),
+        rank         = win_absent("RANK"),
+        dense_rank   = win_absent("DENSE_RANK"),
+        percent_rank = win_absent("PERCENT_RANK"),
+        cume_dist    = win_absent("CUME_DIST"),
+        ntile        = win_absent("NTILE"),
+        mean         = win_absent("AVG"),
+        sd           = win_absent("SD"),
+        var          = win_absent("VAR"),
+        cov          = win_absent("COV"),
+        cor          = win_absent("COR"),
+        sum          = win_absent("SUM"),
+        min          = win_absent("MIN"),
+        max          = win_absent("MAX"),
+        median       = win_absent("PERCENTILE_CONT"),
+        quantile    = win_absent("PERCENTILE_CONT"),
+        n            = win_absent("N"),
+        n_distinct   = win_absent("N_DISTINCT"),
+        cummean      = win_absent("MEAN"),
+        cumsum       = win_absent("SUM"),
+        cummin       = win_absent("MIN"),
+        cummax       = win_absent("MAX"),
+        nth          = win_absent("NTH_VALUE"),
+        first        = win_absent("FIRST_VALUE"),
+        last         = win_absent("LAST_VALUE"),
+        lead         = win_absent("LEAD"),
+        lag          = win_absent("LAG"),
+        order_by     = win_absent("ORDER_BY"),
+        str_flatten  = win_absent("STR_FLATTEN"),
+        count        = win_absent("COUNT")
         )
 
 funcs = dict(scalar = base_scalar, aggregate = base_agg, window = base_win)

@@ -502,6 +502,9 @@ def slice_to_call(x):
     return strip_symbolic(x)
 
 
+def str_to_getitem_call(x):
+    return Call("__getitem__", MetaArg("_"), x)
+
     
 def strip_symbolic(x):
     if isinstance(x, Symbolic):

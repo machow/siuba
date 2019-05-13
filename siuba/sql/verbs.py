@@ -16,12 +16,12 @@ from siuba.dply.verbs import (
         distinct,
         if_else
         )
-from .translate import sa_modify_window, sa_is_window
+from .translate import sa_modify_window, sa_is_window, CustomOverClause
 from .utils import get_dialect_funcs
 
 from sqlalchemy import sql
 import sqlalchemy
-from siuba.siu import Call, CallTreeLocal
+from siuba.siu import Call, CallTreeLocal, str_to_getitem_call
 # TODO: currently needed for select, but can we remove pandas?
 from pandas import Series
 import pandas as pd
@@ -57,17 +57,26 @@ class WindowReplacer(CallListener):
     TODO: could replace with a sqlalchemy transformer
     """
 
-    def __init__(self, columns, group_by, window_cte = None):
+    def __init__(self, columns, group_by, order_by, window_cte = None):
         self.columns = columns
         self.group_by = group_by
+        self.order_by = order_by
         self.window_cte = window_cte
         self.windows = []
 
     def exit(self, node):
         # evaluate
         col_expr = node(self.columns)
-        if sa_is_window(col_expr):
-            label = sa_modify_window(col_expr, self.columns, self.group_by).label(None)
+        if isinstance(col_expr, CustomOverClause):
+            group_by = sql.elements.ClauseList(
+                    *[self.columns[name] for name in self.group_by]
+                    )
+            order_by = sql.elements.ClauseList(
+                    *_create_order_by_clause(self.columns, *self.order_by)
+                    )
+
+            label = col_expr.set_over(group_by, order_by).label(None)
+            #label = sa_modify_window(col_expr, self.columns, self.group_by).label(None)
 
             self.windows.append(label)
 
@@ -81,8 +90,8 @@ class WindowReplacer(CallListener):
         return col_expr
 
 
-def track_call_windows(call, columns, group_by, window_cte = None):
-    listener = WindowReplacer(columns, group_by, window_cte)
+def track_call_windows(call, columns, group_by, order_by, window_cte = None):
+    listener = WindowReplacer(columns, group_by, order_by, window_cte)
     col = listener.enter(call)
     return col, listener.windows
 
@@ -92,16 +101,6 @@ def lift_inner_cols(tbl):
     data = {col.key: col for col in cols}
 
     return sql.base.ImmutableColumnCollection(data, cols)
-
-def has_windows(clause):
-    windows = []
-    append_win = lambda col: windows.append(col)
-
-    sql.util.visitors.traverse(clause, {}, {"over": append_win})
-    if len(windows):
-        return True
-
-    return False
 
 def compile_el(tbl, el):
     compiled = el.compile(
@@ -140,22 +139,19 @@ class LazyTbl:
         self.rm_attr = rm_attr
         self.call_sub_attr = call_sub_attr
 
-    def append_op(self, op):
-        return self.__class__(
-                self.source,
-                self.tbl,
-                self.ops + [op],
-                self.group_by,
-                self.order_by,
-                self.funcs,
-                self.rm_attr,
-                self.call_sub_attr
-                )
+    def append_op(self, op, **kwargs):
+        cpy = self.copy(**kwargs)
+        cpy.ops = cpy.ops + [op]
+        return cpy
 
     def copy(self, **kwargs):
         return self.__class__(**{**self.__dict__, **kwargs})
 
-    def shape_call(self, call, window = True):
+    def shape_call(self, call, window = True, str_accessors = False):
+        # TODO: error if mutate receives a literal value?
+        if str_accessors and isinstance(call, str):
+            return str_to_get_item_call(call)
+
         f_dict1 = self.funcs['scalar']
         f_dict2 = self.funcs['window' if window else 'aggregate']
 
@@ -172,7 +168,11 @@ class LazyTbl:
         """Returns tuple of (new column expression, list of window exprs)"""
 
         columns = self.last_op.columns if columns is None else columns
-        return track_call_windows(call, columns, self.group_by, window_cte)
+        return track_call_windows(call, columns, self.group_by, self.order_by, window_cte)
+
+    def get_ordered_col_names(self):
+        ungrouped = [k for k in self.last_op.columns.keys() if k not in self.group_by]
+        return list(self.group_by) + ungrouped
 
     @property
     def last_op(self):
@@ -282,14 +282,13 @@ def _filter(__data, *args, **kwargs):
     #       1 for window/aggs, and 1 for the where clause
     sel = __data.last_op.alias()
     win_sel = sql.select([sel], from_obj = sel)
-    #fil_sel = sql.select([win_sel], from_obj = win_sel)
 
     conds = []
     windows = []
     for arg in args:
         if isinstance(arg, Call):
             new_call = __data.shape_call(arg)
-            var_cols = new_call.op_vars(attr_calls = False)
+            #var_cols = new_call.op_vars(attr_calls = False)
 
             col_expr, win_cols = __data.track_call_windows(
                     new_call,
@@ -297,8 +296,6 @@ def _filter(__data, *args, **kwargs):
                     window_cte = win_sel
                     )
 
-            #if sa_is_window(col_expr):
-            #    col_expr = sa_modify_window(col_expr, columns, __data.group_by)
             conds.append(col_expr)
         else:
             conds.append(arg)
@@ -309,9 +306,10 @@ def _filter(__data, *args, **kwargs):
     win_alias = win_sel.alias()
     bool_clause = sql.util.ClauseAdapter(win_alias).traverse(bool_clause)
 
-
-    sel = sql.select([win_alias], from_obj = win_alias, whereclause = bool_clause)
-    return __data.append_op(sel)
+    
+    orig_cols = [win_alias.columns[k] for k in __data.get_ordered_col_names()]
+    filt_sel = sql.select(orig_cols, from_obj = win_alias, whereclause = bool_clause)
+    return __data.append_op(filt_sel)
 
 
 @mutate.register(LazyTbl)
@@ -371,20 +369,34 @@ def _arrange(__data, *args):
     last_op = __data.last_op
     cols = lift_inner_cols(last_op)
 
+    new_calls = tuple(
+            __data.shape_call(expr, window = False) if callable(expr) else expr
+            for expr in args
+            )
+
+    sort_cols = _create_order_by_clause(cols, *args)
+
+    return __data.append_op(last_op.order_by(*sort_cols), order_by = new_calls)
+
+
+# TODO: consolidate / pull expr handling funcs into own file?
+def _create_order_by_clause(columns, *args):
     sort_cols = []
     for arg in args:
         # simple named column
         if isinstance(arg, str):
-            sort_cols.append(cols[arg])
+            sort_cols.append(columns[arg])
         # an expression
         elif callable(arg):
-            f, asc = _call_strip_ascending(arg)
-            col_op = f(cols) if asc else f(cols).desc()
+            #f, asc = _call_strip_ascending(arg)
+            #col_op = f(cols) if asc else f(cols).desc()
+            col_op = arg(columns)
             sort_cols.append(col_op)
         else:
             raise NotImplementedError("Must be string or callable")
 
-    return __data.append_op(last_op.order_by(*sort_cols))
+    return sort_cols
+
 
 
 @count.register(LazyTbl)
