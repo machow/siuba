@@ -4,13 +4,13 @@ Note: this test file was heavily influenced by its dbplyr counterpart.
 https://github.com/tidyverse/dbplyr/blob/master/tests/testthat/test-verb-select.R
 """
     
-from siuba import _, mutate, select, group_by
+from siuba import _, mutate, select, group_by, rename
 
 import pytest
 from .helpers import assert_equal_query, data_frame, backend_notimpl
 from string import ascii_lowercase 
 
-DATA = data_frame(a = 1, b = 2, c = 3, d = 4, e = 5)
+DATA = data_frame(a = 1, b = 2, c = 3)
 
 @pytest.fixture(scope = "module")
 def dfs(backend):
@@ -26,6 +26,18 @@ def dfs(backend):
     pytest.param( group_by(_.a) >> select(_.b), data_frame(b = 2, a = 1), marks = pytest.mark.xfail),
     ])
 def test_select_siu(dfs, query, output):
+    assert_equal_query(dfs, query, output)
+
+
+@pytest.mark.parametrize("query, output", [
+    ( rename(A = _.a), data_frame(A = 1, b = 2, c = 3) ),
+    ( rename(A = "a"), data_frame(A = 1, b = 2, c = 3) ),
+    ( rename(A = _.a, B = _.c), data_frame(A = 1, b = 2, B = 3) ),
+    ( rename(A = "a", B = "c"), data_frame(A = 1, b = 2, B = 3) ),
+    ( group_by(_.a) >> rename(z = _.a), data_frame(z = 1, b = 2, c = 3) ),
+    ( group_by(_.a) >> rename(z = "a"), data_frame(z = 1, b = 2, c = 3) )
+    ])
+def test_rename_siu(dfs, query, output):
     assert_equal_query(dfs, query, output)
 
 

@@ -614,7 +614,12 @@ def _rename(__data, **kwargs):
     columns = lift_inner_cols(sel)
 
     # old_keys uses dict as ordered set
-    old_to_new = {v:k for k,v in kwargs.items()}
+    old_to_new = {simple_varname(v):k for k,v in kwargs.items()}
+    
+    if None in old_to_new:
+        raise KeyError("positional arguments must be simple column, "
+                        "e.g. _.colname or _['colname']"
+                        )
 
     labs = [c.label(old_to_new[k]) if k in old_to_new else c for k,c in columns.items()]
 
@@ -638,7 +643,7 @@ def _distinct(__data, *args, _keep_all = False, **kwargs):
     cols.update(kwargs)
 
     if None in cols:
-        raise Exception("positional arguments must be simple column, "
+        raise KeyError("positional arguments must be simple column, "
                         "e.g. _.colname or _['colname']"
                         )
 
