@@ -18,7 +18,7 @@ def dfs(backend):
     return backend.load_df(DATA)
 
 @pytest.mark.parametrize("query, output", [
-    pytest.param(mutate(x = 1), DATA.assign(x = 1), marks = pytest.mark.skip("TODO")),
+    pytest.param(mutate(x = 1), DATA.assign(x = 1), marks = pytest.mark.skip("TODO #39")),
     (mutate(x = _.a + _.b), DATA.assign(x = [10, 10, 10])),
     pytest.param( mutate(x = _.a + _.b) >> summarize(ttl = _.x.sum()), data_frame(ttl = 30.0), marks = pytest.mark.skip("TODO: failing sqlite?")),
     (mutate(x = _.a + 1, y = _.b - 1), DATA.assign(x = [2,3,4], y = [8,7,6])),
@@ -29,15 +29,15 @@ def test_mutate_basic(dfs, query, output):
     assert_equal_query(dfs, query, output)
 
 
-@pytest.mark.skip("TODO: select and mutate not getting along")
+@pytest.mark.skip("mutate can't refer to alias select created (#45)")
 def test_select_mutate_filter(dfs):
     assert_equal_query(
             dfs,
-            select(x = _.a) >> mutate(y = _.x * 2) >> filter(_.z == 2),
-            data_frame(a = 1, b = 9)
+            select(x = _.a) >> mutate(y = _.x * 2) >> filter(_.y == 2),
+            data_frame(y = 2)
             )
 
-@pytest.mark.skip("TODO: check most recent vars for efficient mutate")
+@pytest.mark.skip("TODO: check most recent vars for efficient mutate (#41)")
 def test_mutate_smart_nesting(dfs):
     # y and z both use x, so should create only 1 extra query
     lazy_tbl = dfs >> mutate(x = _.a + 1, y = _.x + 1, z = _.x + 1)
@@ -48,7 +48,7 @@ def test_mutate_smart_nesting(dfs):
     assert isinstance(query.fromclause, sqlalchemy.Table )
 
 
-@pytest.mark.skip("TODO: does pandas backend preserve order?")
+@pytest.mark.skip("TODO: does pandas backend preserve order? (#42)")
 def test_mutate_reassign_column_ordering(dfs):
     assert_equal_query(
             dfs,
@@ -87,7 +87,7 @@ def test_mutate_using_cuml_agg(backend):
             data.assign(y = [1.0, 3, 3, 7])
             )
 
-@pytest.mark.skip("TODO: mutate not preserving var order")
+@pytest.mark.skip("TODO: mutate not preserving var order (#42)")
 def test_mutate_overwrites_prev(backend):
     # TODO: check that query doesn't generate a CTE
     dfs = backend.load_df(data_frame(x = range(1, 5), g = [1,1,2,2]))
