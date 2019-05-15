@@ -463,7 +463,10 @@ def _summarize(__data, **kwargs):
     else:
         # otherwise, can alter the existing select statement
         columns = lift_inner_cols(sel)
+        old_froms = sel.froms
+
         sel = sel.with_only_columns([])
+        sel.append_from(*old_froms)
 
     # add group by columns ----
     group_cols = [columns[k] for k in __data.group_by]

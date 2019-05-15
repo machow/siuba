@@ -122,7 +122,6 @@ base_scalar = dict(
         #str_trim func to cut text off sides
         # TODO: move to postgres specific
         n = lambda col: sql.func.count(),
-        sum = sql_scalar("sum"),
         # TODO: this is to support a DictCall (e.g. used in case_when)
         dict = dict,
         # TODO: don't use singledispatch to add sql support to case_when
@@ -132,6 +131,9 @@ base_scalar = dict(
 
 base_agg = dict(
         mean = sql_agg("avg"),
+        sum = sql_agg("sum"),
+        min = sql_agg("min"),
+        max = sql_agg("max"),
         # TODO: generalize case where doesn't use col
         # need better handeling of vector funcs
         len = lambda col: sql.func.count()
