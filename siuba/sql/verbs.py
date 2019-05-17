@@ -109,6 +109,14 @@ def compile_el(tbl, el):
     )
     return compiled
 
+# Misc utilities --------------------------------------------------------------
+
+def ordered_union(x, y):
+    dx = {el: True for el in x}
+    dy = {el: True for el in y}
+
+    return tuple({**dx, **dy})
+
 
 
 
@@ -485,14 +493,14 @@ def _summarize(__data, **kwargs):
 
     # TODO: is a simple method on __data for doing this...
     new_data = __data.append_op(sel)
-    new_data.group_by = None
+    new_data.group_by = tuple()
     return new_data
 
 
 @group_by.register(LazyTbl)
-def _group_by(__data, *args):
+def _group_by(__data, *args, add = False):
     cols = __data.last_op.columns
-    groups = [simple_varname(arg) for arg in args]
+    groups = tuple(simple_varname(arg) for arg in args)
     if None in groups:
         raise NotImplementedError("Complex expressions not supported in sql group_by")
 
@@ -500,11 +508,15 @@ def _group_by(__data, *args):
     if unmatched:
         raise KeyError("group_by specifies columns missing from table: %s" %unmatched)
 
+    if add:
+        groups = ordered_union(__data.group_by, groups)
+
     return __data.copy(group_by = groups)
+
 
 @ungroup.register(LazyTbl)
 def _ungroup(__data):
-    return __data.copy(group_by = None)
+    return __data.copy(group_by = tuple())
 
 
 @case_when.register(sql.base.ImmutableColumnCollection)
