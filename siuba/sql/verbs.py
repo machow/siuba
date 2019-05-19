@@ -575,19 +575,23 @@ def _relabeled_cols(columns, keys, suffix):
 
 
 @join.register(LazyTbl)
-def _join(left, right, on = None, how = None):
+def _join(left, right, on = None, how = "inner"):
     # Needs to be on the table, not the select
     left_sel = left.last_op.alias()
     right_sel = right.last_op.alias()
+
+    # handle on argument ----
+    on = _validate_join_arg_on(on)
+
+    # handle how argument ----
+    how = _validate_join_arg_how(how)
     
-    if on is None:
-        raise NotImplementedError("on arg must currently be dict")
-    elif isinstance(on, (list, tuple)):
-        on = dict(zip(on, on))
+    if how == "right":
+        # switch joins, since sqlalchemy doesn't have right join arg
+        # see https://stackoverflow.com/q/11400307/1144523
+        left_sel, right_sel = right_sel, left_sel
 
-    if not isinstance(on, Mapping):
-        raise Exception("on must be a Mapping (e.g. dict)")
-
+    # create join conditions ----
     left_cols  = left_sel.columns  #lift_inner_cols(left_sel)
     right_cols = right_sel.columns #lift_inner_cols(right_sel)
 
@@ -596,9 +600,15 @@ def _join(left, right, on = None, how = None):
         col_expr = left_cols[l] == right_cols[r]
         conds.append(col_expr)
         
-
     bool_clause = sql.and_(*conds)
-    join = left_sel.join(right_sel, onclause = bool_clause)
+
+    # create join ----
+    join = left_sel.join(
+            right_sel,
+            onclause = bool_clause,
+            isouter = False if how == "inner" else True,
+            full = True if how == "full" else False
+            )
     
     # note, shared_keys assumes on is a mapping...
     shared_keys = [k for k,v in on.items() if k == v]
@@ -610,6 +620,24 @@ def _join(left, right, on = None, how = None):
 
     sel = sql.select(labeled_cols, from_obj = join)
     return left.append_op(sel)
+
+def _validate_join_arg_on(on):
+    if on is None:
+        raise NotImplementedError("on arg must currently be dict")
+    elif isinstance(on, (list, tuple)):
+        on = dict(zip(on, on))
+
+    if not isinstance(on, Mapping):
+        raise TypeError("on must be a Mapping (e.g. dict)")
+
+    return on
+
+def _validate_join_arg_how(how):
+    how_options = ("inner", "left", "right", "full")
+    if how not in how_options:
+        raise ValueError("how argument needs to be one of %s" %how_options)
+    
+    return how
 
 
 # Head ------------------------------------------------------------------------
