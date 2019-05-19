@@ -5,7 +5,6 @@ import pandas as pd
 import os
 import numpy as np
 
-
 def data_frame(**kwargs):
     fixed = {k: [v] if not np.ndim(v) else v for k,v in kwargs.items()}
     return pd.DataFrame(fixed)
@@ -90,6 +89,9 @@ def auto_types(df):
 
 
 def copy_to_sql(df, name, engine):
+    if isinstance(engine, str):
+        engine = create_engine(engine)
+
     df.to_sql(name, engine, dtype = auto_types(df), index = False, if_exists = "replace")
     return LazyTbl(engine, name)
 
