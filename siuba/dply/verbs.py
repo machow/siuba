@@ -19,7 +19,7 @@ DPLY_FUNCTIONS = (
         "nest", "unnest",
         "expand", "complete",
         # Joins ----
-        "join", "inner_join", "left_join", "right_join", "semi_join", "full_join",
+        "join", "inner_join", "full_join", "left_join", "right_join", "semi_join", "anti_join",
         # TODO: move to vectors
         "if_else", "case_when",
         )
@@ -890,6 +890,8 @@ def semi_join(left, right = None, on = None):
 
     return left.merge(right.loc[:,on_cols], how = 'inner', on = on_cols)
 
+def anti_join(*args, **kwargs):
+    raise NotImplementedError("anti_join not currently implemented")
 
 left_join = partial(join, how = "left")
 right_join = partial(join, how = "right")
