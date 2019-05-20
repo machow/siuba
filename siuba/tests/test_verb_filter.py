@@ -5,7 +5,7 @@ https://github.com/tidyverse/dbplyr/blob/master/tests/testthat/test-verb-filter.
 """
     
 from siuba import _, filter, group_by, arrange
-from siuba.dply.vector import row_number
+from siuba.dply.vector import row_number, desc
 import pandas as pd
 
 import pytest
@@ -59,5 +59,15 @@ def test_filter_via_group_by_arrange(backend):
             dfs,
             group_by(_.g) >> arrange(_.x) >> filter(_.x.cumsum() > 3),
             data_frame(g = [1, 2, 2], x = [3, 3, 4])
+            )
+
+@backend_notimpl("sqlite")
+def test_filter_via_group_by_desc_arrange(backend):
+    dfs = backend.load_df(x = [3,2,1] + [2,3,4], g = [1]*3 + [2]*3)
+
+    assert_equal_query(
+            dfs,
+            group_by(_.g) >> arrange(desc(_.x)) >> filter(_.x.cumsum() > 3),
+            data_frame(g = [1, 1, 2, 2, 2], x = [2, 1, 4, 3, 2])
             )
 

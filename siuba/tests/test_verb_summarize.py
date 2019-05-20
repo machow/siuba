@@ -66,7 +66,6 @@ def test_summarize_no_same_call_var_refs(df):
         df >> summarize(y = _.x.min(), z = _.y + 1)
 
 
-@pytest.mark.skip("TODO (see #30)")
 def test_summarize_removes_order_vars(df):
     lazy_tbl = df >> summarize(n = n(_))
 

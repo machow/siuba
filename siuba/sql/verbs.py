@@ -382,9 +382,10 @@ def _arrange(__data, *args):
             for expr in args
             )
 
-    sort_cols = _create_order_by_clause(cols, *args)
+    sort_cols = _create_order_by_clause(cols, *new_calls)
 
-    return __data.append_op(last_op.order_by(*sort_cols), order_by = new_calls)
+    order_by = __data.order_by + new_calls
+    return __data.append_op(last_op.order_by(*sort_cols), order_by = order_by)
 
 
 # TODO: consolidate / pull expr handling funcs into own file?
@@ -492,8 +493,7 @@ def _summarize(__data, **kwargs):
         sel.append_column(col)
 
     # TODO: is a simple method on __data for doing this...
-    new_data = __data.append_op(sel)
-    new_data.group_by = tuple()
+    new_data = __data.append_op(sel, group_by = tuple(), order_by = tuple())
     return new_data
 
 

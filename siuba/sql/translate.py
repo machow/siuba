@@ -2,6 +2,7 @@ from sqlalchemy import sql
 from sqlalchemy.sql import sqltypes as types
 from functools import singledispatch
 from .verbs import case_when, if_else
+import warnings
 
 # TODO: must make these take both tbl, col as args, since hard to find window funcs
 def sa_is_window(clause):
@@ -44,6 +45,13 @@ class CumlOver(Over, CustomOverClause):
     def set_over(self, group_by, order_by):
         self.partition_by = group_by
         self.order_by = order_by
+
+        if not len(order_by):
+            warnings.warn(
+                    "No order by columns explicitly set in window function. SQL engine"
+                    "does not guarantee a row ordering. Recommend using an arrange beforehand.",
+                    RuntimeWarning
+                    )
         return self
 
 

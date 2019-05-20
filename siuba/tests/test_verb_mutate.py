@@ -81,11 +81,14 @@ def test_mutate_using_agg_expr(backend):
 def test_mutate_using_cuml_agg(backend):
     data = data_frame(x = range(1, 5), g = [1,1,2,2])
     dfs = backend.load_df(data)
-    assert_equal_query(
-            dfs,
-            group_by(_.g) >> mutate(y = _.x.cumsum()),
-            data.assign(y = [1.0, 3, 3, 7])
-            )
+
+    # cuml window without arrange before generates warning
+    with pytest.warns(None):
+        assert_equal_query(
+                dfs,
+                group_by(_.g) >> mutate(y = _.x.cumsum()),
+                data.assign(y = [1.0, 3, 3, 7])
+                )
 
 @pytest.mark.skip("TODO: mutate not preserving var order (#42)")
 def test_mutate_overwrites_prev(backend):
