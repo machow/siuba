@@ -43,11 +43,10 @@ def test_group_by_ungroup(df):
 def test_group_by_before_joins(df):
     assert False
 
-@pytest.mark.skip("TODO: (#52)")
 def test_group_by_performs_mutate(df):
     assert_equal_query(
             df,
             group_by(z = _.x + _.y) >> summarize(n = n(_)),
-            data_frame(z = 10, n = 4)
+            data_frame(z = 10, n = 3)
             )
 

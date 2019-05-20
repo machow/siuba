@@ -522,9 +522,16 @@ def _summarize(__data, **kwargs):
 
 
 @group_by.register(LazyTbl)
-def _group_by(__data, *args, add = False):
-    cols = __data.last_op.columns
-    groups = tuple(simple_varname(arg) for arg in args)
+def _group_by(__data, *args, add = False, **kwargs):
+    if kwargs:
+        data = mutate(__data, **kwargs)
+    else:
+        data = __data
+
+    cols = data.last_op.columns
+
+    # put kwarg grouping vars last, so similar order to function call
+    groups =  tuple(simple_varname(arg) for arg in args) + tuple(kwargs)
     if None in groups:
         raise NotImplementedError("Complex expressions not supported in sql group_by")
 
@@ -533,9 +540,9 @@ def _group_by(__data, *args, add = False):
         raise KeyError("group_by specifies columns missing from table: %s" %unmatched)
 
     if add:
-        groups = ordered_union(__data.group_by, groups)
+        groups = ordered_union(data.group_by, groups)
 
-    return __data.copy(group_by = groups)
+    return data.copy(group_by = groups)
 
 
 @ungroup.register(LazyTbl)
