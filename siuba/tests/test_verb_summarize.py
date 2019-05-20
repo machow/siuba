@@ -21,16 +21,22 @@ def df(backend):
 def gdf(df):
     return df >> group_by(_.g)
 
+
 @pytest.mark.parametrize("query, output", [
     (summarize(y = n(_)), data_frame(y = 4)),
     (summarize(y = _.x.min()), data_frame(y = 1)),
-    pytest.param(
-        mutate(y = _.x.cumsum()) >> summarize(z = _.y.max()), data_frame(y = [10]),
-        marks = pytest.mark.skip("TODO: select should identify windows and subquery")
-        )
     ])
 def test_summarize_basic(df, query, output):
     assert_equal_query(df, query, output)
+
+
+@backend_notimpl("sqlite")
+def test_summarize_after_mutate_cuml_win(backend, df):
+    assert_equal_query(
+            df,
+            mutate(y = _.x.cumsum()) >> summarize(z = _.y.max()),
+            data_frame(z = [10.])
+            )
 
 
 def test_summarize_keeps_group_vars(gdf):
@@ -60,7 +66,6 @@ def test_summarize_removes_1_grouping(backend):
     assert not len(q2.group_by)
 
 
-@pytest.mark.skip("TODO: catch and raise error with useful message (#49)")
 def test_summarize_no_same_call_var_refs(df):
     with pytest.raises(ValueError):
         df >> summarize(y = _.x.min(), z = _.y + 1)

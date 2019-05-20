@@ -102,6 +102,21 @@ def lift_inner_cols(tbl):
 
     return sql.base.ImmutableColumnCollection(data, cols)
 
+def col_expr_requires_cte(call, sel):
+    call_vars = set(call.op_vars(attr_calls = False))
+
+    columns = lift_inner_cols(sel)
+    sel_labs = set(k for k,v in columns.items() if isinstance(v, sql.elements.Label))
+    
+    return (
+            len(sel._group_by_clause)
+            or not sel_labs.isdisjoint(call_vars)
+            )
+
+def get_missing_columns(call, columns):
+    missing_cols = set(call.op_vars(attr_calls = False)) - set(columns.keys())
+    return missing_cols
+
 def compile_el(tbl, el):
     compiled = el.compile(
          dialect = tbl.source.dialect,
@@ -461,11 +476,14 @@ def _summarize(__data, **kwargs):
     #   - filter is fine, since it uses a CTE
     #   - need to detect any window functions...
     sel = __data.last_op._clone()
-    labs = set(k for k,v in sel.columns.items() if isinstance(v, sql.elements.Label))
+
+    new_calls = {k: __data.shape_call(expr, window = False) for k, expr in kwargs.items()}
+    needs_cte = [col_expr_requires_cte(call, sel) for call in new_calls.values()]
 
     # create select statement ----
-    if len(sel._group_by_clause):
-        # current select stmt has window functions, so need to make it subquery
+    if any(needs_cte):
+        # need a cte, due to alias cols or existing group by
+        # current select stmt has group by clause, so need to make it subquery
         cte = sel.alias()
         columns = cte.columns
         sel = sql.select(from_obj = cte)
@@ -486,13 +504,19 @@ def _summarize(__data, **kwargs):
     # add each aggregate column ----
     # TODO: can't do summarize(b = mean(a), c = b + mean(a))
     #       since difficult for c to refer to agg and unagg cols in SQL
-    for k, expr in kwargs.items():
-        new_call = __data.shape_call(expr, window = False)
-        col = new_call(columns).label(k)
+    for k, expr in new_calls.items():
+        missing_cols = get_missing_columns(expr, columns)
+        if missing_cols:
+            raise ValueError(
+                    "Summarize cannot find the following columns: %s. "
+                    "Note that it cannot refer to variables defined earlier in the "
+                    "same summarize call." % missing_cols
+                    )
+
+        col = expr(columns).label(k)
 
         sel.append_column(col)
 
-    # TODO: is a simple method on __data for doing this...
     new_data = __data.append_op(sel, group_by = tuple(), order_by = tuple())
     return new_data
 
