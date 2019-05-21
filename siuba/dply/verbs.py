@@ -538,6 +538,11 @@ def var_create(*args):
 
 @singledispatch2(DataFrame)
 def select(__data, *args, **kwargs):
+    if kwargs:
+        raise NotImplementedError(
+                "Using kwargs in select not currently supported. "
+                "Use _.newname == _.oldname instead"
+                )
     var_list = var_create(*args)
 
     od = var_select(__data.columns, *var_list)

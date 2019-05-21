@@ -36,12 +36,11 @@ def test_mutate_literal(dfs, query, output):
     assert_equal_query(dfs, query, output)
 
 
-@pytest.mark.skip("mutate can't refer to alias select created (#45)")
 def test_select_mutate_filter(dfs):
     assert_equal_query(
             dfs,
-            select(x = _.a) >> mutate(y = _.x * 2) >> filter(_.y == 2),
-            data_frame(y = 2)
+            select(_.x == _.a) >> mutate(y = _.x * 2) >> filter(_.y == 2),
+            data_frame(x = 1, y = 2)
             )
 
 @pytest.mark.skip("TODO: check most recent vars for efficient mutate (#41)")

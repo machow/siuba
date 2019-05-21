@@ -29,6 +29,13 @@ def test_select_siu(dfs, query, output):
     assert_equal_query(dfs, query, output)
 
 
+@pytest.mark.skip("TODO: #63")
+def test_select_kwargs(dfs):
+    assert_equal_query(dfs, select(x = _.a), data_frame(x = 1))
+
+
+# Rename ----------------------------------------------------------------------
+
 @pytest.mark.parametrize("query, output", [
     ( rename(A = _.a), data_frame(A = 1, b = 2, c = 3) ),
     ( rename(A = "a"), data_frame(A = 1, b = 2, c = 3) ),

@@ -286,6 +286,11 @@ def _collect(__data, *args, **kwargs):
 @select.register(LazyTbl)
 def _select(__data, *args, **kwargs):
     # see https://stackoverflow.com/questions/25914329/rearrange-columns-in-sqlalchemy-select-object
+    if kwargs:
+        raise NotImplementedError(
+                "Using kwargs in select not currently supported. "
+                "Use _.newname == _.oldname instead"
+                )
     last_op = __data.last_op
     columns = {c.key: c for c in last_op.inner_columns}
 
