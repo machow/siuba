@@ -26,8 +26,13 @@ def gdf(df):
     (summarize(y = n(_)), data_frame(y = 4)),
     (summarize(y = _.x.min()), data_frame(y = 1)),
     ])
-def test_summarize_basic(df, query, output):
+def test_summarize_ungrouped(df, query, output):
     assert_equal_query(df, query, output)
+
+
+@pytest.mark.skip("TODO: should return 1 row (#63)")
+def test_ungrouped_summarize_literal(df, query, output):
+    assert_equal_query(df, summarize(y = 1), data_frame(y = 1)) 
 
 
 @backend_notimpl("sqlite")
@@ -45,6 +50,7 @@ def test_summarize_keeps_group_vars(gdf):
 
 
 @pytest.mark.parametrize("query, output", [
+    (summarize(y = 1), data_frame(g = ['a', 'b'], y = [1, 1])),
     (summarize(y = n(_)), data_frame(g = ['a', 'b'], y = [2,2])),
     (summarize(y = _.x.min()), data_frame(g = ['a', 'b'], y = [1, 3])),
     # TODO: same issue as above
