@@ -18,7 +18,6 @@ def dfs(backend):
     return backend.load_df(DATA)
 
 @pytest.mark.parametrize("query, output", [
-    pytest.param(mutate(x = 1), DATA.assign(x = 1), marks = pytest.mark.skip("TODO #39")),
     (mutate(x = _.a + _.b), DATA.assign(x = [10, 10, 10])),
     pytest.param( mutate(x = _.a + _.b) >> summarize(ttl = _.x.sum()), data_frame(ttl = 30.0), marks = pytest.mark.skip("TODO: failing sqlite?")),
     (mutate(x = _.a + 1, y = _.b - 1), DATA.assign(x = [2,3,4], y = [8,7,6])),
@@ -26,6 +25,14 @@ def dfs(backend):
     (mutate(x = _.a + 1, y = _.x + 1), DATA.assign(x = [2,3,4], y = [3,4,5]))
     ])
 def test_mutate_basic(dfs, query, output):
+    assert_equal_query(dfs, query, output)
+
+@pytest.mark.parametrize("query, output", [
+    (mutate(x = 1), DATA.assign(x = 1)),
+    (mutate(x = "a"), DATA.assign(x = "a")),
+    (mutate(x = 1.2), DATA.assign(x = 1.2))
+    ])
+def test_mutate_literal(dfs, query, output):
     assert_equal_query(dfs, query, output)
 
 

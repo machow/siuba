@@ -21,7 +21,7 @@ from .utils import get_dialect_funcs
 
 from sqlalchemy import sql
 import sqlalchemy
-from siuba.siu import Call, CallTreeLocal, str_to_getitem_call
+from siuba.siu import Call, CallTreeLocal, str_to_getitem_call, Lazy
 # TODO: currently needed for select, but can we remove pandas?
 from pandas import Series
 import pandas as pd
@@ -173,7 +173,13 @@ class LazyTbl:
     def shape_call(self, call, window = True, str_accessors = False):
         # TODO: error if mutate receives a literal value?
         if str_accessors and isinstance(call, str):
+            # verbs that can use strings as accessors, like group_by, or
+            # arrange, need to convert those strings into a getitem call
             return str_to_get_item_call(call)
+        elif not isinstance(call, Call):
+            # verbs that use literal strings, need to convert them to a call
+            # that returns a sqlalchemy "literal" object
+            return Lazy(sql.literal(call))
 
         f_dict1 = self.funcs['scalar']
         f_dict2 = self.funcs['window' if window else 'aggregate']
@@ -368,7 +374,7 @@ def _mutate_select(sel, colname, func, labs, __data):
     # Call objects let us check whether column expr used a derived column
     # e.g. SELECT a as b, b + 1 as c raises an error in SQL, so need subquery
     call_vars = func.op_vars(attr_calls = False)
-    if isinstance(func, Call) and labs.isdisjoint(call_vars):
+    if labs.isdisjoint(call_vars):
         # New column may be able to modify existing select
         columns = lift_inner_cols(sel)
         # replacing an existing column, so strip it from select statement
