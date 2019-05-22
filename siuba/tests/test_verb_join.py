@@ -121,17 +121,15 @@ def test_basic_full_join(backend, df1, df2):
     target = DF1.merge(DF2, on = "ii", how = "outer")
     assert_frame_sort_equal(out, target)
 
-@pytest.mark.skip("TODO: semi_join (#53)")
 def test_basic_semi_join(df1, df2):
     assert_frame_sort_equal(
-            semi_join(df1, df2) >> collect(),
+            semi_join(df1, df2, {"ii": "ii"}) >> collect(),
             DF1.loc[:1,]
             )
 
-@pytest.mark.skip("TODO: anti_join (#55)")
 def test_basic_anti_join(df1, df2):
     assert_frame_sort_equal(
-            anti_join(df1, df2) >> collect(),
-            DF1.loc[:1,]
+            anti_join(df1, df2, on = {"ii": "ii"}) >> collect(),
+            DF1.loc[2:,]
             )
 

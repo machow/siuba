@@ -10,7 +10,7 @@ from siuba.dply.verbs import (
         count,
         group_by, ungroup,
         case_when,
-        join, left_join, right_join, inner_join,
+        join, left_join, right_join, inner_join, semi_join, anti_join,
         head,
         rename,
         distinct,
@@ -622,10 +622,8 @@ def _join(left, right, on = None, how = "inner"):
     left_sel = left.last_op.alias()
     right_sel = right.last_op.alias()
 
-    # handle on argument ----
-    on = _validate_join_arg_on(on)
-
-    # handle how argument ----
+    # handle arguments ----
+    on  = _validate_join_arg_on(on)
     how = _validate_join_arg_how(how)
     
     if how == "right":
@@ -634,15 +632,7 @@ def _join(left, right, on = None, how = "inner"):
         left_sel, right_sel = right_sel, left_sel
 
     # create join conditions ----
-    left_cols  = left_sel.columns  #lift_inner_cols(left_sel)
-    right_cols = right_sel.columns #lift_inner_cols(right_sel)
-
-    conds = []
-    for l, r in on.items():
-        col_expr = left_cols[l] == right_cols[r]
-        conds.append(col_expr)
-        
-    bool_clause = sql.and_(*conds)
+    bool_clause = _create_join_conds(left_sel, right_sel, on)
 
     # create join ----
     join = left_sel.join(
@@ -663,6 +653,44 @@ def _join(left, right, on = None, how = "inner"):
     sel = sql.select(labeled_cols, from_obj = join)
     return left.append_op(sel)
 
+
+@semi_join.register(LazyTbl)
+def _semi_join(left, right = None, on = None):
+
+    left_sel = left.last_op.alias()
+    right_sel = right.last_op.alias()
+
+    # handle arguments ----
+    on  = _validate_join_arg_on(on)
+    
+    # create join conditions ----
+    bool_clause = _create_join_conds(left_sel, right_sel, on)
+
+    # create inner join ----
+    join = left_sel.join(right_sel, onclause = bool_clause)
+
+    # only keep left hand select's columns ----
+    sel = sql.select(left_sel.columns, from_obj = join)
+    return left.append_op(sel)
+
+
+@anti_join.register(LazyTbl)
+def _anti_join(left, right = None, on = None):
+    left_sel = left.last_op.alias()
+    right_sel = right.last_op.alias()
+
+    # handle arguments ----
+    on  = _validate_join_arg_on(on)
+    
+    # create join conditions ----
+    bool_clause = _create_join_conds(left_sel, right_sel, on)
+
+    # create inner join ----
+    not_exists = ~sql.exists([1], from_obj = right_sel).where(bool_clause)
+    sel = sql.select(left_sel.columns, from_obj = left_sel).where(not_exists)
+    return left.append_op(sel)
+       
+
 def _validate_join_arg_on(on):
     if on is None:
         raise NotImplementedError("on arg must currently be dict")
@@ -681,6 +709,17 @@ def _validate_join_arg_how(how):
     
     return how
 
+def _create_join_conds(left_sel, right_sel, on):
+    left_cols  = left_sel.columns  #lift_inner_cols(left_sel)
+    right_cols = right_sel.columns #lift_inner_cols(right_sel)
+
+    conds = []
+    for l, r in on.items():
+        col_expr = left_cols[l] == right_cols[r]
+        conds.append(col_expr)
+        
+    return sql.and_(*conds)
+    
 
 # Head ------------------------------------------------------------------------
 

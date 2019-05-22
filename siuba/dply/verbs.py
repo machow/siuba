@@ -895,7 +895,8 @@ def semi_join(left, right = None, on = None):
 
     return left.merge(right.loc[:,on_cols], how = 'inner', on = on_cols)
 
-def anti_join(*args, **kwargs):
+@singledispatch2(pd.DataFrame)
+def anti_join(left, right = None, on = None):
     raise NotImplementedError("anti_join not currently implemented")
 
 left_join = partial(join, how = "left")
