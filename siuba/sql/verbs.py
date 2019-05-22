@@ -592,7 +592,7 @@ def _case_when(__data, cases):
 
 from collections.abc import Mapping
 
-def _joined_cols(left_cols, right_cols, on_keys):
+def _joined_cols(left_cols, right_cols, on_keys, full = False):
     """Return labeled columns, according to selection rules for joins.
 
     Rules:
@@ -605,6 +605,15 @@ def _joined_cols(left_cols, right_cols, on_keys):
     shared_labs = set(left_cols.keys()).intersection(keep_right)
 
     right_cols_no_keys = {k: right_cols[k] for k in keep_right}
+
+    # for an outer join, have key columns coalesce values
+    if full:
+        left_cols = {**left_cols}
+        for lk, rk in on_keys.items():
+            col = sql.functions.coalesce(left_cols[lk], right_cols[rk])
+            left_cols[lk] = col.label(lk)
+
+    # create labels ----
     l_labs = _relabeled_cols(left_cols, shared_labs, "_x")
     r_labs = _relabeled_cols(right_cols_no_keys, shared_labs, "_y")
 
@@ -643,8 +652,8 @@ def _join(left, right, on = None, how = "inner"):
     join = left_sel.join(
             right_sel,
             onclause = bool_clause,
-            isouter = False if how == "inner" else True,
-            full = True if how == "full" else False
+            isouter = how != "inner",
+            full = how == "full"
             )
     
     # note, shared_keys assumes on is a mapping...
@@ -652,7 +661,8 @@ def _join(left, right, on = None, how = "inner"):
     labeled_cols = _joined_cols(
             left_sel.columns,
             right_sel.columns,
-            on_keys = on
+            on_keys = on,
+            full = how == "full"
             )
 
     sel = sql.select(labeled_cols, from_obj = join)
