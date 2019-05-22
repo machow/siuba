@@ -592,14 +592,19 @@ def _case_when(__data, cases):
 
 from collections.abc import Mapping
 
-def _joined_cols(left_cols, right_cols, shared_keys):
+def _joined_cols(left_cols, right_cols, on_keys):
+    """Return labeled columns, according to selection rules for joins.
+
+    Rules:
+        1. For join keys, keep left table's column
+        2. When keys have the same labels, add suffix
+    """
     # TODO: remove sets, so uses stable ordering
     # when left and right cols have same name, suffix with _x / _y
-    shared_labs = set(left_cols.keys()) \
-            .intersection(right_cols.keys()) \
-            .difference(shared_keys)
+    keep_right = set(right_cols.keys()) - set(on_keys.values())
+    shared_labs = set(left_cols.keys()).intersection(keep_right)
 
-    right_cols_no_keys = {k: v for k, v in right_cols.items() if k not in shared_keys}
+    right_cols_no_keys = {k: right_cols[k] for k in keep_right}
     l_labs = _relabeled_cols(left_cols, shared_labs, "_x")
     r_labs = _relabeled_cols(right_cols_no_keys, shared_labs, "_y")
 
@@ -647,7 +652,7 @@ def _join(left, right, on = None, how = "inner"):
     labeled_cols = _joined_cols(
             left_sel.columns,
             right_sel.columns,
-            shared_keys = shared_keys
+            on_keys = on
             )
 
     sel = sql.select(labeled_cols, from_obj = join)
@@ -694,6 +699,8 @@ def _anti_join(left, right = None, on = None):
 def _validate_join_arg_on(on):
     if on is None:
         raise NotImplementedError("on arg must currently be dict")
+    elif isinstance(on, str):
+        on = {on: on}
     elif isinstance(on, (list, tuple)):
         on = dict(zip(on, on))
 

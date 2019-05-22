@@ -49,17 +49,15 @@ def df3(backend):
 
 
 
-@pytest.mark.skip("TODO: is keeping both right now")
 def test_join_diff_vars_keeps_left(df1, df2_jj):
     out = inner_join(df1, df2_jj, {"ii": "jj"}) >> collect()
 
     assert out.columns.tolist() == ["ii", "x", "y"]
 
-@pytest.mark.skip("TODO")
 def test_join_on_str_arg(df1, df2):
     out = inner_join(df1, df2, "ii") >> collect()
 
-    target = DF1.assign(y = ["a", "b", None, None])
+    target = DF1.iloc[:2,].assign(y = ["a", "b"])
     assert_frame_sort_equal(out, target)
 
 def test_join_on_list_arg(backend):
@@ -69,7 +67,7 @@ def test_join_on_list_arg(backend):
     df_b = backend.load_df(DF2.assign(jj = lambda d: d.ii))
     out = inner_join(df_a, df_b, ["ii", "jj"]) >> collect()
 
-    assert_frame_sort_equal(out, data.loc[:1, :].assign(y = ["a", "b"]))
+    assert_frame_sort_equal(out, data.iloc[:2, :].assign(y = ["a", "b"]))
 
 @pytest.mark.skip("TODO: note, unsure of this syntax")
 def test_join_on_same_col_multiple_times():
@@ -79,7 +77,7 @@ def test_join_on_same_col_multiple_times():
 
     out = inner_join(df_a, df_b, {("ii", "jj"): "ii"}) >> collect()
     # keeps all but last row
-    assert_frame_sort_equal(out, data.iloc[:1,])
+    assert_frame_sort_equal(out, data.iloc[:2,])
 
 def test_join_on_missing_col(df1, df2):
     with pytest.raises(KeyError):
@@ -111,7 +109,7 @@ def test_basic_right_join(df1, df2):
 
 def test_basic_inner_join(df1, df2):
     out = inner_join(df1, df2, {"ii": "ii"}) >> collect()
-    target = DF1.loc[:1,:].assign(y = ["a", "b"])
+    target = DF1.iloc[:2,:].assign(y = ["a", "b"])
     assert_frame_sort_equal(out, target)
 
 @pytest.mark.skip("TODO: use coalesce (#57)")
@@ -124,12 +122,12 @@ def test_basic_full_join(backend, df1, df2):
 def test_basic_semi_join(df1, df2):
     assert_frame_sort_equal(
             semi_join(df1, df2, {"ii": "ii"}) >> collect(),
-            DF1.loc[:1,]
+            DF1.iloc[:2,]
             )
 
 def test_basic_anti_join(df1, df2):
     assert_frame_sort_equal(
             anti_join(df1, df2, on = {"ii": "ii"}) >> collect(),
-            DF1.loc[2:,]
+            DF1.iloc[2:,]
             )
 
