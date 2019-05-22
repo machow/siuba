@@ -96,7 +96,6 @@ def test_mutate_using_cuml_agg(backend):
                 data.assign(y = [1.0, 3, 3, 7])
                 )
 
-@pytest.mark.skip("TODO: mutate not preserving var order (#42)")
 def test_mutate_overwrites_prev(backend):
     # TODO: check that query doesn't generate a CTE
     dfs = backend.load_df(data_frame(x = range(1, 5), g = [1,1,2,2]))

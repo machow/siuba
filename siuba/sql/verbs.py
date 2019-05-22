@@ -374,17 +374,14 @@ def _mutate_select(sel, colname, func, labs, __data):
     function handles whether to add a column to the existing select statement,
     or to use it as a subquery.
     """
-    #colname, func
-    replace_col = colname in sel.columns
+    replace_col = False
     # Call objects let us check whether column expr used a derived column
     # e.g. SELECT a as b, b + 1 as c raises an error in SQL, so need subquery
     call_vars = func.op_vars(attr_calls = False)
     if labs.isdisjoint(call_vars):
         # New column may be able to modify existing select
+        replace_col = colname in sel.columns
         columns = lift_inner_cols(sel)
-        # replacing an existing column, so strip it from select statement
-        if replace_col:
-            sel = sel.with_only_columns([v for k,v in columns.items() if k != colname])
 
     else:
         # anything else requires a subquery
@@ -394,6 +391,12 @@ def _mutate_select(sel, colname, func, labs, __data):
 
     # evaluate call expr on columns, making sure to use group vars
     new_col, windows = __data.track_call_windows(func, columns)
+
+    # replacing an existing column, so strip it from select statement
+    if replace_col:
+        replaced = {**columns}
+        replaced[colname] = new_col.label(colname)
+        return sel.with_only_columns(list(replaced.values()))
 
     return sel.column(new_col.label(colname))
 
