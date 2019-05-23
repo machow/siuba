@@ -209,14 +209,14 @@ def raise_type_error(f):
 # Collect and show_query =========
 
 @pipe_no_args
-@singledispatch2(DataFrame)
+@singledispatch2((DataFrame, DataFrameGroupBy))
 def collect(__data, *args, **kwargs):
     # simply return DataFrame, since requires no execution
     return __data
 
 
 @pipe_no_args
-@singledispatch2(DataFrame)
+@singledispatch2((DataFrame, DataFrameGroupBy))
 def show_query(tbl, simplify = False):
     print("No query to show for a DataFrame")
     return __data
