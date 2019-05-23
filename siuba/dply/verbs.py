@@ -206,6 +206,20 @@ def raise_type_error(f):
                 types = ", ".join(map(str, f.registry.keys()))
                 ))
 
+# Collect and show_query =========
+
+@pipe_no_args
+@singledispatch2(DataFrame)
+def collect(__data, *args, **kwargs):
+    # simply return DataFrame, since requires no execution
+    return __data
+
+
+@pipe_no_args
+@singledispatch2(DataFrame)
+def show_query(tbl, simplify = False):
+    print("No query to show for a DataFrame")
+    return __data
 
 # Mutate ======================================================================
 

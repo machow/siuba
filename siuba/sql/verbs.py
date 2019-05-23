@@ -1,6 +1,6 @@
 from siuba.dply.verbs import (
         singledispatch2,
-        pipe_no_args,
+        show_query, collect,
         simple_varname,
         select, VarList, var_select,
         mutate,
@@ -239,9 +239,8 @@ def use_simple_names():
     finally:
         deregister(sql.compiler._CompileLabel)
 
-@pipe_no_args
-@singledispatch2(LazyTbl)
-def show_query(tbl, simplify = False):
+@show_query.register(LazyTbl)
+def _show_query(tbl, simplify = False):
     query = tbl.last_op #if not simplify else 
     compile_query = lambda: query.compile(
                 dialect = tbl.source.dialect,
@@ -260,9 +259,9 @@ def show_query(tbl, simplify = False):
     return tbl
 
 # collect ----------
-@pipe_no_args
-@singledispatch2(LazyTbl)
-def collect(__data, as_df = True):
+
+@collect.register(LazyTbl)
+def _collect(__data, as_df = True):
     # TODO: maybe remove as_df options, always return dataframe
     # normally can just pass the sql objects to execute, but for some reason
     # psycopg2 completes about incomplete template.
@@ -276,11 +275,6 @@ def collect(__data, as_df = True):
         return pd.read_sql(compiled, __data.source)
 
     return __data.source.execute(compiled).fetchall()
-
-@collect.register(pd.DataFrame)
-def _collect(__data, *args, **kwargs):
-    # simply return DataFrame, since requires no execution
-    return __data
 
 
 @select.register(LazyTbl)
