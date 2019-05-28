@@ -217,7 +217,7 @@ def collect(__data, *args, **kwargs):
 
 @pipe_no_args
 @singledispatch2((DataFrame, DataFrameGroupBy))
-def show_query(tbl, simplify = False):
+def show_query(__data, simplify = False):
     print("No query to show for a DataFrame")
     return __data
 
