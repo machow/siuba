@@ -10,7 +10,7 @@ import pandas as pd
 
 import pytest
 
-from .helpers import assert_equal_query, data_frame, backend_notimpl
+from .helpers import assert_equal_query, data_frame, backend_notimpl, backend_sql
 
 DATA = pd.DataFrame({
     "x": [1,1,1,1],
@@ -26,6 +26,7 @@ def test_filter_basic(backend):
     assert_equal_query(dfs, filter(_.x > 3), df[lambda _: _.x > 3])
 
 
+@backend_sql("TODO: pandas - grouped col should be first after mutate")
 @backend_notimpl("sqlite")
 def test_filter_via_group_by(backend):
     df = data_frame(
@@ -41,6 +42,8 @@ def test_filter_via_group_by(backend):
             data_frame(g = [1,1,2,2], x = [1,2,6,7])
             )
 
+
+@backend_sql("TODO: pandas - grouped col should be first after mutate")
 @backend_notimpl("sqlite")
 def test_filter_via_group_by_agg(backend):
     dfs = backend.load_df(x = range(1,11), g = [1]*5 + [2]*5)

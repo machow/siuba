@@ -1,5 +1,6 @@
 from sqlalchemy import create_engine, types
 from siuba.sql import LazyTbl, collect
+from siuba.dply.verbs import ungroup
 from pandas.testing import assert_frame_equal
 import pandas as pd
 import os
@@ -28,8 +29,26 @@ BACKEND_CONFIG = {
             }
         }
 
-
 class Backend:
+    def __init__(self, name):
+        self.name = name
+
+    def dispose(self):
+        pass
+
+    def load_df(self, df = None, **kwargs):
+        if df is None and kwargs:
+            df = pd.DataFrame(kwargs)
+        elif df is not None and kwargs:
+            raise ValueError("Cannot pass kwargs, and a DataFrame")
+
+        return df
+
+    def __repr__(self):
+        return "{0}({1})".format(self.__class__.__name__, repr(self.name))
+
+
+class SqlBackend(Backend):
     table_name_indx = 0
     sa_conn_fmt = "{dialect}://{user}:{password}@{host}:{port}/{dbname}"
 
@@ -49,20 +68,16 @@ class Backend:
         return "siuba_{0:03d}".format(cls.table_name_indx)
 
     def load_df(self, df = None, **kwargs):
-        if df is None and kwargs:
-            df = pd.DataFrame(kwargs)
-        elif df is not None and kwargs:
-            raise ValueError("Cannot pass kwargs, and a DataFrame")
-
+        df = super().load_df(df, **kwargs)
         return copy_to_sql(df, self.unique_table_name(), self.engine)
 
-    def __repr__(self):
-        return "{0}({1})".format(self.__class__.__name__, repr(self.name))
 
 def assert_frame_sort_equal(a, b):
     """Tests that DataFrames are equal, even if rows are in different order"""
-    sorted_a = a.sort_values(by = a.columns.tolist()).reset_index(drop = True)
-    sorted_b = b.sort_values(by = b.columns.tolist()).reset_index(drop = True)
+    df_a = ungroup(a)
+    df_b = ungroup(b)
+    sorted_a = df_a.sort_values(by = df_a.columns.tolist()).reset_index(drop = True)
+    sorted_b = df_b.sort_values(by = df_b.columns.tolist()).reset_index(drop = True)
 
     assert_frame_equal(sorted_a, sorted_b)
 
@@ -112,3 +127,17 @@ def backend_notimpl(*names):
         return wrapper
     return outer
 
+def backend_sql(msg):
+    # allow decorating without an extra call
+    if callable(msg):
+        return backend_sql(None)(msg)
+
+    def outer(f):
+        @wraps(f)
+        def wrapper(backend, *args, **kwargs):
+            if not isinstance(backend, SqlBackend):
+                pytest.skip(msg)
+            else:
+                return f(backend, *args, **kwargs)
+        return wrapper
+    return outer

@@ -1,5 +1,5 @@
 import pytest
-from .helpers import assert_equal_query, Backend, data_frame
+from .helpers import assert_equal_query, Backend, SqlBackend, data_frame
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -7,8 +7,9 @@ def pytest_addoption(parser):
             )
 
 params_backend = [
-    pytest.param(lambda: Backend("postgresql"), id = "postgresql", marks=pytest.mark.postgresql),
-    pytest.param(lambda: Backend("sqlite"), id = "sqlite", marks=pytest.mark.sqlite)
+    pytest.param(lambda: SqlBackend("postgresql"), id = "postgresql", marks=pytest.mark.postgresql),
+    pytest.param(lambda: SqlBackend("sqlite"), id = "sqlite", marks=pytest.mark.sqlite),
+    pytest.param(lambda: Backend("pandas"), id = "pandas", marks=pytest.mark.pandas)
     ]
 
 @pytest.fixture(params = params_backend, scope = "session")
@@ -21,13 +22,4 @@ def skip_backend(request, backend):
         mark_args = request.node.get_closest_marker('skip_backend').args
         if backend.name in mark_args:
             pytest.skip('skipped on backend: {}'.format(backend.name)) 
-
-@pytest.fixture(autouse=True)
-def notimpl_backend(request, backend):
-    if request.node.get_closest_marker('notimpl_backend'):
-        mark_args = request.node.get_closest_marker('notimpl_backend').args
-        if backend.name in mark_args:
-            pytest.skip('skipped on backend: {}'.format(backend.name)) 
-
-   
 

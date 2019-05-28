@@ -5,9 +5,10 @@ import pandas as pd
 
 import pytest
 
-from .helpers import assert_equal_query, data_frame, backend_notimpl
+from .helpers import assert_equal_query, data_frame, backend_notimpl, backend_sql
 
 
+@backend_sql
 @backend_notimpl("sqlite")
 def test_no_arrange_before_cuml_window_warning(backend):
     data = data_frame(x = range(1, 5), g = [1,1,2,2])
@@ -15,6 +16,7 @@ def test_no_arrange_before_cuml_window_warning(backend):
     with pytest.warns(RuntimeWarning):
         dfs >> mutate(y = _.x.cumsum())
 
+@backend_sql
 def test_arranges_back_to_back(backend):
     data = data_frame(x = range(1, 5), g = [1,1,2,2])
     dfs = backend.load_df(data)

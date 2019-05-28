@@ -8,7 +8,7 @@ from siuba import _, mutate, select, group_by, summarize, filter
 from siuba.dply.vector import row_number
 
 import pytest
-from .helpers import assert_equal_query, data_frame, backend_notimpl
+from .helpers import assert_equal_query, data_frame, backend_notimpl, backend_sql
 from string import ascii_lowercase 
 
 DATA = data_frame(a = [1,2,3], b = [9,8,7])
@@ -62,6 +62,8 @@ def test_mutate_reassign_column_ordering(dfs):
             data_frame(a = 1, b = 2, c = 3)
             )
 
+
+@backend_sql
 @backend_notimpl("sqlite")
 def test_mutate_window_funcs(backend):
     data = data_frame(x = range(1, 5), g = [1,1,2,2])
@@ -83,6 +85,7 @@ def test_mutate_using_agg_expr(backend):
             data.assign(y = [-.5, .5, -.5, .5])
             )
 
+@backend_sql # TODO: pandas outputs a int column
 @backend_notimpl("sqlite")
 def test_mutate_using_cuml_agg(backend):
     data = data_frame(x = range(1, 5), g = [1,1,2,2])

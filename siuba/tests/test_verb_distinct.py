@@ -6,7 +6,7 @@ https://github.com/tidyverse/dbplyr/blob/master/tests/testthat/test-verb-distinc
     
 from siuba.sql import LazyTbl, collect
 from siuba import _, distinct
-from .helpers import assert_equal_query
+from .helpers import assert_equal_query, backend_sql
 import pandas as pd
 import os
 
@@ -35,7 +35,8 @@ def test_distinct_one_arg(df):
 
     assert_equal_query(df, distinct(_.y), distinct(DATA, _.y))
 
-def test_distinct_keep_all_not_impl(df):
+@backend_sql
+def test_distinct_keep_all_not_impl(backend, df):
     # TODO: should just mock LazyTbl
     with pytest.raises(NotImplementedError):
         distinct(df, _.y, _keep_all = True) >> collect()
