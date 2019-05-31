@@ -209,18 +209,41 @@ class LazyTbl:
     def last_op(self):
         return self.ops[-1] if len(self.ops) else None
 
-    def __repr__(self):
+    def _get_preview(self):
         tbl_small = self.append_op(self.last_op.limit(5))
+        return collect(tbl_small)
 
-        # makes sure to get engine, even if sqlalchemy connection obj
-        engine = self.source.engine
-
-        return ("# Source: lazy query\n"
+    def __repr__(self):
+        template = (
+                "# Source: lazy query\n"
                 "# DB Conn: {}\n"
                 "# Preview:\n{}\n"
                 "# .. may have more rows"
-                    .format(repr(engine), repr(collect(tbl_small)))
                 )
+
+        return template.format(repr(self.source.engine), repr(self._get_preview()))
+
+    def _repr_html_(self):
+        template = (
+                "<div>"
+                "<pre>"
+                "# Source: lazy query\n"
+                "# DB Conn: {}\n"
+                "# Preview:\n"
+                "</pre>"
+                "{}"
+                "<p># .. may have more rows</p>"
+                "</div>"
+                )
+
+        data = self._get_preview()
+        html_data = getattr(data, '_repr_html_', lambda: repr(data))()
+        return template.format(self.source.engine, html_data)
+
+
+def _repr_grouped_df_html_(self):
+    return "<div><p>(grouped data frame)</p>" + self._selected_obj._repr_html_() + "</div>"
+
 
 
 # Main Funcs 
