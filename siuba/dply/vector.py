@@ -61,7 +61,7 @@ def row_number(x):
         n = x.shape[0]
     else:
         n = len(x)
-    return np.arange(n)
+    return np.arange(1, n + 1)
 
 
 @register_symbolic
