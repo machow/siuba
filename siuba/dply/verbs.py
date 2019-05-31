@@ -22,6 +22,7 @@ DPLY_FUNCTIONS = (
         "join", "inner_join", "full_join", "left_join", "right_join", "semi_join", "anti_join",
         # TODO: move to vectors
         "if_else", "case_when",
+        "collect", "show_query"
         )
 
 __all__ = [*DPLY_FUNCTIONS, "Pipeable", "pipe"]
