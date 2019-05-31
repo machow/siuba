@@ -103,13 +103,15 @@ def lift_inner_cols(tbl):
     return sql.base.ImmutableColumnCollection(data, cols)
 
 def col_expr_requires_cte(call, sel):
+    """Return whether a variable assignment needs a CTE"""
+
     call_vars = set(call.op_vars(attr_calls = False))
 
     columns = lift_inner_cols(sel)
     sel_labs = set(k for k,v in columns.items() if isinstance(v, sql.elements.Label))
     
-    return (
-            len(sel._group_by_clause)
+    return (   len(sel._group_by_clause)
+            or len(sel._order_by_clause)
             or not sel_labs.isdisjoint(call_vars)
             )
 
@@ -772,7 +774,7 @@ def _rename(__data, **kwargs):
 def _distinct(__data, *args, _keep_all = False, **kwargs):
     if (args or kwargs) and _keep_all:
         raise NotImplementedError("Distinct with variables specified in sql requires _keep_all = False")
-
+    
     inner_sel = mutate(__data, **kwargs).last_op if kwargs else __data.last_op
 
     # TODO: this is copied from the df distinct version
@@ -785,12 +787,22 @@ def _distinct(__data, *args, _keep_all = False, **kwargs):
                         "e.g. _.colname or _['colname']"
                         )
 
-    if not cols: cols = list(inner_sel.columns.keys())
+    # use all columns by default
+    if not cols:
+        cols = list(inner_sel.columns.keys())
 
-    sel_cols = lift_inner_cols(inner_sel)
-    distinct_cols = [sel_cols[k] for k in cols]
+    if not len(inner_sel._order_by_clause):
+        # select distinct has to include any columns in the order by clause,
+        # so can only safely modify existing statement when there's no order by
+        sel_cols = lift_inner_cols(inner_sel)
+        distinct_cols = [sel_cols[k] for k in cols]
+        sel = inner_sel.with_only_columns(distinct_cols).distinct()
+    else:
+        # fallback to cte
+        cte = inner_sel.alias()
+        distinct_cols = [cte.columns[k] for k in cols]
+        sel = sql.select(distinct_cols, from_obj = cte).distinct()
 
-    sel = inner_sel.with_only_columns(distinct_cols).distinct()
     return __data.append_op(sel)
 
     

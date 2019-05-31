@@ -159,7 +159,7 @@ base_agg = dict(
         )
 
 base_win = dict(
-        row_number = win_over("row_number"),
+        row_number = lambda col: CumlOver(sql.func.row_number()),
         min_rank = win_over("rank"),
         rank = win_over("rank"),
         dense_rank = win_over("dense_rank"),
