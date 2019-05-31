@@ -576,13 +576,15 @@ def _select(__data, *args, **kwargs):
 @singledispatch2(DataFrame)
 def rename(__data, **kwargs):
     # TODO: allow names with spaces, etc..
-    col_names = {v:k for k,v in kwargs.items()}
+    col_names = {simple_varname(v):k for k,v in kwargs.items()}
+    if None in col_names:
+        raise ValueError("Rename needs column name (e.g. 'a' or _.a), but received %s"%col_names[None])
 
     return __data.rename(columns  = col_names)
 
 @rename.register(DataFrameGroupBy)
 def _rename(__data, **kwargs):
-    raise Exception("Selecting columns of grouped DataFrame currently not allowed")
+    raise NotImplementedError("Selecting columns of grouped DataFrame currently not allowed")
 
 
 
@@ -633,6 +635,11 @@ def arrange(__data, *args):
 
     return df.sort_values(by = tmp_colnames, kind = "mergesort", ascending = ascending) \
              .drop(tmp_colnames, axis = 1)
+
+
+@arrange.register(DataFrameGroupBy)
+def _arrange(__data, *args):
+    raise NotImplementedError("TODO: arrange with grouped DataFrame")
 
 
 

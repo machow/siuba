@@ -10,8 +10,8 @@ def df(backend):
     return backend.load_df(data_frame(x = [1,2,3]))
 
 def test_show_query(df):
-    assert isinstance(show_query(df), LazyTbl)
-    assert isinstance(df >> show_query(), LazyTbl)
+    assert isinstance(show_query(df), df.__class__)
+    assert isinstance(df >> show_query(), df.__class__)
     assert isinstance(show_query(), Pipeable)
 
 def test_collect(df):

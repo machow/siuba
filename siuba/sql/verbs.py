@@ -515,7 +515,7 @@ def _summarize(__data, **kwargs):
     for k, expr in new_calls.items():
         missing_cols = get_missing_columns(expr, columns)
         if missing_cols:
-            raise ValueError(
+            raise NotImplementedError(
                     "Summarize cannot find the following columns: %s. "
                     "Note that it cannot refer to variables defined earlier in the "
                     "same summarize call." % missing_cols

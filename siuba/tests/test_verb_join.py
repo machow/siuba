@@ -13,7 +13,7 @@ from siuba.dply.vector import row_number, n
 from siuba.sql.verbs import collect
 
 import pytest
-from .helpers import assert_equal_query, assert_frame_sort_equal, data_frame, backend_notimpl
+from .helpers import assert_equal_query, assert_frame_sort_equal, data_frame, backend_notimpl, backend_sql
 
 
 DF1 = data_frame(
@@ -49,7 +49,8 @@ def df3(backend):
 
 
 
-def test_join_diff_vars_keeps_left(df1, df2_jj):
+@backend_sql("TODO: pandas")
+def test_join_diff_vars_keeps_left(backend, df1, df2_jj):
     out = inner_join(df1, df2_jj, {"ii": "jj"}) >> collect()
 
     assert out.columns.tolist() == ["ii", "x", "y"]
@@ -101,7 +102,8 @@ def test_basic_left_join(df1, df2):
     target = DF1.assign(y = ["a", "b", None, None])
     assert_frame_sort_equal(out, target)
 
-def test_basic_right_join(df1, df2):
+@backend_sql("TODO: pandas returns columns in rev name order")
+def test_basic_right_join(backend, df1, df2):
     # same as left join, but flip df arguments
     out = right_join(df2, df1, {"ii": "ii"}) >> collect()
     target = DF1.assign(y = ["a", "b", None, None])
@@ -112,19 +114,22 @@ def test_basic_inner_join(df1, df2):
     target = DF1.iloc[:2,:].assign(y = ["a", "b"])
     assert_frame_sort_equal(out, target)
 
+@backend_sql("TODO: pandas - full should be converted to 'outer'")
 @pytest.mark.skip_backend("sqlite")
 def test_basic_full_join(backend, df1, df2):
     out = full_join(df1, df2, {"ii": "ii"}) >> collect()
     target = DF1.merge(DF2, on = "ii", how = "outer")
     assert_frame_sort_equal(out, target)
 
-def test_basic_semi_join(df1, df2):
+@backend_sql("TODO: pandas - key error?")
+def test_basic_semi_join(backend, df1, df2):
     assert_frame_sort_equal(
             semi_join(df1, df2, {"ii": "ii"}) >> collect(),
             DF1.iloc[:2,]
             )
 
-def test_basic_anti_join(df1, df2):
+@backend_sql("TODO: pandas - implement anti join")
+def test_basic_anti_join(backend, df1, df2):
     assert_frame_sort_equal(
             anti_join(df1, df2, on = {"ii": "ii"}) >> collect(),
             DF1.iloc[2:,]

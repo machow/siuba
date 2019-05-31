@@ -7,7 +7,7 @@ https://github.com/tidyverse/dbplyr/blob/master/tests/testthat/test-verb-select.
 from siuba import _, mutate, select, group_by, rename
 
 import pytest
-from .helpers import assert_equal_query, data_frame, backend_notimpl
+from .helpers import assert_equal_query, data_frame, backend_notimpl, backend_sql
 from string import ascii_lowercase 
 
 DATA = data_frame(a = 1, b = 2, c = 3)
@@ -40,11 +40,17 @@ def test_select_kwargs(dfs):
     ( rename(A = _.a), data_frame(A = 1, b = 2, c = 3) ),
     ( rename(A = "a"), data_frame(A = 1, b = 2, c = 3) ),
     ( rename(A = _.a, B = _.c), data_frame(A = 1, b = 2, B = 3) ),
-    ( rename(A = "a", B = "c"), data_frame(A = 1, b = 2, B = 3) ),
-    ( group_by(_.a) >> rename(z = _.a), data_frame(z = 1, b = 2, c = 3) ),
-    ( group_by(_.a) >> rename(z = "a"), data_frame(z = 1, b = 2, c = 3) )
+    ( rename(A = "a", B = "c"), data_frame(A = 1, b = 2, B = 3) )
     ])
 def test_rename_siu(dfs, query, output):
     assert_equal_query(dfs, query, output)
 
+
+@backend_sql("TODO: pandas - grouped df rename")
+@pytest.mark.parametrize("query, output", [
+    ( group_by(_.a) >> rename(z = _.a), data_frame(z = 1, b = 2, c = 3) ),
+    ( group_by(_.a) >> rename(z = "a"), data_frame(z = 1, b = 2, c = 3) )
+    ])
+def test_grouped_rename_siu(backend, dfs, query, output):
+    assert_equal_query(dfs, query, output)
 

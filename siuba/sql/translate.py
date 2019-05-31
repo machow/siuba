@@ -1,3 +1,14 @@
+"""
+This module holds default translations from pandas syntax to sql for 3 kinds of operations...
+
+1. scalar - elementwise operations (e.g. array1 + array2)
+2. aggregation - operations that result in a single number (e.g. array1.mean())
+3. window - operations that do calculations across a window
+            (e.g. array1.lag() or array1.expanding().mean())
+
+
+"""
+
 from sqlalchemy import sql
 from sqlalchemy.sql import sqltypes as types
 from functools import singledispatch
@@ -77,13 +88,13 @@ def sql_agg(name):
     sa_func = getattr(sql.func, name)
     return lambda col: sa_func(col)
 
-def sql_scalar(name):
+def sql_scalar(name, *args):
     sa_func = getattr(sql.func, name)
-    return lambda col: sa_func(col)
+    return lambda col: sa_func(col, *args)
 
-def sql_colmeth(meth):
+def sql_colmeth(meth, *outerargs):
     def f(col, *args):
-        return getattr(col, meth)(*args)
+        return getattr(col, meth)(*outerargs, *args)
     return f
 
 def sql_astype(col, _type):
@@ -116,8 +127,8 @@ base_scalar = dict(
         # TODO: I think these are postgres specific?
         hour = lambda col: sql.func.date_trunc('hour', col),
         week = lambda col: sql.func.date_trunc('week', col),
-        isna = lambda col: col.is_(None),
-        isnull = lambda col: col.is_(None),
+        isna = sql_colmeth("is_", None),
+        isnull = sql_colmeth("is_", None),
         # dply.vector funcs ----
         desc = lambda col: col.desc(),
         

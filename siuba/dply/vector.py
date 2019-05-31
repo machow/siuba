@@ -91,7 +91,7 @@ def lead(x, n = 1, default = None):
 
 
 @register_symbolic
-def lag():
+def lag(x, n = 1, default = None):
     res = x.shift(n)
 
     if default is not None:

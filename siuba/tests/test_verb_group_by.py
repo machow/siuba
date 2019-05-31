@@ -8,13 +8,15 @@ from siuba import _, group_by, ungroup, summarize
 from siuba.dply.vector import row_number, n
 
 import pytest
-from .helpers import assert_equal_query, data_frame, backend_notimpl
+from .helpers import assert_equal_query, data_frame, backend_notimpl, SqlBackend
 from string import ascii_lowercase 
 
 DATA = data_frame(x = [1,2,3], y = [9,8,7], g = ['a', 'a', 'b'])
 
 @pytest.fixture(scope = "module")
 def df(backend):
+    if not isinstance(backend, SqlBackend):
+        pytest.skip("TODO: generalize tests to pandas")
     return backend.load_df(DATA)
 
 
