@@ -3,7 +3,7 @@
     :hidden:
 
     intro.Rmd
-    intro_sql.Rmd
+    intro_sql.ipynb
 
 .. toctree::
     :caption: Core One-table Verbs
