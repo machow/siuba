@@ -210,7 +210,9 @@ class LazyTbl:
         return self.ops[-1] if len(self.ops) else None
 
     def _get_preview(self):
-        tbl_small = self.append_op(self.last_op.limit(5))
+        # need to make prev op a cte, so we don't override any previous limit
+        new_sel = sql.select([self.last_op.alias()]).limit(5)
+        tbl_small = self.append_op(new_sel)
         return collect(tbl_small)
 
     def __repr__(self):
