@@ -104,7 +104,10 @@ def sql_astype(col, _type):
             float: types.Numeric,
             bool: types.Boolean
             }
-    sa_type = mappings[_type]
+    try:
+        sa_type = mappings[_type]
+    except KeyError:
+        raise ValueError("sql astype currently only supports type objects: str, int, float, bool")
     return sql.cast(col, sa_type)
 
 base_scalar = dict(
