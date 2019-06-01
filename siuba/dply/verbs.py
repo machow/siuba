@@ -19,9 +19,10 @@ DPLY_FUNCTIONS = (
         "nest", "unnest",
         "expand", "complete",
         # Joins ----
-        "join", "inner_join", "left_join", "right_join", "semi_join", "full_join",
+        "join", "inner_join", "full_join", "left_join", "right_join", "semi_join", "anti_join",
         # TODO: move to vectors
         "if_else", "case_when",
+        "collect", "show_query"
         )
 
 __all__ = [*DPLY_FUNCTIONS, "Pipeable", "pipe"]
@@ -206,6 +207,20 @@ def raise_type_error(f):
                 types = ", ".join(map(str, f.registry.keys()))
                 ))
 
+# Collect and show_query =========
+
+@pipe_no_args
+@singledispatch2((DataFrame, DataFrameGroupBy))
+def collect(__data, *args, **kwargs):
+    # simply return DataFrame, since requires no execution
+    return __data
+
+
+@pipe_no_args
+@singledispatch2((DataFrame, DataFrameGroupBy))
+def show_query(__data, simplify = False):
+    print("No query to show for a DataFrame")
+    return __data
 
 # Mutate ======================================================================
 
@@ -538,6 +553,11 @@ def var_create(*args):
 
 @singledispatch2(DataFrame)
 def select(__data, *args, **kwargs):
+    if kwargs:
+        raise NotImplementedError(
+                "Using kwargs in select not currently supported. "
+                "Use _.newname == _.oldname instead"
+                )
     var_list = var_create(*args)
 
     od = var_select(__data.columns, *var_list)
@@ -557,13 +577,15 @@ def _select(__data, *args, **kwargs):
 @singledispatch2(DataFrame)
 def rename(__data, **kwargs):
     # TODO: allow names with spaces, etc..
-    col_names = {v:k for k,v in kwargs.items()}
+    col_names = {simple_varname(v):k for k,v in kwargs.items()}
+    if None in col_names:
+        raise ValueError("Rename needs column name (e.g. 'a' or _.a), but received %s"%col_names[None])
 
     return __data.rename(columns  = col_names)
 
 @rename.register(DataFrameGroupBy)
 def _rename(__data, **kwargs):
-    raise Exception("Selecting columns of grouped DataFrame currently not allowed")
+    raise NotImplementedError("Selecting columns of grouped DataFrame currently not allowed")
 
 
 
@@ -614,6 +636,11 @@ def arrange(__data, *args):
 
     return df.sort_values(by = tmp_colnames, kind = "mergesort", ascending = ascending) \
              .drop(tmp_colnames, axis = 1)
+
+
+@arrange.register(DataFrameGroupBy)
+def _arrange(__data, *args):
+    raise NotImplementedError("TODO: arrange with grouped DataFrame")
 
 
 
@@ -890,6 +917,9 @@ def semi_join(left, right = None, on = None):
 
     return left.merge(right.loc[:,on_cols], how = 'inner', on = on_cols)
 
+@singledispatch2(pd.DataFrame)
+def anti_join(left, right = None, on = None):
+    raise NotImplementedError("anti_join not currently implemented")
 
 left_join = partial(join, how = "left")
 right_join = partial(join, how = "right")

@@ -1,7 +1,19 @@
+"""
+This module holds default translations from pandas syntax to sql for 3 kinds of operations...
+
+1. scalar - elementwise operations (e.g. array1 + array2)
+2. aggregation - operations that result in a single number (e.g. array1.mean())
+3. window - operations that do calculations across a window
+            (e.g. array1.lag() or array1.expanding().mean())
+
+
+"""
+
 from sqlalchemy import sql
 from sqlalchemy.sql import sqltypes as types
 from functools import singledispatch
 from .verbs import case_when, if_else
+import warnings
 
 # TODO: must make these take both tbl, col as args, since hard to find window funcs
 def sa_is_window(clause):
@@ -9,35 +21,80 @@ def sa_is_window(clause):
             or isinstance(clause, sql.elements.WithinGroup)
 
 
-def sa_modify_window(clause, columns, group_by = None, order_by = None):
-    cls = clause.__class__ if sa_is_window(clause) else getattr(clause, "over")
+def sa_modify_window(clause, group_by = None, order_by = None):
     if group_by:
-        partition_by = [columns[name] for name in group_by]
-        return cls(**{**clause.__dict__, 'partition_by': partition_by})
+        group_cols = [columns[name] for name in group_by]
+        partition_by = sql.elements.ClauseList(*group_cols)
+        clone = clause._clone()
+        clone.partition_by = partition_by
+
+        return clone
 
     return clause
 
+from sqlalchemy.sql.elements import Over
+# windowed agg (group by)
+# agg
+# windowed scalar
+# ordered set agg
+
+class CustomOverClause: pass
+
+class AggOver(Over, CustomOverClause):
+    def set_over(self, group_by, order_by = None):
+        self.partition_by = group_by
+        return self
+
+
+class RankOver(Over, CustomOverClause): 
+    def set_over(self, group_by, order_by = None):
+        self.partition_by = group_by
+        return self
+
+
+class CumlOver(Over, CustomOverClause):
+    def set_over(self, group_by, order_by):
+        self.partition_by = group_by
+        self.order_by = order_by
+
+        if not len(order_by):
+            warnings.warn(
+                    "No order by columns explicitly set in window function. SQL engine"
+                    "does not guarantee a row ordering. Recommend using an arrange beforehand.",
+                    RuntimeWarning
+                    )
+        return self
+
+
+def win_absent(name):
+    def not_implemented(*args, **kwargs):
+        raise NotImplementedError("SQL dialect does not support {}.".format(name))
+    
+    return not_implemented
 
 def win_over(name):
     sa_func = getattr(sql.func, name)
-    return lambda col: sa_func().over(order_by = col)
+    return lambda col: RankOver(sa_func(), order_by = col)
 
+def win_cumul(name):
+    sa_func = getattr(sql.func, name)
+    return lambda col: CumlOver(sa_func(col), rows = (None,0))
 
 def win_agg(name):
     sa_func = getattr(sql.func, name)
-    return lambda col: sa_func(col).over()
+    return lambda col: AggOver(sa_func(col))
 
 def sql_agg(name):
     sa_func = getattr(sql.func, name)
     return lambda col: sa_func(col)
 
-def sql_scalar(name):
+def sql_scalar(name, *args):
     sa_func = getattr(sql.func, name)
-    return lambda col: sa_func(col)
+    return lambda col: sa_func(col, *args)
 
-def sql_colmeth(meth):
+def sql_colmeth(meth, *outerargs):
     def f(col, *args):
-        return getattr(col, meth)(*args)
+        return getattr(col, meth)(*outerargs, *args)
     return f
 
 def sql_astype(col, _type):
@@ -47,7 +104,10 @@ def sql_astype(col, _type):
             float: types.Numeric,
             bool: types.Boolean
             }
-    sa_type = mappings[_type]
+    try:
+        sa_type = mappings[_type]
+    except KeyError:
+        raise ValueError("sql astype currently only supports type objects: str, int, float, bool")
     return sql.cast(col, sa_type)
 
 base_scalar = dict(
@@ -70,9 +130,10 @@ base_scalar = dict(
         # TODO: I think these are postgres specific?
         hour = lambda col: sql.func.date_trunc('hour', col),
         week = lambda col: sql.func.date_trunc('week', col),
-        isna = lambda col: col.is_(None),
-        isnull = lambda col: col.is_(None),
+        isna = sql_colmeth("is_", None),
+        isnull = sql_colmeth("is_", None),
         # dply.vector funcs ----
+        desc = lambda col: col.desc(),
         
         # TODO: string methods
         #str.len,
@@ -83,7 +144,6 @@ base_scalar = dict(
         #str_trim func to cut text off sides
         # TODO: move to postgres specific
         n = lambda col: sql.func.count(),
-        sum = sql_scalar("sum"),
         # TODO: this is to support a DictCall (e.g. used in case_when)
         dict = dict,
         # TODO: don't use singledispatch to add sql support to case_when
@@ -93,13 +153,16 @@ base_scalar = dict(
 
 base_agg = dict(
         mean = sql_agg("avg"),
+        sum = sql_agg("sum"),
+        min = sql_agg("min"),
+        max = sql_agg("max"),
         # TODO: generalize case where doesn't use col
         # need better handeling of vector funcs
         len = lambda col: sql.func.count()
         )
 
 base_win = dict(
-        row_number = win_over("row_number"),
+        row_number = lambda col: CumlOver(sql.func.row_number()),
         min_rank = win_over("rank"),
         rank = win_over("rank"),
         dense_rank = win_over("dense_rank"),
@@ -130,10 +193,45 @@ base_win = dict(
         # cumulative funcs ---
         #avg("id") OVER (PARTITION BY "email" ORDER BY "id" ROWS UNBOUNDED PRECEDING)
         #cummean = win_agg("
-        #cumsum
+        cumsum = win_cumul("sum")
         #cummin
         #cummax
 
+        )
+
+# based on https://github.com/tidyverse/dbplyr/blob/master/R/backend-.R
+base_nowin = dict(
+        row_number   = win_absent("ROW_NUMBER"),
+        min_rank     = win_absent("RANK"),
+        rank         = win_absent("RANK"),
+        dense_rank   = win_absent("DENSE_RANK"),
+        percent_rank = win_absent("PERCENT_RANK"),
+        cume_dist    = win_absent("CUME_DIST"),
+        ntile        = win_absent("NTILE"),
+        mean         = win_absent("AVG"),
+        sd           = win_absent("SD"),
+        var          = win_absent("VAR"),
+        cov          = win_absent("COV"),
+        cor          = win_absent("COR"),
+        sum          = win_absent("SUM"),
+        min          = win_absent("MIN"),
+        max          = win_absent("MAX"),
+        median       = win_absent("PERCENTILE_CONT"),
+        quantile    = win_absent("PERCENTILE_CONT"),
+        n            = win_absent("N"),
+        n_distinct   = win_absent("N_DISTINCT"),
+        cummean      = win_absent("MEAN"),
+        cumsum       = win_absent("SUM"),
+        cummin       = win_absent("MIN"),
+        cummax       = win_absent("MAX"),
+        nth          = win_absent("NTH_VALUE"),
+        first        = win_absent("FIRST_VALUE"),
+        last         = win_absent("LAST_VALUE"),
+        lead         = win_absent("LEAD"),
+        lag          = win_absent("LAG"),
+        order_by     = win_absent("ORDER_BY"),
+        str_flatten  = win_absent("STR_FLATTEN"),
+        count        = win_absent("COUNT")
         )
 
 funcs = dict(scalar = base_scalar, aggregate = base_agg, window = base_win)

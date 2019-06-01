@@ -1,6 +1,6 @@
 from siuba.dply.verbs import (
         singledispatch2,
-        pipe_no_args,
+        show_query, collect,
         simple_varname,
         select, VarList, var_select,
         mutate,
@@ -10,18 +10,18 @@ from siuba.dply.verbs import (
         count,
         group_by, ungroup,
         case_when,
-        join, left_join, right_join, inner_join,
+        join, left_join, right_join, inner_join, semi_join, anti_join,
         head,
         rename,
         distinct,
         if_else
         )
-from .translate import sa_modify_window, sa_is_window
+from .translate import sa_modify_window, sa_is_window, CustomOverClause
 from .utils import get_dialect_funcs
 
 from sqlalchemy import sql
 import sqlalchemy
-from siuba.siu import Call, CallTreeLocal
+from siuba.siu import Call, CallTreeLocal, str_to_getitem_call, Lazy
 # TODO: currently needed for select, but can we remove pandas?
 from pandas import Series
 import pandas as pd
@@ -57,17 +57,26 @@ class WindowReplacer(CallListener):
     TODO: could replace with a sqlalchemy transformer
     """
 
-    def __init__(self, columns, group_by, window_cte = None):
+    def __init__(self, columns, group_by, order_by, window_cte = None):
         self.columns = columns
         self.group_by = group_by
+        self.order_by = order_by
         self.window_cte = window_cte
         self.windows = []
 
     def exit(self, node):
         # evaluate
         col_expr = node(self.columns)
-        if sa_is_window(col_expr):
-            label = sa_modify_window(col_expr, self.columns, self.group_by).label(None)
+        if isinstance(col_expr, CustomOverClause):
+            group_by = sql.elements.ClauseList(
+                    *[self.columns[name] for name in self.group_by]
+                    )
+            order_by = sql.elements.ClauseList(
+                    *_create_order_by_clause(self.columns, *self.order_by)
+                    )
+
+            label = col_expr.set_over(group_by, order_by).label(None)
+            #label = sa_modify_window(col_expr, self.columns, self.group_by).label(None)
 
             self.windows.append(label)
 
@@ -81,8 +90,8 @@ class WindowReplacer(CallListener):
         return col_expr
 
 
-def track_call_windows(call, columns, group_by, window_cte = None):
-    listener = WindowReplacer(columns, group_by, window_cte)
+def track_call_windows(call, columns, group_by, order_by, window_cte = None):
+    listener = WindowReplacer(columns, group_by, order_by, window_cte)
     col = listener.enter(call)
     return col, listener.windows
 
@@ -93,15 +102,22 @@ def lift_inner_cols(tbl):
 
     return sql.base.ImmutableColumnCollection(data, cols)
 
-def has_windows(clause):
-    windows = []
-    append_win = lambda col: windows.append(col)
+def col_expr_requires_cte(call, sel):
+    """Return whether a variable assignment needs a CTE"""
 
-    sql.util.visitors.traverse(clause, {}, {"over": append_win})
-    if len(windows):
-        return True
+    call_vars = set(call.op_vars(attr_calls = False))
 
-    return False
+    columns = lift_inner_cols(sel)
+    sel_labs = set(k for k,v in columns.items() if isinstance(v, sql.elements.Label))
+    
+    return (   len(sel._group_by_clause)
+            or len(sel._order_by_clause)
+            or not sel_labs.isdisjoint(call_vars)
+            )
+
+def get_missing_columns(call, columns):
+    missing_cols = set(call.op_vars(attr_calls = False)) - set(columns.keys())
+    return missing_cols
 
 def compile_el(tbl, el):
     compiled = el.compile(
@@ -109,6 +125,14 @@ def compile_el(tbl, el):
          compile_kwargs = {"literal_binds": True}
     )
     return compiled
+
+# Misc utilities --------------------------------------------------------------
+
+def ordered_union(x, y):
+    dx = {el: True for el in x}
+    dy = {el: True for el in y}
+
+    return tuple({**dx, **dy})
 
 
 
@@ -140,22 +164,25 @@ class LazyTbl:
         self.rm_attr = rm_attr
         self.call_sub_attr = call_sub_attr
 
-    def append_op(self, op):
-        return self.__class__(
-                self.source,
-                self.tbl,
-                self.ops + [op],
-                self.group_by,
-                self.order_by,
-                self.funcs,
-                self.rm_attr,
-                self.call_sub_attr
-                )
+    def append_op(self, op, **kwargs):
+        cpy = self.copy(**kwargs)
+        cpy.ops = cpy.ops + [op]
+        return cpy
 
     def copy(self, **kwargs):
         return self.__class__(**{**self.__dict__, **kwargs})
 
-    def shape_call(self, call, window = True):
+    def shape_call(self, call, window = True, str_accessors = False):
+        # TODO: error if mutate receives a literal value?
+        if str_accessors and isinstance(call, str):
+            # verbs that can use strings as accessors, like group_by, or
+            # arrange, need to convert those strings into a getitem call
+            return str_to_get_item_call(call)
+        elif not isinstance(call, Call):
+            # verbs that use literal strings, need to convert them to a call
+            # that returns a sqlalchemy "literal" object
+            return Lazy(sql.literal(call))
+
         f_dict1 = self.funcs['scalar']
         f_dict2 = self.funcs['window' if window else 'aggregate']
 
@@ -172,24 +199,53 @@ class LazyTbl:
         """Returns tuple of (new column expression, list of window exprs)"""
 
         columns = self.last_op.columns if columns is None else columns
-        return track_call_windows(call, columns, self.group_by, window_cte)
+        return track_call_windows(call, columns, self.group_by, self.order_by, window_cte)
+
+    def get_ordered_col_names(self):
+        ungrouped = [k for k in self.last_op.columns.keys() if k not in self.group_by]
+        return list(self.group_by) + ungrouped
 
     @property
     def last_op(self):
         return self.ops[-1] if len(self.ops) else None
 
+    def _get_preview(self):
+        # need to make prev op a cte, so we don't override any previous limit
+        new_sel = sql.select([self.last_op.alias()]).limit(5)
+        tbl_small = self.append_op(new_sel)
+        return collect(tbl_small)
+
     def __repr__(self):
-        tbl_small = self.append_op(self.last_op.limit(5))
-
-        # makes sure to get engine, even if sqlalchemy connection obj
-        engine = self.source.engine
-
-        return ("# Source: lazy query\n"
+        template = (
+                "# Source: lazy query\n"
                 "# DB Conn: {}\n"
                 "# Preview:\n{}\n"
                 "# .. may have more rows"
-                    .format(repr(engine), repr(collect(tbl_small)))
                 )
+
+        return template.format(repr(self.source.engine), repr(self._get_preview()))
+
+    def _repr_html_(self):
+        template = (
+                "<div>"
+                "<pre>"
+                "# Source: lazy query\n"
+                "# DB Conn: {}\n"
+                "# Preview:\n"
+                "</pre>"
+                "{}"
+                "<p># .. may have more rows</p>"
+                "</div>"
+                )
+
+        data = self._get_preview()
+        html_data = getattr(data, '_repr_html_', lambda: repr(data))()
+        return template.format(self.source.engine, html_data)
+
+
+def _repr_grouped_df_html_(self):
+    return "<div><p>(grouped data frame)</p>" + self._selected_obj._repr_html_() + "</div>"
+
 
 
 # Main Funcs 
@@ -210,9 +266,8 @@ def use_simple_names():
     finally:
         deregister(sql.compiler._CompileLabel)
 
-@pipe_no_args
-@singledispatch2(LazyTbl)
-def show_query(tbl, simplify = False):
+@show_query.register(LazyTbl)
+def _show_query(tbl, simplify = False):
     query = tbl.last_op #if not simplify else 
     compile_query = lambda: query.compile(
                 dialect = tbl.source.dialect,
@@ -231,9 +286,9 @@ def show_query(tbl, simplify = False):
     return tbl
 
 # collect ----------
-@pipe_no_args
-@singledispatch2(LazyTbl)
-def collect(__data, as_df = True):
+
+@collect.register(LazyTbl)
+def _collect(__data, as_df = True):
     # TODO: maybe remove as_df options, always return dataframe
     # normally can just pass the sql objects to execute, but for some reason
     # psycopg2 completes about incomplete template.
@@ -248,15 +303,15 @@ def collect(__data, as_df = True):
 
     return __data.source.execute(compiled).fetchall()
 
-@collect.register(pd.DataFrame)
-def _collect(__data, *args, **kwargs):
-    # simply return DataFrame, since requires no execution
-    return __data
-
 
 @select.register(LazyTbl)
 def _select(__data, *args, **kwargs):
     # see https://stackoverflow.com/questions/25914329/rearrange-columns-in-sqlalchemy-select-object
+    if kwargs:
+        raise NotImplementedError(
+                "Using kwargs in select not currently supported. "
+                "Use _.newname == _.oldname instead"
+                )
     last_op = __data.last_op
     columns = {c.key: c for c in last_op.inner_columns}
 
@@ -282,14 +337,13 @@ def _filter(__data, *args, **kwargs):
     #       1 for window/aggs, and 1 for the where clause
     sel = __data.last_op.alias()
     win_sel = sql.select([sel], from_obj = sel)
-    #fil_sel = sql.select([win_sel], from_obj = win_sel)
 
     conds = []
     windows = []
     for arg in args:
         if isinstance(arg, Call):
             new_call = __data.shape_call(arg)
-            var_cols = new_call.op_vars(attr_calls = False)
+            #var_cols = new_call.op_vars(attr_calls = False)
 
             col_expr, win_cols = __data.track_call_windows(
                     new_call,
@@ -297,8 +351,6 @@ def _filter(__data, *args, **kwargs):
                     window_cte = win_sel
                     )
 
-            #if sa_is_window(col_expr):
-            #    col_expr = sa_modify_window(col_expr, columns, __data.group_by)
             conds.append(col_expr)
         else:
             conds.append(arg)
@@ -309,9 +361,10 @@ def _filter(__data, *args, **kwargs):
     win_alias = win_sel.alias()
     bool_clause = sql.util.ClauseAdapter(win_alias).traverse(bool_clause)
 
-
-    sel = sql.select([win_alias], from_obj = win_alias, whereclause = bool_clause)
-    return __data.append_op(sel)
+    
+    orig_cols = [win_alias.columns[k] for k in __data.get_ordered_col_names()]
+    filt_sel = sql.select(orig_cols, from_obj = win_alias, whereclause = bool_clause)
+    return __data.append_op(filt_sel)
 
 
 @mutate.register(LazyTbl)
@@ -342,17 +395,14 @@ def _mutate_select(sel, colname, func, labs, __data):
     function handles whether to add a column to the existing select statement,
     or to use it as a subquery.
     """
-    #colname, func
-    replace_col = colname in sel.columns
+    replace_col = False
     # Call objects let us check whether column expr used a derived column
     # e.g. SELECT a as b, b + 1 as c raises an error in SQL, so need subquery
     call_vars = func.op_vars(attr_calls = False)
-    if isinstance(func, Call) and labs.isdisjoint(call_vars):
+    if labs.isdisjoint(call_vars):
         # New column may be able to modify existing select
+        replace_col = colname in sel.columns
         columns = lift_inner_cols(sel)
-        # replacing an existing column, so strip it from select statement
-        if replace_col:
-            sel = sel.with_only_columns([v for k,v in columns.items() if k != colname])
 
     else:
         # anything else requires a subquery
@@ -363,6 +413,12 @@ def _mutate_select(sel, colname, func, labs, __data):
     # evaluate call expr on columns, making sure to use group vars
     new_col, windows = __data.track_call_windows(func, columns)
 
+    # replacing an existing column, so strip it from select statement
+    if replace_col:
+        replaced = {**columns}
+        replaced[colname] = new_col.label(colname)
+        return sel.with_only_columns(list(replaced.values()))
+
     return sel.column(new_col.label(colname))
 
 
@@ -371,20 +427,35 @@ def _arrange(__data, *args):
     last_op = __data.last_op
     cols = lift_inner_cols(last_op)
 
+    new_calls = tuple(
+            __data.shape_call(expr, window = False) if callable(expr) else expr
+            for expr in args
+            )
+
+    sort_cols = _create_order_by_clause(cols, *new_calls)
+
+    order_by = __data.order_by + new_calls
+    return __data.append_op(last_op.order_by(*sort_cols), order_by = order_by)
+
+
+# TODO: consolidate / pull expr handling funcs into own file?
+def _create_order_by_clause(columns, *args):
     sort_cols = []
     for arg in args:
         # simple named column
         if isinstance(arg, str):
-            sort_cols.append(cols[arg])
+            sort_cols.append(columns[arg])
         # an expression
         elif callable(arg):
-            f, asc = _call_strip_ascending(arg)
-            col_op = f(cols) if asc else f(cols).desc()
+            #f, asc = _call_strip_ascending(arg)
+            #col_op = f(cols) if asc else f(cols).desc()
+            col_op = arg(columns)
             sort_cols.append(col_op)
         else:
             raise NotImplementedError("Must be string or callable")
 
-    return __data.append_op(last_op.order_by(*sort_cols))
+    return sort_cols
+
 
 
 @count.register(LazyTbl)
@@ -440,18 +511,24 @@ def _summarize(__data, **kwargs):
     #   - filter is fine, since it uses a CTE
     #   - need to detect any window functions...
     sel = __data.last_op._clone()
-    labs = set(k for k,v in sel.columns.items() if isinstance(v, sql.elements.Label))
+
+    new_calls = {k: __data.shape_call(expr, window = False) for k, expr in kwargs.items()}
+    needs_cte = [col_expr_requires_cte(call, sel) for call in new_calls.values()]
 
     # create select statement ----
-    if len(sel._group_by_clause):
-        # current select stmt has window functions, so need to make it subquery
+    if any(needs_cte):
+        # need a cte, due to alias cols or existing group by
+        # current select stmt has group by clause, so need to make it subquery
         cte = sel.alias()
         columns = cte.columns
         sel = sql.select(from_obj = cte)
     else:
         # otherwise, can alter the existing select statement
         columns = lift_inner_cols(sel)
+        old_froms = sel.froms
+
         sel = sel.with_only_columns([])
+        sel.append_from(*old_froms)
 
     # add group by columns ----
     group_cols = [columns[k] for k in __data.group_by]
@@ -462,22 +539,34 @@ def _summarize(__data, **kwargs):
     # add each aggregate column ----
     # TODO: can't do summarize(b = mean(a), c = b + mean(a))
     #       since difficult for c to refer to agg and unagg cols in SQL
-    for k, expr in kwargs.items():
-        new_call = __data.shape_call(expr, window = False)
-        col = new_call(columns).label(k)
+    for k, expr in new_calls.items():
+        missing_cols = get_missing_columns(expr, columns)
+        if missing_cols:
+            raise NotImplementedError(
+                    "Summarize cannot find the following columns: %s. "
+                    "Note that it cannot refer to variables defined earlier in the "
+                    "same summarize call." % missing_cols
+                    )
+
+        col = expr(columns).label(k)
 
         sel.append_column(col)
 
-    # TODO: is a simple method on __data for doing this...
-    new_data = __data.append_op(sel)
-    new_data.group_by = None
+    new_data = __data.append_op(sel, group_by = tuple(), order_by = tuple())
     return new_data
 
 
 @group_by.register(LazyTbl)
-def _group_by(__data, *args):
-    cols = __data.last_op.columns
-    groups = [simple_varname(arg) for arg in args]
+def _group_by(__data, *args, add = False, **kwargs):
+    if kwargs:
+        data = mutate(__data, **kwargs)
+    else:
+        data = __data
+
+    cols = data.last_op.columns
+
+    # put kwarg grouping vars last, so similar order to function call
+    groups =  tuple(simple_varname(arg) for arg in args) + tuple(kwargs)
     if None in groups:
         raise NotImplementedError("Complex expressions not supported in sql group_by")
 
@@ -485,11 +574,15 @@ def _group_by(__data, *args):
     if unmatched:
         raise KeyError("group_by specifies columns missing from table: %s" %unmatched)
 
-    return __data.copy(group_by = groups)
+    if add:
+        groups = ordered_union(data.group_by, groups)
+
+    return data.copy(group_by = groups)
+
 
 @ungroup.register(LazyTbl)
 def _ungroup(__data):
-    return __data.copy(group_by = None)
+    return __data.copy(group_by = tuple())
 
 
 @case_when.register(sql.base.ImmutableColumnCollection)
@@ -523,14 +616,28 @@ def _case_when(__data, cases):
 
 from collections.abc import Mapping
 
-def _joined_cols(left_cols, right_cols, shared_keys):
+def _joined_cols(left_cols, right_cols, on_keys, full = False):
+    """Return labeled columns, according to selection rules for joins.
+
+    Rules:
+        1. For join keys, keep left table's column
+        2. When keys have the same labels, add suffix
+    """
     # TODO: remove sets, so uses stable ordering
     # when left and right cols have same name, suffix with _x / _y
-    shared_labs = set(left_cols.keys()) \
-            .intersection(right_cols.keys()) \
-            .difference(shared_keys)
+    keep_right = set(right_cols.keys()) - set(on_keys.values())
+    shared_labs = set(left_cols.keys()).intersection(keep_right)
 
-    right_cols_no_keys = {k: v for k, v in right_cols.items() if k not in shared_keys}
+    right_cols_no_keys = {k: right_cols[k] for k in keep_right}
+
+    # for an outer join, have key columns coalesce values
+    if full:
+        left_cols = {**left_cols}
+        for lk, rk in on_keys.items():
+            col = sql.functions.coalesce(left_cols[lk], right_cols[rk])
+            left_cols[lk] = col.label(lk)
+
+    # create labels ----
     l_labs = _relabeled_cols(left_cols, shared_labs, "_x")
     r_labs = _relabeled_cols(right_cols_no_keys, shared_labs, "_y")
 
@@ -548,19 +655,102 @@ def _relabeled_cols(columns, keys, suffix):
 
 
 @join.register(LazyTbl)
-def _join(left, right, on = None, how = None):
+def _join(left, right, on = None, how = "inner"):
     # Needs to be on the table, not the select
     left_sel = left.last_op.alias()
     right_sel = right.last_op.alias()
+
+    # handle arguments ----
+    on  = _validate_join_arg_on(on)
+    how = _validate_join_arg_how(how)
     
+    if how == "right":
+        # switch joins, since sqlalchemy doesn't have right join arg
+        # see https://stackoverflow.com/q/11400307/1144523
+        left_sel, right_sel = right_sel, left_sel
+
+    # create join conditions ----
+    bool_clause = _create_join_conds(left_sel, right_sel, on)
+
+    # create join ----
+    join = left_sel.join(
+            right_sel,
+            onclause = bool_clause,
+            isouter = how != "inner",
+            full = how == "full"
+            )
+    
+    # note, shared_keys assumes on is a mapping...
+    shared_keys = [k for k,v in on.items() if k == v]
+    labeled_cols = _joined_cols(
+            left_sel.columns,
+            right_sel.columns,
+            on_keys = on,
+            full = how == "full"
+            )
+
+    sel = sql.select(labeled_cols, from_obj = join)
+    return left.append_op(sel)
+
+
+@semi_join.register(LazyTbl)
+def _semi_join(left, right = None, on = None):
+
+    left_sel = left.last_op.alias()
+    right_sel = right.last_op.alias()
+
+    # handle arguments ----
+    on  = _validate_join_arg_on(on)
+    
+    # create join conditions ----
+    bool_clause = _create_join_conds(left_sel, right_sel, on)
+
+    # create inner join ----
+    join = left_sel.join(right_sel, onclause = bool_clause)
+
+    # only keep left hand select's columns ----
+    sel = sql.select(left_sel.columns, from_obj = join)
+    return left.append_op(sel)
+
+
+@anti_join.register(LazyTbl)
+def _anti_join(left, right = None, on = None):
+    left_sel = left.last_op.alias()
+    right_sel = right.last_op.alias()
+
+    # handle arguments ----
+    on  = _validate_join_arg_on(on)
+    
+    # create join conditions ----
+    bool_clause = _create_join_conds(left_sel, right_sel, on)
+
+    # create inner join ----
+    not_exists = ~sql.exists([1], from_obj = right_sel).where(bool_clause)
+    sel = sql.select(left_sel.columns, from_obj = left_sel).where(not_exists)
+    return left.append_op(sel)
+       
+
+def _validate_join_arg_on(on):
     if on is None:
         raise NotImplementedError("on arg must currently be dict")
+    elif isinstance(on, str):
+        on = {on: on}
     elif isinstance(on, (list, tuple)):
         on = dict(zip(on, on))
 
     if not isinstance(on, Mapping):
-        raise Exception("on must be a Mapping (e.g. dict)")
+        raise TypeError("on must be a Mapping (e.g. dict)")
 
+    return on
+
+def _validate_join_arg_how(how):
+    how_options = ("inner", "left", "right", "full")
+    if how not in how_options:
+        raise ValueError("how argument needs to be one of %s" %how_options)
+    
+    return how
+
+def _create_join_conds(left_sel, right_sel, on):
     left_cols  = left_sel.columns  #lift_inner_cols(left_sel)
     right_cols = right_sel.columns #lift_inner_cols(right_sel)
 
@@ -569,21 +759,8 @@ def _join(left, right, on = None, how = None):
         col_expr = left_cols[l] == right_cols[r]
         conds.append(col_expr)
         
-
-    bool_clause = sql.and_(*conds)
-    join = left_sel.join(right_sel, onclause = bool_clause)
+    return sql.and_(*conds)
     
-    # note, shared_keys assumes on is a mapping...
-    shared_keys = [k for k,v in on.items() if k == v]
-    labeled_cols = _joined_cols(
-            left_sel.columns,
-            right_sel.columns,
-            shared_keys = shared_keys
-            )
-
-    sel = sql.select(labeled_cols, from_obj = join)
-    return left.append_op(sel)
-
 
 # Head ------------------------------------------------------------------------
 
@@ -602,7 +779,12 @@ def _rename(__data, **kwargs):
     columns = lift_inner_cols(sel)
 
     # old_keys uses dict as ordered set
-    old_to_new = {v:k for k,v in kwargs.items()}
+    old_to_new = {simple_varname(v):k for k,v in kwargs.items()}
+    
+    if None in old_to_new:
+        raise KeyError("positional arguments must be simple column, "
+                        "e.g. _.colname or _['colname']"
+                        )
 
     labs = [c.label(old_to_new[k]) if k in old_to_new else c for k,c in columns.items()]
 
@@ -617,7 +799,7 @@ def _rename(__data, **kwargs):
 def _distinct(__data, *args, _keep_all = False, **kwargs):
     if (args or kwargs) and _keep_all:
         raise NotImplementedError("Distinct with variables specified in sql requires _keep_all = False")
-
+    
     inner_sel = mutate(__data, **kwargs).last_op if kwargs else __data.last_op
 
     # TODO: this is copied from the df distinct version
@@ -626,16 +808,26 @@ def _distinct(__data, *args, _keep_all = False, **kwargs):
     cols.update(kwargs)
 
     if None in cols:
-        raise Exception("positional arguments must be simple column, "
+        raise KeyError("positional arguments must be simple column, "
                         "e.g. _.colname or _['colname']"
                         )
 
-    if not cols: cols = list(inner_sel.columns.keys())
+    # use all columns by default
+    if not cols:
+        cols = list(inner_sel.columns.keys())
 
-    sel_cols = lift_inner_cols(inner_sel)
-    distinct_cols = [sel_cols[k] for k in cols]
+    if not len(inner_sel._order_by_clause):
+        # select distinct has to include any columns in the order by clause,
+        # so can only safely modify existing statement when there's no order by
+        sel_cols = lift_inner_cols(inner_sel)
+        distinct_cols = [sel_cols[k] for k in cols]
+        sel = inner_sel.with_only_columns(distinct_cols).distinct()
+    else:
+        # fallback to cte
+        cte = inner_sel.alias()
+        distinct_cols = [cte.columns[k] for k in cols]
+        sel = sql.select(distinct_cols, from_obj = cte).distinct()
 
-    sel = inner_sel.with_only_columns(distinct_cols).distinct()
     return __data.append_op(sel)
 
     

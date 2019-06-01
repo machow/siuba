@@ -32,7 +32,7 @@ def cummean(x):
 
 @register_symbolic
 def desc(x):
-    NotImplementedError("Use minus sign in arrange instead (e.g. -_.somecol)")
+    return x.sort_values()
 
 
 @register_symbolic
@@ -61,7 +61,7 @@ def row_number(x):
         n = x.shape[0]
     else:
         n = len(x)
-    return np.arange(n)
+    return np.arange(1, n + 1)
 
 
 @register_symbolic
@@ -91,7 +91,7 @@ def lead(x, n = 1, default = None):
 
 
 @register_symbolic
-def lag():
+def lag(x, n = 1, default = None):
     res = x.shift(n)
 
     if default is not None:
