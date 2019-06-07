@@ -603,7 +603,6 @@ def _call_strip_ascending(f):
 @singledispatch2(DataFrame)
 def arrange(__data, *args):
     # TODO:
-    #   - general handling of stripping Symbolics
     #   - add arguments to pass to sort_values (e.g. ascending, kind)
     # 
     # basically need some (1) select behavior, (2) mutate-like behavior
@@ -620,22 +619,26 @@ def arrange(__data, *args):
     #kwargs = {n_cols + ii: arg for ii,arg in enumerate(args)}
 
     # TODO: more careful handling of arg types (true across library :/ )..
-    tmp_colnames = []
+    tmp_cols = []
+    sort_cols = []
     ascending = []
     for ii, arg in enumerate(args):
-        if isinstance(arg, str):
-            tmp_colnames.append(arg)
+        f, asc = _call_strip_ascending(arg)
+        ascending.append(asc)
+
+        col = simple_varname(f)
+        if col is not None:
+            sort_cols.append(col)
         else:
             # TODO: could screw up if user has columns names that are ints...
-            tmp_colnames.append(n_cols + ii)
-
-            f, asc = _call_strip_ascending(arg)
-            ascending.append(asc)
+            sort_cols.append(n_cols + ii)
+            tmp_cols.append(n_cols + ii)
 
             df[n_cols + ii] = f(df)
 
-    return df.sort_values(by = tmp_colnames, kind = "mergesort", ascending = ascending) \
-             .drop(tmp_colnames, axis = 1)
+
+    return df.sort_values(by = sort_cols, kind = "mergesort", ascending = ascending) \
+             .drop(tmp_cols, axis = 1)
 
 
 @arrange.register(DataFrameGroupBy)

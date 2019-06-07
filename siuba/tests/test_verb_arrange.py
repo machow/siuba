@@ -7,6 +7,42 @@ import pytest
 
 from .helpers import assert_equal_query, data_frame, backend_notimpl, backend_sql
 
+DATA = data_frame(x = [2,2,1], y = [2,1,1], z = ['z']*3)
+
+@pytest.fixture(scope = "module")
+def df(backend):
+    return backend.load_df(DATA)
+
+
+@pytest.mark.parametrize("query, output", [
+    (arrange(_.x), DATA.sort_values(['x'])),
+    (arrange("x"), DATA.sort_values(['x'])),
+    (arrange(_.x, _.y), DATA.sort_values(['x', 'y'])),
+    (arrange("x", "y"), DATA.sort_values(['x', 'y'])),
+    (arrange(_.x, "y"), DATA.sort_values(['x', 'y']))
+    ])
+def test_basic_arrange(df, query, output):
+    assert_equal_query(df, query, output)
+
+
+@pytest.mark.parametrize("query, output", [
+    (arrange(-_.x), DATA.sort_values(['x'], ascending = [False])),
+    (arrange(-_.x, _.y), DATA.sort_values(['x', 'y'], ascending = [False, True])),
+    (arrange(-_.x, "y"), DATA.sort_values(['x', 'y'], ascending = [False, True]))
+    ])
+def test_arrange_desc(df, query, output):
+    assert_equal_query(df, query, output)
+
+
+@pytest.mark.parametrize("query, output", [
+    (arrange(_.x - _.x), DATA),
+    (arrange(_.x * -1), DATA.sort_values(['x'], ascending = [False])),
+    ])
+def test_arrange_with_expr(df, query, output):
+    assert_equal_query(df, query, output)
+
+
+# SQL -------------------------------------------------------------------------
 
 @backend_sql
 @backend_notimpl("sqlite")
