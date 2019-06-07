@@ -147,11 +147,17 @@ class LazyTbl:
             ):
         
         # connection and dialect specific functions
-        self.source = source
-        self.funcs = get_dialect_funcs(source.dialect.name) if funcs is None else funcs
+        self.source = sqlalchemy.create_engine(source) if isinstance(source, str) else source
+        self.funcs = get_dialect_funcs(self.source.dialect.name) if funcs is None else funcs
 
         if isinstance(tbl, str):
-            self.tbl = sqlalchemy.Table(tbl, sqlalchemy.MetaData(), autoload_with = source)
+            schema, table_name = tbl.split('.')
+            self.tbl = sqlalchemy.Table(
+                        table_name,
+                        sqlalchemy.MetaData(),
+                        autoload_with = self.source,
+                        schema = schema
+                        )
         else:
             self.tbl = tbl
 
