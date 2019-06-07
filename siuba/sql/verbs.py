@@ -151,7 +151,7 @@ class LazyTbl:
         self.funcs = get_dialect_funcs(self.source.dialect.name) if funcs is None else funcs
 
         if isinstance(tbl, str):
-            schema, table_name = tbl.split('.')
+            schema, table_name = tbl.split('.') if '.' in tbl else [None, tbl]
             self.tbl = sqlalchemy.Table(
                         table_name,
                         sqlalchemy.MetaData(),
@@ -465,8 +465,11 @@ def _create_order_by_clause(columns, *args):
 
 
 @count.register(LazyTbl)
-def _count(__data, *args, sort = False):
+def _count(__data, *args, sort = False, **kwargs):
     # TODO: if already col named n, use name nn, etc.. get logic from tidy.py
+    if kwargs:
+        raise NotImplementedError("TODO")
+
     # similar to filter verb, we need two select statements,
     # an inner one for derived cols, and outer to group by them
     sel = __data.last_op.alias()
@@ -476,16 +479,17 @@ def _count(__data, *args, sort = False):
     # holds any mutation style columns
     group_cols = []
     for arg in args:
-        col_expr = arg(sel.columns) if callable(arg) else arg
-        if not isinstance(col_expr, (schema.Column, str)):
-            # compile, so we can use the expr as its name (e.g. "id + 1")
-            name = str(compile_el(__data, col_expr))
-            label = col_expr.label(name)
-            sel_inner.append_column(label)
-        else:
-            name = str(col_expr)
+        col_name = simple_varname(arg)
+        if col_name is None:
+            # evaluate call
+            col_expr = arg(sel.columns) if callable(arg) else arg
 
-        group_cols.append(name)
+            # compile, so we can use the expr as its name (e.g. "id + 1")
+            col_name = str(compile_el(__data, col_expr))
+            label = col_expr.label(col_name)
+            sel_inner.append_column(label)
+
+        group_cols.append(col_name)
 
     # outer select ----
     # holds selected columns and tally (n)
