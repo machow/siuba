@@ -111,12 +111,20 @@ def sql_astype(col, _type):
     return sql.cast(col, sa_type)
 
 base_scalar = dict(
-        # TODO: these methods are sqlalchemy ColumnElement methods, simplify?
+        # infix operators -----
+        # NOTE: all sqlalchemy.Column operators are used
+        # TODO: need way to implement ** operator
+
+        # sqlalchemy.ColumnElement methods ----
         cast = sql_colmeth("cast"),
         startswith = sql_colmeth("startswith"),
         endswith = sql_colmeth("endswith"),
         between = sql_colmeth("between"),
         isin = sql_colmeth("in_"),
+
+        # bitwise operations -----
+        # TODO
+
         # these are methods on sql.funcs ---- 
         abs = sql_scalar("abs"),
         acos = sql_scalar("acos"),
@@ -156,8 +164,10 @@ base_agg = dict(
         sum = sql_agg("sum"),
         min = sql_agg("min"),
         max = sql_agg("max"),
+        count = sql_agg("count"),
         # TODO: generalize case where doesn't use col
         # need better handeling of vector funcs
+        # TODO: delete this, len() is not a method anywhere, or vect func
         len = lambda col: sql.func.count()
         )
 
@@ -186,6 +196,7 @@ base_win = dict(
         #median
 
         # counts ----
+        count = win_agg("count"),
         len = lambda col: sql.func.count().over(),
         #n
         #n_distinct
