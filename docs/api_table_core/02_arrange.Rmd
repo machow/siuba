@@ -19,25 +19,98 @@ pd.set_option("display.max_rows", 5)
 
 ## Arrange
 
+This function lets you to arrange the rows of your data, through two steps...
+
+* choosing columns to arrange by
+* specifying an order (ascending or descending)
+
+Below, we'll illustrate this function with a single variable, multiple variables, and more general expressions.
+
 ```{python}
-from siuba import _
+from siuba import _, arrange, select
 from siuba.data import mtcars
+
+small_mtcars = mtcars >> select(_.cyl, _.mpg, _.hp)
+
+small_mtcars
 ```
 
-### Example 1: 
+### Arranging rows by a single variable
+
+
+The simplest way to use arrange is to specify a column name. The `arrange` function uses `pandas.sort_values` under the hood, and arranges rows in ascending order.
+
+For example, the code below arranges the rows from least to greatest horsepower (`hp`).
 
 ```{python}
-
+# simple arrange of 1 var
+small_mtcars >> arrange(_.hp)
 ```
 
-### Example 2: 
+If you add a `-` before a column or expression, `arrange` will sort the rows in descending order. This applies to all types of columns, including arrays of strings and categories!
 
 ```{python}
-
+small_mtcars >> arrange(-_.hp)
 ```
 
-### Example 3: 
+### Arranging rows by multiple variables
+
+
+When arrange receives multiple arguments, it sorts so that the one specified first changes the slowest, followed by the second, and so on.
 
 ```{python}
+small_mtcars >> arrange(_.cyl, _.mpg)
+```
 
+```{python}
+small_mtcars >> arrange(_.cyl, -_.mpg)
+```
+
+### Expressions
+
+
+You can also `arrange` the rows of your data using more complex expressions, similar to those you would use in a `mutate`.
+
+For example, the code below sorts by horsepower (`hp`) per cylindar (`cyl`).
+
+```{python}
+small_mtcars >> arrange(_.hp / _.cyl)
+```
+
+#### Arranging Categorical series
+
+
+Note that when arranging a categorical series, it will be arranged in the order of its categories. For example, the DataFrame below consists of a category with three entries.
+
+```{python}
+df = pd.DataFrame({
+    "x_cat": pd.Categorical(["c", "b", "a"])
+    })
+
+df
+```
+
+While the values of the category go from "c" to "a", the default levels of a categorical are already sorted, so go from "a" to "c". This can be seen in the very last line of output below.
+
+```{python}
+df.x_cat
+```
+
+Since `pd.sort_values` would sort the categorical according to the order listed under "Categories", arrange does this also.
+
+```{python}
+df >> arrange(_.x_cat)
+```
+
+This means that if reorder the categories, the arrange will follow that reordering!
+
+```{python}
+from siuba.dply.forcats import fct_rev
+
+df["rev_x_cat"] = fct_rev(df.x_cat)
+df.rev_x_cat
+```
+
+```{python}
+df >> arrange(_.rev_x_cat)
 ```

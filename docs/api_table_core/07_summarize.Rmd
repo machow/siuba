@@ -19,25 +19,40 @@ pd.set_option("display.max_rows", 5)
 
 ## Summarize
 
+This function lets you define a new column in your data, which is a single number calculated either across all the data, or within specified groups. It will result in a DataFrame with as many rows as the number of unique groups, or if no groups are defined, one row.
+
 ```{python}
-from siuba import _
+from siuba import _, group_by, summarize
 from siuba.data import mtcars
 ```
 
-### Example 1: 
+### Summarize over everything
+
+When you use summarize with an ungrouped DataFrame, the result is a single row.
 
 ```{python}
-
+mtcars >> summarize(avg_mpg = _.mpg.mean())
 ```
 
-### Example 2: 
+### Summarizing per group
+
+When you use summarize with a grouped DataFrame, the result has the same number of rows as there are groups in the data. For example, there are 3 values of cylinders (`cyl`) a row can have (4, 6, or 8), so ther result will be 3 rows.
 
 ```{python}
-
+(mtcars
+  >> group_by(_.cyl)
+  >> summarize(avg_mpg = _.mpg.mean())
+  )
 ```
 
-### Example 3: 
+Note that summarize also accepts a single value, like a string or number.
 
 ```{python}
-
+(mtcars
+  >> group_by(_.cyl)
+  >> summarize(
+       measure = "mean miles per gallon",
+       value = _.mpg.mean()
+       )
+  )
 ```

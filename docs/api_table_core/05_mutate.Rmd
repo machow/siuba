@@ -20,24 +20,52 @@ pd.set_option("display.max_rows", 5)
 ## Mutate
 
 ```{python}
-from siuba import _, mutate
+from siuba import _, group_by, mutate, select
 from siuba.data import mtcars
+
+small_cars = mtcars[["mpg", "cyl", "hp"]]
 ```
 
-### Example 1: Assign new column
+### Assign new column
 
 ```{python}
-mutate(mtcars, cyl2 = _.cyl * 2)
+mutate(small_cars, cyl2 = _.cyl * 2)
 ```
 
-### Example 2: Reference new column in mutate
-
 ```{python}
-mutate(mtcars, cyl2 = _.cyl * 2, cyl4 = _.cyl2 * 2)
+mutate(small_cars, cyl2 = _.cyl * 2, cyl4 = _.cyl2 * 2)
 ```
 
-### Example 3: Assign new column from multiple
+```{python}
+mutate(small_cars, misc = "hey")
+```
+
+### Used with group_by
 
 ```{python}
-mutate(mtcars, hp_per_wt = _.hp / _.wt)
+(small_cars
+  >> group_by(_.cyl)
+  >> mutate(
+       hp_mean = _.hp.mean(),
+       demeaned_hp = _.hp - _.hp_mean
+     )
+  )
+```
+
+```{python}
+(small_cars
+  >> group_by(_.cyl)
+  >> mutate(
+       hp_per_cyl = _.hp / _.cyl,
+       diff = _.hp_per_cyl - _.hp_per_cyl.shift(1)
+     )
+  )
+```
+
+### With if_else and case_when
+
+TODO
+
+```{python}
+
 ```
