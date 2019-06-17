@@ -14,30 +14,28 @@ jupyter:
 
 ```{python nbsphinx=hidden}
 import pandas as pd
-pd.set_option("display.max_rows", 5)
+pd.set_option("display.max_rows", 2)
 ```
 
 ## Rename
 
+This function gives one or more columns new names. It returns a DataFrame with the renamed and original columns.
+
 ```{python}
-from siuba import _
+from siuba import _, rename, select
 from siuba.data import mtcars
+
+small_cars = mtcars[["mpg", "cyl", "hp"]]
 ```
 
-### Example 1: 
+For example, the code below renames `mpg` to be uppercase, while keeping the other columns of data.
 
 ```{python}
-
+small_cars >> rename(MPG = "mpg")
 ```
 
-### Example 2: 
+It is equivalent to renaming in a select, while also selecting all other columns.
 
 ```{python}
-
-```
-
-### Example 3: 
-
-```{python}
-
+small_cars >> select(_.MPG == _.mpg, _.cyl, _.hp)
 ```

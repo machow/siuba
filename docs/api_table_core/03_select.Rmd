@@ -19,25 +19,128 @@ pd.set_option("display.max_rows", 5)
 
 ## Select
 
+This function lets you select specific columns of your data to keep.
+Each selection may include up to three pieces...
+
+* specifying column(s) to include or remove
+* excluding some specified columns
+* renaming a column
+
+The documentation below will illustrate these pieces when specifying one column at a time, specifying multiple columns, or searching columns using functions like `contains`.
+
 ```{python}
-from siuba import _
+from siuba import _, select
 from siuba.data import mtcars
+
+mtcars
 ```
 
-### Example 1: 
+### Specifying one column at a time
+
+
+#### Specify columns by name or position
+
+The cleanest way to specify a column is to refer to it by name.
+By default, referring to a column will keep it.
 
 ```{python}
-
+mtcars >> select(_.mpg, _.cyl)
 ```
 
-### Example 2: 
+This approach ensures that you can easily rename, or exclude it from the data (shown in following sections). However, you can also refer to a column using a string, or its 0-indexed column position.
 
 ```{python}
-
+# two other ways to keep the same columns
+mtcars >> select(0, 1)
+mtcars >> select("mpg", "cyl")
 ```
 
-### Example 3: 
+#### Excluding columns
+
+You can remove a column from the data by specifying it with a minus sign (`-`) in front of it.
+This action can be performed on multiple columns.
 
 ```{python}
+# simple select with exclusion
+mtcars >> select(-_.mpg, -_.cyl)
+```
 
+#### Renaming columns
+
+You can rename a specified column by using the equality operator (`==`).
+This operation takes the following form.
+
+* `_.new_name == _.old_name`
+
+```{python}
+# select with rename
+mtcars >> select(_.miles_per_gallon == _.mpg, _.cyl)
+```
+
+Note that expressing the new column name on the left is similar to how creating a python dictionary works. For example...
+
+* `select(_.a == _.x, _.b == _.y)`
+* `dict(a = "x", b = "y")`
+
+both create new entries named "a" and "b".
+
+However, keep in mind that pandas `DataFrame.rename` method uses the **opposite** approach.
+
+
+### Select a slice of columns
+
+When the columns you want to select are adjacent to each other, you can select them using a special slicing syntax. This syntax takes the form...
+
+* `_["start_col":"end_col"]`
+
+where "start_col" and "end_col" can be any of the three methods to specify a column: `_.some_col`, "some_col", or its position number.
+
+```{python}
+mtcars >> select(_["mpg": "hp"])
+```
+
+Note that when position number is used to slice columns, the columns you specify are exactly the ones you would be from indexing the `DataFrame.columns` attribute.
+
+```{python}
+print(mtcars.columns[0:4])
+
+mtcars >> select(_[0:4])
+```
+
+Finally, columns selected through slicing can be excluded using the minus operator (`-`).
+
+```{python}
+mtcars >> select(-_["mpg": "hp"])
+```
+
+### Searching with methods like `startswith` or `contains`
+
+
+The final, most flexible way to specify columns is to use any of the methods on the `DataFrame.columns.str` attribute. This is done by calling any of these methods in a siu expression (e.g. `_.startswith('a')`).
+
+```{python}
+# prints columns that contain the letter d
+columns = mtcars.columns
+print(columns[columns.str.contains('d')])
+
+# uses the same method to select only these columns
+mtcars >> select(_.contains('d'))
+```
+
+As with the other approaches of specifying columns, you can also choose to exclude them.
+
+```{python}
+mtcars >> select(-_.contains('d'))
+```
+
+There are many string methods that can be accessed from `DataFrame.colname.str`. 
+See [their pandas docs](https://pandas.pydata.org/pandas-docs/stable/user_guide/text.html), or their docstrings (e.g. `help(mtcars.cyl.str.contains)`) for more information.
+
+For convenience, the names of these methods are listed below.
+
+```{python}
+str_methods = dir(mtcars.columns.str)
+str_useful = [x for x in str_methods if not x.startswith("_")]
+
+print(str_useful)
 ```

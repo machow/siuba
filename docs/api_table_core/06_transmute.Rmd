@@ -19,25 +19,16 @@ pd.set_option("display.max_rows", 5)
 
 ## Transmute
 
+This function is equivalent doing a `mutate`, followed by a `select` to keep the recently defined columns. Currently the way it works is...
+
+* Positional arguments are used to select columns
+* Named arguments are used as in mutate
+
 ```{python}
-from siuba import _
+from siuba import _, transmute
 from siuba.data import mtcars
 ```
 
-### Example 1: 
-
 ```{python}
-
-```
-
-### Example 2: 
-
-```{python}
-
-```
-
-### Example 3: 
-
-```{python}
-
+mtcars >> transmute(_.cyl, _.mpg, hp_per_cyl = _.hp / _.cyl)
 ```

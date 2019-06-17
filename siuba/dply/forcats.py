@@ -12,6 +12,8 @@ def register_symbolic(f):
     return f
 
 
+# fct_reorder -----------------------------------------------------------------
+
 @register_symbolic
 @singledispatch
 def fct_reorder(fct, x, func = np.median):
@@ -25,6 +27,8 @@ def fct_reorder(fct, x, func = np.median):
     return pd.Categorical.from_codes(codes, list(ordered.index))
 
 
+# fct_recode ------------------------------------------------------------------
+
 @register_symbolic
 @singledispatch
 def fct_recode(fct, **kwargs):
@@ -32,8 +36,10 @@ def fct_recode(fct, **kwargs):
         fct = pd.Categorical(fct)
 
     rev_kwargs = {v:k for k,v in kwargs.items()}
-    fct.rename_categories(rev_kwargs)
+    return fct.rename_categories(rev_kwargs)
 
+
+# fct_collapse ----------------------------------------------------------------
 
 @register_symbolic
 @singledispatch
@@ -75,6 +81,9 @@ def fct_collapse(fct, recat, group_other = None):
     new_cats = list(new_cat_set.keys())
     return pd.Categorical.from_codes(new_codes, new_cats)
 
+
+# fct_lump --------------------------------------------------------------------
+
 @register_symbolic
 @singledispatch
 def fct_lump(fct, n = None, prop = None, w = None, other_level = "Other", ties = None):
@@ -103,3 +112,17 @@ def _get_values(x):
     if isinstance(x, pd.Series): return x.values
 
     return x
+
+
+# fct_rev ---------------------------------------------------------------------
+
+@register_symbolic
+@singledispatch
+def fct_rev(fct):
+    if not isinstance(fct, pd.Categorical):
+        fct = pd.Categorical(fct)
+
+    rev_levels = list(reversed(fct.categories))
+
+    return fct.reorder_categories(rev_levels)
+    

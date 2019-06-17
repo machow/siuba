@@ -19,25 +19,115 @@ pd.set_option("display.max_rows", 5)
 
 ## Filter
 
+This function keeps rows of data that meet all specified conditions.
+
+At its core, it follows the three following rules:
+
+* if each condition is true for a row, then it keeps that row.
+* it does not keep a row when a condition results in NA values.
+* it works with normal functions, including lambdas.
+
+
+
 ```{python}
-from siuba import _
+from siuba import _, filter, group_by
 from siuba.data import mtcars
 ```
 
-### Example 1: 
+### Filter basics
+
+
+This section demonstrates each of the three rules listed above.
+
+For example, in the code below, a row must meet two conditions to be kept in the data. You can verbalize these conditions as, "`cyl` is equal to four, and `gear` is equal to five".
 
 ```{python}
-
+mtcars >> filter(_.cyl == 4, _.gear == 5)
 ```
 
-### Example 2: 
+As with most subsetting in pandas, when a condition evalutes to an `NA` value, the row is automatically excluded. This is different from pandas indexing, where `NA` values produce errors.
 
 ```{python}
+df = pd.DataFrame({
+    "x": [True, False, pd.np.nan],
+    })
 
+df
 ```
 
-### Example 3: 
+```{python}
+df >> filter(_.x)
+```
+
+Finally, while the simplest method is to use `filter` with siu expressions, both these forms work:
+
+* `_.cyl == 4`
+* `lambda _: _.cyl == 4`
+
 
 ```{python}
+mtcars >> filter(lambda _: _.cyl == 4, lambda _: _.gear == 5)
+```
 
+Under the hood, `filter` will call the lambda on the underlying data. However, keep in mind that using a lambda function prevents siuba from working with SQL, and from optimizing filter conditions over pandas DataFrames in the future.
+
+
+### Grouped filters
+
+
+In the example below, we keep rows where the horsepower (hp) is above the median horsepower for each cylinder group. This means that the filter performas the following operations.
+
+* calculates the median `hp` for each `cyl` grouping.
+* for each row, based on the `cyl` group it belongs to, tests where the `hp` is greater than the median `hp`.
+* keeps only rows where this test passes.
+
+```{python}
+(mtcars
+  >> group_by(_.cyl)
+  >> filter(_.hp > _.hp.median())
+  )
+```
+
+### Filter with siuba vector functions
+
+
+The siuba library includes a number of helper functions for operating on arrays of data (i.e. pandas Series or numpy arrays).
+
+These functions can also do other useful calculations inside a filter, like...
+
+* return the row number of an entry
+* calculate a cumulative sum
+* shift all values down (lag) or up (lead) one
+
+
+#### Keeping the two lowest horsepower rows per cylinder
+
+For example, in the code below we filter to...
+
+* sort the data by ascending horse power (`hp`).
+* get the row number of each entry within a `cyl` group.
+* filter it to keep the two lowest `hp` cars per group.
+
+Note that since there are 3 `cyl` groups (4, 6, or 8 cylinders), this returns 6 rows.
+
+```{python}
+from siuba.dply.vector import row_number, lag
+from siuba import arrange
+
+(mtcars
+  >> arrange(_.hp)
+  >> group_by(_.cyl)
+  >> filter(row_number(_) <= 2)
+  )
+```
+
+#### Comparing shifts in hp across rows
+
+Below we sort the data by ascending horsepower (`hp`), then filter to keep rows where it increases by 50.
+
+```{python}
+(mtcars
+  >> arrange(_.hp)
+  >> filter(_.hp - lag(_.hp) > 50)
+  )
 ```

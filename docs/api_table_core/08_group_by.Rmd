@@ -19,25 +19,64 @@ pd.set_option("display.max_rows", 5)
 
 ## Group by
 
+This function is used to specify groups in your data for verbs like `mutate`, `filter`, and `summarize` to perform operations over.
+
+For example, in the `mtcars` dataset, there are 3 possible values for cylinders (`cyl`). You could use `group_by` to say that you want to perform operations separately for each of these 3 groups of values.
+
+An important compliment to `group_by` is `ungroup`, which removes all current groupings.
+
 ```{python}
-from siuba import _
+from siuba import _, group_by, ungroup, filter, mutate, summarize
 from siuba.data import mtcars
+
+small_cars = mtcars[["cyl", "gear", "hp"]]
+
+small_cars
 ```
 
-### Example 1: 
+### Grouping by column
+
+The simplest way to use group by is to specify your grouping column directly. This is shown below, by grouping `mtcars` according to its 3 groups of cylinder values (4, 6, or 8 cylinders).
 
 ```{python}
+g_cyl = small_cars >> group_by(_.cyl)
 
+g_cyl
 ```
 
-### Example 2: 
+Note that the result is simply a pandas GroupedDataFrame, which is what is returned if you use `mtcars.groupby('cyl')`. Normally, a GroupedDataFrame doesn't print out a preview of itself, but `siuba` modifies it to do so, since this is very handy.
+
+The `group_by` function is most often used with `filter`, `mutate`, and `summarize`.
 
 ```{python}
-
+# keep rows where hp is greater than mean hp within cyl group
+g_cyl >> filter(_.hp > _.hp.mean())
 ```
 
-### Example 3: 
+```{python}
+g_cyl >> mutate(avg_hp = _.hp.mean())
+```
 
 ```{python}
+g_cyl >> summarize(avg_hp = _.hp.mean())
+```
 
+### Grouping by multiple columns
+
+In order to group by multiple columns, simply specify them all as arguments to `group_by`.
+
+```{python}
+small_cars >> group_by(_.cyl, _.gear)
+```
+
+### Defining a new column for grouping
+
+```{python}
+small_cars >> group_by(high_hp = _.hp > 300)
+```
+
+### Ungrouping
+
+```{python}
+small_cars >> group_by(_.cyl) >> ungroup()
 ```

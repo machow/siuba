@@ -1,11 +1,12 @@
 .. toctree::
-    :maxdepth: 3
+    :maxdepth: 2
     :hidden:
 
     intro.Rmd
     intro_sql.ipynb
 
 .. toctree::
+    :maxdepth: 2
     :caption: Core One-table Verbs
     :hidden:
     :glob:
@@ -13,6 +14,7 @@
     api_table_core/*
 
 .. toctree::
+    :maxdepth: 2
     :caption: Other One-table Verbs
     :hidden:
     :glob:
@@ -20,6 +22,7 @@
     api_table_other/*
 
 .. toctree::
+    :maxdepth: 2
     :caption: Two-table Verbs
     :hidden:
     :glob:
@@ -27,6 +30,7 @@
     api_table_two/*
 
 .. toctree::
+    :maxdepth: 2
     :caption: Tidy Verbs
     :hidden:
     :glob:
