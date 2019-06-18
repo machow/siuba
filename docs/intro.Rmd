@@ -40,7 +40,7 @@ The siuba library has 3 main goals:
 * **multiple data sources** - allow a chain of operations (called a pipe) to work with pandas and SQL data.
 
 
-### Consice pandas operations with siu expressions (`_`)
+### Concise pandas operations with siu expressions (`_`)
 
 ```{python}
 # old approach
