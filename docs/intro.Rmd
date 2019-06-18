@@ -17,7 +17,7 @@ import pandas as pd
 pd.set_option("display.max_rows", 5)
 ```
 
-# Introduction to siuba
+## Introduction to siuba
 
 Siuba is a tool for concise, flexible data-analysis over multiple data sources. It currently supports pandas DataFrames and SQL tables.
 
@@ -40,7 +40,7 @@ The siuba library has 3 main goals:
 * **multiple data sources** - allow a chain of operations (called a pipe) to work with pandas and SQL data.
 
 
-## Consice pandas operations with siu expressions (`_`)
+### Consice pandas operations with siu expressions (`_`)
 
 ```{python}
 # old approach
@@ -110,7 +110,7 @@ f_x = ~~_.x
 f_x(AThing)
 ```
 
-## Flexible in handling grouped and ungrouped data
+### Flexible in handling grouped and ungrouped data
 
 One major challenge when working with pandas is that many methods which exist on an ungrouped DataFrame, do not exist on a grouped DataFrame. To illustrate, below are the methods shown above.
 
@@ -126,7 +126,7 @@ The first two methods (indexing with `[` and assign) only work with ungrouped da
 **TODO: review simple uses of the verbs filter, summarize, mutate. For now, see core one table verbs section of docs**
 
 
-## Works seamlessly with pandas and SQL
+### Works seamlessly with pandas and SQL
 
 Up to this point we've covered how siuba simplifies column operations using siu expressions (`_`), and a pipe of table verbs to flexibly handle both grouped and ungrouped data. A major benefit of these two approaches is that they allow us to change how siuba behaves depending on the data source on which it is operating.
 
