@@ -3,7 +3,8 @@
     :hidden:
 
     intro.Rmd
-    intro_sql.ipynb
+    intro_sql_basic.ipynb
+    intro_sql_interm.ipynb
 
 .. toctree::
     :maxdepth: 2
