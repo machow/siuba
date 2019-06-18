@@ -12,15 +12,139 @@ jupyter:
     name: python3
 ---
 
-<!-- #region {"nbsphinx": "hidden"} -->
-This notebook is part of siuba's sphinx documentation.
-<!-- #endregion -->
+```{python nbsphinx=hidden}
+import pandas as pd
+pd.set_option("display.max_rows", 5)
+```
 
 # Introduction to siuba
 
+Siuba is a tool for concise, flexible data-analysis over multiple data sources. It currently supports pandas DataFrames and SQL tables.
+
+
 ```{python}
-from siuba import _, mutate
+from siuba import _, group_by, summarize, filter
 from siuba.data import mtcars
 
-mutate(mtcars, cyl2 = _.cyl * 2, cyl4 = _.cyl2 * 2)
+(mtcars
+  >> group_by(_.cyl)
+  >> summarize(avg_hp = _.hp.mean())
+  )
+```
+
+The siuba library has 3 main goals:
+
+
+* **concise** - simplify using pandas methods on columns of data, with siu expressions (e.g. `_.somecol.mean()`).
+* **flexible** - ensure that any operations can run on either grouped or ungrouped data.
+* **multiple data sources** - allow a chain of operations (called a pipe) to work with pandas and SQL data.
+
+
+## Consice pandas operations with siu expressions (`_`)
+
+```{python}
+# old approach
+mtcars[lambda _: _.cyl == 4]
+
+# siu approach
+mtcars[_.cyl == 4]
+```
+
+```{python}
+# old approach
+mtcars.assign(cyl2 = lambda _: _.cyl*2)
+
+# siu approach
+mtcars.assign(cyl2 = _.cyl*2)
+```
+
+```{python}
+# siu approach
+mtcars \
+  .groupby("cyl") \
+  .apply((_.mpg / _.cyl).mean())
+```
+
+Note that using siu expressions is not limited to pandas.
+At its core, a siu expression just generates a function that can be called, similar to a `lambda` function.
+
+```{python}
+# using a lambda
+f_lambda = lambda _: _ + _
+
+# using siu expression
+f = _ + _
+
+f(1)
+```
+
+The one exception is that if a siu expression needs to access an attribute, then you need to escape it with two tildes.
+
+
+```{python}
+class AThing:
+    x = 1
+    
+    @staticmethod
+    def print_hey():
+        print("hey")
+
+# produces 1
+AThing.x
+
+# calling a method doesn't need to be escaped
+f_hey = _.print_hey()
+f_hey(AThing)
+```
+
+```{python}
+# operations that don't end in attribute access are fine!
+f_add = _.x + _.x
+f_add(AThing)
+```
+
+```{python}
+# ending with attribute access needs to be escaped
+f_x = ~~_.x
+
+f_x(AThing)
+```
+
+## Flexible in handling grouped and ungrouped data
+
+One major challenge when working with pandas is that many methods which exist on an ungrouped DataFrame, do not exist on a grouped DataFrame. To illustrate, below are the methods shown above.
+
+* `mtcars[_.cyl == 4]`
+* `mtcars.assign(cyl2 = _.cyl*2)`
+* `mtcars.groupby('cyl').apply(...)`
+
+The first two methods (indexing with `[` and assign) only work with ungrouped data. In the last method chain, `apply` works different depending whether data is grouped or not.
+
+**(TODO: finish describing apply case)**
+
+
+**TODO: review simple uses of the verbs filter, summarize, mutate. For now, see core one table verbs section of docs**
+
+
+## Works seamlessly with pandas and SQL
+
+Up to this point we've covered how siuba simplifies column operations using siu expressions (`_`), and a pipe of table verbs to flexibly handle both grouped and ungrouped data. A major benefit of these two approaches is that they allow us to change how siuba behaves depending on the data source on which it is operating.
+
+This is shown below, where we perform an operation from earlier in the docs to a sqlite table.
+
+```{python}
+from sqlalchemy import create_engine
+from siuba.sql import LazyTbl
+
+# # copy in to sqlite
+engine = create_engine("sqlite:///:memory")
+mtcars.to_sql("mtcars", engine, if_exists = "replace")
+
+# connect with siuba
+tbl_mtcars = LazyTbl(engine, "mtcars")
+
+(tbl_mtcars
+  >> group_by(_.cyl)
+  >> summarize(avg_hp = _.hp.mean())
+  )
 ```
