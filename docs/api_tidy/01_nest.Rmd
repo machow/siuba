@@ -24,7 +24,7 @@ from siuba import _, nest, unnest, group_by
 from gapminder import gapminder
 ```
 
-### Example 1: 
+### Specifying column to exclude
 
 ```{python}
 gap_country = nest(gapminder, -_.country)
@@ -36,7 +36,7 @@ gap_country
 unnest(gap_country, "data")
 ```
 
-### Example 2: 
+### Specifying column to include
 
 ```{python}
 # specifying columns to nest directly
@@ -48,7 +48,7 @@ df = pd.DataFrame({
 df >> nest(_.value)
 ```
 
-### Example 3: 
+### Group by and nesting
 
 ```{python}
 # equivalent to
@@ -60,7 +60,7 @@ df >> nest(_.value)
   )
 ```
 
-### Splitting sentences into words
+### Unnesting lists
 
 
 For context, see [this Stack Overflow post](https://stackoverflow.com/questions/30885005/pandas-series-of-lists-to-one-series).
@@ -77,8 +77,11 @@ sent
 ```
 
 ```{python}
-(sent
-  >> mutate(data = _.sentence.str.split(" "))
-  >> unnest()
-  )
+split_sent = sent >> mutate(data = _.sentence.str.split(" "))
+
+split_sent
+```
+
+```{python}
+split_sent >> unnest()
 ```

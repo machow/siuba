@@ -20,24 +20,48 @@ pd.set_option("display.max_rows", 5)
 ## Joins
 
 ```{python}
-from siuba import _
-from siuba.data import mtcars
+from siuba import _, inner_join, left_join, full_join
+
+df1 = pd.DataFrame({'id': [1,2], 'x': ['a', 'b']})
+df2 = pd.DataFrame({'id': [2,2,3], 'y': ['l', 'm', 'n']})
 ```
 
-### Example 1: 
-
 ```{python}
-
+df1
 ```
 
-### Example 2: 
-
 ```{python}
-
+df2
 ```
 
-### Example 3: 
+### Inner join
 
 ```{python}
+inner_join(df1, df2, on = "id")
+```
 
+### Left join 
+
+```{python}
+left_join(df1, df2, on = "id")
+```
+
+### Full join
+
+```{python}
+# TODO: fix
+#full_join(df1, df2, on = "id")
+```
+
+### Semi and anti join
+
+```{python}
+from siuba import semi_join, anti_join
+
+semi_join(df1, df2, on = "id")
+```
+
+```{python}
+# TODO: implement
+#anti_join(df1, df2, on = "id")
 ```

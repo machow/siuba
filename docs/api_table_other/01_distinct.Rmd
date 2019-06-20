@@ -19,25 +19,35 @@ pd.set_option("display.max_rows", 5)
 
 ## Distinct
 
+This function keeps only unique values for a specified column. If multiple columns are specified, it keeps only the unique groups of values for those columns.
+
 ```{python}
-from siuba import _
+from siuba import _, distinct
 from siuba.data import mtcars
 ```
 
-### Example 1: 
+### Specifying distinct columns
 
 ```{python}
-
+mtcars >> distinct(_.cyl, _.gear)
 ```
 
-### Example 2: 
+Note that by default, only the columns that are passed to `distinct` are returned.
+
+
+### Keeping all other columns
+
+In order to keep all the columns from the data, you can use the `_keep_all` argument. In this case, the first row encountered for each set of distinct values is returned.
 
 ```{python}
-
+mtcars >> distinct(_.cyl, _.gear, _keep_all = True)
 ```
 
-### Example 3: 
+### Specifying column expressions
+
+The `distinct` function also accepts column expressions, so long as they are passed as a keyword argument.
+This is illustrated below, by calculating distinct values of mpg, rounded to the nearest whole number.
 
 ```{python}
-
+mtcars >> distinct(round_mpg = _.mpg.round())
 ```
