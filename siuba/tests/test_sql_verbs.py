@@ -41,6 +41,19 @@ def db():
     conn.execute(ins, id=2, name='wendy', fullname='Wendy Williams')
     yield conn
 
+# LazyTbl ---------------------------------------------------------------------
+
+def test_lazy_tbl_table_string(db):
+    tbl = LazyTbl(db, 'addresses')
+    tbl.tbl.columns.user_id
+
+def test_lazy_tbl_manual_columns(db):
+    tbl = LazyTbl(db, 'addresses', columns = ('user_id', 'wrong_name'))
+    tbl.tbl.columns.wrong_name
+    tbl.tbl.columns.user_id
+
+    with pytest.raises(AttributeError):
+        tbl.tbl.columns.email_address
 
 # mutate ----------------------------------------------------------------------
 
