@@ -137,7 +137,7 @@ from sqlalchemy import create_engine
 from siuba.sql import LazyTbl
 
 # # copy in to sqlite
-engine = create_engine("sqlite:///:memory")
+engine = create_engine("sqlite:///:memory:")
 mtcars.to_sql("mtcars", engine, if_exists = "replace")
 
 # connect with siuba
