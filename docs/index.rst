@@ -5,6 +5,7 @@
     intro.Rmd
     intro_sql_basic.ipynb
     intro_sql_interm.ipynb
+    developer/index.rst
 
 .. toctree::
     :maxdepth: 2

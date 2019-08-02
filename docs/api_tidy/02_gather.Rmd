@@ -1,0 +1,48 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.1'
+      jupytext_version: 1.1.1
+  kernelspec:
+    display_name: Python 3
+    language: python
+    name: python3
+---
+
+```{python nbsphinx=hidden}
+import pandas as pd
+pd.set_option("display.max_rows", 20)
+```
+
+## Gather
+
+```{python}
+from siuba import _, nest, unnest, group_by, gather
+from siuba.data import mtcars
+```
+
+```{python}
+costs = pd.DataFrame({
+    'id': [1,2],
+    'price_x': [.1, .2],
+    'price_y': [.4, .5],
+    'price_z': [.7, .8]
+})
+
+costs
+```
+
+```{python}
+costs >> gather('measure', 'value', _.price_x, _.price_y, _.price_z)
+```
+
+```{python}
+costs >> gather('measure', 'value', _["price_x":"price_z"])
+```
+
+```{python}
+costs >> gather('measure', 'value', -_.id)
+```
