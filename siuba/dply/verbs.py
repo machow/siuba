@@ -709,21 +709,40 @@ def _if_else(cond, true_vals, false_vals):
 # TODO: evaluate this non-table verb approach
 from siuba.siu import DictCall
 
+def _val_call(call, data, n, indx = None):
+    if not callable(call):
+        return call
+
+    arr = call(data)
+    if arr.shape != (n,):
+        raise ValueError("Expected call to return array of shape {}"
+                         "but it returned shape {}".format(n, arr.shape))
+
+    return arr[indx] if indx is not None else arr
+
+
 @singledispatch2((pd.DataFrame,pd.Series))
 def case_when(__data, cases):
     if isinstance(cases, Call):
         cases = cases(__data)
     # TODO: handle when receive list of (k,v) pairs for py < 3.5 compat?
-    out = np.repeat(None, len(__data))
-    for k, v in reversed(list(cases.items())):
+
+    stripped_cases = {strip_symbolic(k): strip_symbolic(v) for k,v in cases.items()}
+    n = len(__data)
+    out = np.repeat(None, n)
+    for k, v in reversed(list(stripped_cases.items())):
         if callable(k):
-            result = k(__data)
+            result = _val_call(k, __data, n)
             indx = np.where(result)[0]
-            out[indx] = v
+
+            val_res = _val_call(v, __data, n, indx)
+            out[indx] = val_res
         elif k:
             # e.g. k is just True, etc..
-            out[:] = v
+            val_res = _val_call(v, __data, n)
+            out[:] = val_res
 
+    # by recreating an array, attempts to cast as best dtype
     return np.array(list(out))
 
 @case_when.register(Symbolic)
