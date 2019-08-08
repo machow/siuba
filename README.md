@@ -21,7 +21,7 @@ See the [siuba docs](https://siuba.readthedocs.io) for a full introduction.
 ### Basic use
 
 ```python
-from siuba import _, group_by, summarize, filter
+from siuba import *
 from siuba.data import mtcars
 
 (mtcars
