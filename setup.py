@@ -18,7 +18,7 @@ setup(
     version=version,
     description='A package for quick, scrappy analyses with pandas and SQL',
     author='Michael Chow',
-    license='BSD',
+    license='MIT',
     author_email='mc_al_gh_siuba@fastmail.com',
     url='https://github.com/machow/siuba',
     keywords=['package', ],
