@@ -43,6 +43,8 @@ See [introduction to siuba](https://siuba.readthedocs.io/en/latest/intro.html#In
 ### What is a siu expression (e.g. `_.cyl == 4`)?
 
 ```python
+from siuba import _
+
 # old approach
 mtcars[lambda _: _.cyl == 4]
 
@@ -67,6 +69,9 @@ See [siu expression section here](https://siuba.readthedocs.io/en/latest/intro.h
 ### Using with SQL
 
 ```python
+from siuba import _, group_by, summarize, filter
+from siuba.data import mtcars
+
 from sqlalchemy import create_engine
 from siuba.sql import LazyTbl
 
