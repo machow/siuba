@@ -4,6 +4,7 @@ from siuba.dply.verbs import (
         simple_varname,
         select, VarList, var_select,
         mutate,
+        transmute,
         filter,
         arrange, _call_strip_ascending,
         summarize,
@@ -471,6 +472,18 @@ def _mutate_select(sel, colname, func, labs, __data):
         return sel.with_only_columns(list(replaced.values()))
 
     return sel.column(new_col.label(colname))
+
+
+@transmute.register(LazyTbl)
+def _transmute(__data, **kwargs):
+    f_mutate = mutate.registry[type(__data)]
+
+    sel = f_mutate(__data, **kwargs).last_op
+
+    columns = lift_inner_cols(sel)
+    sel_stripped = sel.with_only_columns([columns[k] for k in kwargs])
+
+    return __data.append_op(sel_stripped)
 
 
 @arrange.register(LazyTbl)
