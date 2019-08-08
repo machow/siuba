@@ -108,6 +108,13 @@ def simple_varname(call):
     return None
 
 
+def ordered_union(x, y):
+    # TODO: duplicated in sql file
+    dx = {el: True for el in x}
+    dy = {el: True for el in y}
+
+    return tuple({**dx, **dy})
+
 # Symbolic Wrapper ============================================================
 
 from functools import wraps
@@ -257,7 +264,7 @@ def _mutate(__data, **kwargs):
 # Group By ====================================================================
 
 @singledispatch2((pd.DataFrame, DataFrameGroupBy))
-def group_by(__data, *args, **kwargs):
+def group_by(__data, *args, add = False, **kwargs):
     tmp_df = mutate(__data, **kwargs) if kwargs else __data
 
     by_vars = list(map(simple_varname, args))
@@ -265,6 +272,11 @@ def group_by(__data, *args, **kwargs):
         if name is None: raise Exception("group by variable %s is not a column name" %ii)
 
     by_vars.extend(kwargs.keys())
+
+    if isinstance(tmp_df, DataFrameGroupBy) and add:
+        prior_groups = [el.name for el in __data.grouper.groupings]
+        all_groups = ordered_union(prior_groups, by_vars)
+        return tmp_df.obj.groupby(list(all_groups))
 
     return tmp_df.groupby(by = by_vars)
 
@@ -767,18 +779,38 @@ def _count_group(data, *args):
     return 
 
 
-@singledispatch2(pd.DataFrame)
+@singledispatch2((pd.DataFrame, DataFrameGroupBy))
 def count(__data, *args, wt = None, sort = False, **kwargs):
-    # TODO: if expr, works like mutate
+    """Return the number of rows for each grouping of data.
 
-    #group by args
+    Args:
+        __data: a DataFrame
+        *args: the names of columns to be used for grouping. Passed to group_by.
+        wt: the name of a column to use as a weighted for each row.
+        sort: whether to sort the results in descending order.
+        **kwargs: creates a new named column, and uses for grouping. Passed to group_by.
+
+    """
+    no_grouping_vars = not args and not kwargs and isinstance(__data, pd.DataFrame)
+
     if wt is None:
-        counts = group_by(__data, *args, **kwargs).size().reset_index()
+        if no_grouping_vars: 
+            # no groups, just use number of rows
+            counts = pd.DataFrame({'tmp': [__data.shape[0]]})
+        else:
+            # tally rows for each group
+            counts = group_by(__data, *args, add = True, **kwargs).size().reset_index()
     else:
         wt_col = simple_varname(wt)
         if wt_col is None:
             raise Exception("wt argument has to be simple column name")
-        counts = group_by(__data, *args, **kwargs)[wt_col].sum().reset_index()
+
+        if no_grouping_vars:
+            # no groups, sum weights
+            counts = pd.DataFrame({'tmp': [__data[wt_col].sum()]})
+        else:
+            # do weighted tally
+            counts = group_by(__data, *args, add = True, **kwargs)[wt_col].sum().reset_index()
 
 
     # count col named, n. If that col already exists, add more "n"s...
@@ -790,7 +822,7 @@ def count(__data, *args, wt = None, sort = False, **kwargs):
     counts.rename(columns = {counts.columns[-1]: out_col}, inplace = True)
 
     if sort:
-        return counts.sort_values(out_col, ascending = False)
+        return counts.sort_values(out_col, ascending = False).reset_index(drop = True)
 
     return counts
 

@@ -510,9 +510,12 @@ def _create_order_by_clause(columns, *args):
 
 
 @count.register(LazyTbl)
-def _count(__data, *args, sort = False, **kwargs):
+def _count(__data, *args, sort = False, wt = None, **kwargs):
     # TODO: if already col named n, use name nn, etc.. get logic from tidy.py
     if kwargs:
+        raise NotImplementedError("TODO")
+
+    if wt is not None:
         raise NotImplementedError("TODO")
 
     # similar to filter verb, we need two select statements,
