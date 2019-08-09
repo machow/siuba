@@ -650,7 +650,8 @@ def arrange(__data, *args):
 
 
     return df.sort_values(by = sort_cols, kind = "mergesort", ascending = ascending) \
-             .drop(tmp_cols, axis = 1)
+             .drop(tmp_cols, axis = 1) \
+             .reset_index(drop = True)
 
 
 @arrange.register(DataFrameGroupBy)
