@@ -945,6 +945,10 @@ def join(left, right, on = None, how = None):
     if how is None:
         raise Exception("Must specify how argument")
 
+    # pandas uses outer, but dplyr uses term full
+    if how == "full":
+        how = "outer"
+
     if isinstance(on, Mapping):
         left_on, right_on = zip(*on.items())
         return left.merge(right, how = how, left_on = left_on, right_on = right_on)
