@@ -934,6 +934,8 @@ def _convert_nested_entry(x):
 # Joins =======================================================================
 from collections.abc import Mapping
 from functools import partial
+from pandas.core.reshape.merge import _MergeOperation
+
 
 # TODO: will need to use multiple dispatch
 @singledispatch2(pd.DataFrame)
@@ -958,10 +960,10 @@ def _join(left, right, on = None, how = None):
 @singledispatch2(pd.DataFrame)
 def semi_join(left, right = None, on = None):
     if isinstance(on, Mapping):
-        left_on, right_on = zip(*on.items())
-        return left.merge(right[right_on], how = 'inner', left_on = left_on, right_on = right_on)
-
-    if on is None:
+        # coerce colnames to list, to avoid indexing with tuples
+        on_cols, right_on = map(list, zip(*on.items()))
+        right = right[right_on].rename(dict(zip(right_on, on_cols)))
+    elif on is None:
         on_cols = set(left.columns).intersection(set(right.columns))
         if not len(on_cols):
             raise Exception("No joining column specified, and no shared column names")
@@ -972,9 +974,22 @@ def semi_join(left, right = None, on = None):
 
     return left.merge(right.loc[:,on_cols], how = 'inner', on = on_cols)
 
+
 @singledispatch2(pd.DataFrame)
 def anti_join(left, right = None, on = None):
-    raise NotImplementedError("anti_join not currently implemented")
+    """Return the left table with every row that would *not* be kept in an inner join.
+    """
+    # copied from semi_join
+    if isinstance(on, Mapping):
+        left_on, right_on = zip(*on.items())
+
+    # manually perform merge, up to getting pieces need for indexing
+    merger = _MergeOperation(left, right, left_on = left_on, right_on = right_on)
+    _, l_indx, _ = merger._get_join_info()
+    
+    # use the left table's indexer to exclude those rows
+    range_indx = pd.RangeIndex(len(left))
+    return left.iloc[range_indx.difference(l_indx),:]
 
 left_join = partial(join, how = "left")
 right_join = partial(join, how = "right")

@@ -121,17 +121,26 @@ def test_basic_full_join(backend, df1, df2):
     target = DF1.merge(DF2, on = "ii", how = "outer")
     assert_frame_sort_equal(out, target)
 
-@backend_sql("TODO: pandas - key error?")
 def test_basic_semi_join(backend, df1, df2):
     assert_frame_sort_equal(
             semi_join(df1, df2, {"ii": "ii"}) >> collect(),
             DF1.iloc[:2,]
             )
 
-@backend_sql("TODO: pandas - implement anti join")
 def test_basic_anti_join(backend, df1, df2):
     assert_frame_sort_equal(
             anti_join(df1, df2, on = {"ii": "ii"}) >> collect(),
             DF1.iloc[2:,]
             )
 
+def test_basic_anti_join(backend, df1, df2):
+    assert_frame_sort_equal(
+            anti_join(df1, df2, on = {"ii": "ii"}) >> collect(),
+            DF1.iloc[2:,]
+            )
+
+def test_basic_anti_join(backend, df1, df2):
+    assert_frame_sort_equal(
+            anti_join(df1, df2, on = {"ii": "ii", "x": "y"}) >> collect(),
+            DF1.iloc[2:,]
+            )
