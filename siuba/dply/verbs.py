@@ -108,12 +108,11 @@ def simple_varname(call):
     return None
 
 
-def ordered_union(x, y):
-    # TODO: duplicated in sql file
-    dx = {el: True for el in x}
-    dy = {el: True for el in y}
-
-    return tuple({**dx, **dy})
+def ordered_union(*args):
+    out = {}
+    for arg in args:
+        out.update({el: True for el in arg})
+    return tuple(out)
 
 # Symbolic Wrapper ============================================================
 
@@ -405,12 +404,23 @@ def transmute(__data, *args, **kwargs):
 
 @transmute.register(DataFrameGroupBy)
 def _transmute(__data, *args, **kwargs):
-    # Note: not the most efficient function. Selects columns every group.
-    f_transmute = transmute.registry[pd.DataFrame]
+    arg_vars = list(map(simple_varname, args))
+    for ii, name in enumerate(arg_vars):
+        if name is None: raise Exception("complex, unnamed expression at pos %s not supported"%ii)
 
-    df = __data.apply(f_transmute, *args, **kwargs)
+    f_mutate = mutate.registry[DataFrameGroupBy]
 
-    return _regroup(df)
+    gdf = f_mutate(__data, **kwargs)
+    groupings = gdf.grouper.groupings
+
+    group_names = [x.name for x in groupings]
+    if None in group_names:
+        raise ValueError("Passed a grouped DataFrame to transmute, but not all "
+                         "its groups are named. Groups: %s" % group_names)
+
+    subset = ungroup(gdf)[[*group_names, *arg_vars, *kwargs.keys()]]
+
+    return subset.groupby(groupings)
 
 
 
