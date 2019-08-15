@@ -476,12 +476,16 @@ def _mutate_select(sel, colname, func, labs, __data):
 
 @transmute.register(LazyTbl)
 def _transmute(__data, **kwargs):
+    # will use mutate, then select some cols
     f_mutate = mutate.registry[type(__data)]
+
+    # transmute keeps grouping cols, and any defined in kwargs
+    cols_to_keep = ordered_union(__data.group_by, kwargs)
 
     sel = f_mutate(__data, **kwargs).last_op
 
     columns = lift_inner_cols(sel)
-    sel_stripped = sel.with_only_columns([columns[k] for k in kwargs])
+    sel_stripped = sel.with_only_columns([columns[k] for k in cols_to_keep])
 
     return __data.append_op(sel_stripped)
 
