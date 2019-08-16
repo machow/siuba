@@ -168,7 +168,8 @@ base_agg = dict(
         # TODO: generalize case where doesn't use col
         # need better handeling of vector funcs
         # TODO: delete this, len() is not a method anywhere, or vect func
-        len = lambda col: sql.func.count()
+        len = lambda col: sql.func.count(),
+        n_distinct = lambda col: sql.func.count(sql.func.distinct(col))
         )
 
 base_win = dict(
@@ -254,10 +255,10 @@ funcs = dict(scalar = base_scalar, aggregate = base_agg, window = base_win)
 # alias to LazyTbl.no_win.dense_rank...
 #          LazyTbl.agg.dense_rank...
 
-from collections.abc import Mapping
+from collections.abc import MutableMapping
 import itertools
 
-class SqlTranslator(Mapping):
+class SqlTranslator(MutableMapping):
     def __init__(self, d, **kwargs):
         self.d = d
         self.kwargs = kwargs
@@ -275,3 +276,10 @@ class SqlTranslator(Mapping):
             return self.kwargs[x]
         except KeyError:
             return self.d[x]
+
+    def __setitem__(self, k, v):
+        self.d[k] = v
+
+    def __delitem__(self, k):
+        del self.d[k]
+    
