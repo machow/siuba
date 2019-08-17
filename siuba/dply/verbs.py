@@ -18,6 +18,7 @@ DPLY_FUNCTIONS = (
         "spread", "gather",
         "nest", "unnest",
         "expand", "complete",
+        "separate",
         # Joins ----
         "join", "inner_join", "full_join", "left_join", "right_join", "semi_join", "anti_join",
         # TODO: move to vectors
@@ -1088,6 +1089,58 @@ def complete(__data, *args, fill = None):
 
     return df
     
+# Separate/Unit/Extract ============================================================
+
+import warnings
+
+@singledispatch2(pd.DataFrame)
+def separate(___data, col, into, sep = "\W+",
+             remove = True, convert = False,
+             extra = "warn", fill = "warn"
+            ):
+    if not remove:
+        raise NotImplementedError("TODO: remove argument")
+    
+    n_into = len(into)
+    col_name = simple_varname(col)
+    
+    # splitting column ----
+    all_splits = ___data[col_name].str.split(sep, expand = True)
+    n_split_cols = len(all_splits.columns)
+    
+    # handling too many or too few splits ----
+    if  n_split_cols < n_into:
+        # too few columns
+        raise ValueError("Expected %s split cols, found %s" %(n_into, n_split_cols))
+    elif n_split_cols > n_into:
+        # Extra argument controls how we deal with too many splits
+        if extra == "warn":
+            warnings.warn("some warning about too many splits", UserWarning)
+        elif extra == "drop":
+            pass
+        elif extra == "merge":
+            raise NotImplementedError("TODO: separate extra = 'merge'")
+        else:
+            raise ValueError("Invalid extra argument: %s" %extra)
+
+    # end up with only the into columns, correctly named ----
+    new_names = dict(zip(range(n_into), into))
+    keep_splits = all_splits.iloc[:, :n_into].rename(columns = new_names)
+    
+    out = pd.concat([___data, keep_splits], axis = 1)
+
+    # attempt to convert columns to numeric ----
+    if convert:
+        # TODO: better strategy here? 
+        for k in into:
+            try:
+                out[k] = pd.to_numeric(out[k])
+            except ValueError:
+                pass
+
+    return out
+
+
 
 # Install Siu =================================================================
 
