@@ -16,7 +16,7 @@ params_backend = [
 def backend(request):
     return request.param()
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def skip_backend(request, backend):
     if request.node.get_closest_marker('skip_backend'):
         mark_args = request.node.get_closest_marker('skip_backend').args

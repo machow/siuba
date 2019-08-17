@@ -115,7 +115,7 @@ def test_basic_inner_join(df1, df2):
     assert_frame_sort_equal(out, target)
 
 @pytest.mark.skip_backend("sqlite")
-def test_basic_full_join(backend, df1, df2):
+def test_basic_full_join(skip_backend, backend, df1, df2):
     out = full_join(df1, df2, {"ii": "ii"}) >> collect()
     target = DF1.merge(DF2, on = "ii", how = "outer")
     assert_frame_sort_equal(out, target)
