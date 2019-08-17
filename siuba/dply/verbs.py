@@ -1094,18 +1094,48 @@ def complete(__data, *args, fill = None):
 import warnings
 
 @singledispatch2(pd.DataFrame)
-def separate(___data, col, into, sep = "\W+",
+def separate(__data, col, into, sep = "\W+",
              remove = True, convert = False,
              extra = "warn", fill = "warn"
             ):
-    if not remove:
-        raise NotImplementedError("TODO: remove argument")
-    
+    """Split col into len(into) piece. Return DataFrame with a column added for each piece.
+
+    Args:
+        __data:  a DataFrame
+        col: name of column to split (either string, or siu expression)
+        into: names of resulting columns holding each entry in split
+        sep: regular expression used to split col. Passed to col.str.split method.
+        remove: whether to remove col from the returned DataFrame
+        convert: whether to attempt to convert the split columns to numerics
+        extra: what to do when more splits than into names.
+               One of ("warn", "drop" or "merge").
+               "warn" produces a warning; "drop" and "merge" currently not implemented.
+        fill: what to do when fewer splits than into names. Currently not implemented.
+
+    Examples
+    --------
+
+    ::
+        import pandas as pd
+        from siuba import separate
+
+        df = pd.DataFrame({
+            "label": ["S1-1", "S2-2"]
+            })
+
+        # split into two columns
+        separate(df, "label", into = ["season", "episode"])
+
+        # split, and try to convert columns to numerics
+        separate(df, "label", into = ["season", "episode"], convert = True)
+
+    """
+
     n_into = len(into)
     col_name = simple_varname(col)
     
     # splitting column ----
-    all_splits = ___data[col_name].str.split(sep, expand = True)
+    all_splits = __data[col_name].str.split(sep, expand = True)
     n_split_cols = len(all_splits.columns)
     
     # handling too many or too few splits ----
@@ -1127,7 +1157,7 @@ def separate(___data, col, into, sep = "\W+",
     new_names = dict(zip(range(n_into), into))
     keep_splits = all_splits.iloc[:, :n_into].rename(columns = new_names)
     
-    out = pd.concat([___data, keep_splits], axis = 1)
+    out = pd.concat([__data, keep_splits], axis = 1)
 
     # attempt to convert columns to numeric ----
     if convert:
@@ -1137,6 +1167,9 @@ def separate(___data, col, into, sep = "\W+",
                 out[k] = pd.to_numeric(out[k])
             except ValueError:
                 pass
+
+    if remove:
+        return out.drop(columns = col_name)
 
     return out
 
