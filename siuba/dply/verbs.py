@@ -1174,6 +1174,19 @@ def separate(__data, col, into, sep = "\W+",
     return out
 
 
+@separate.register(DataFrameGroupBy)
+def _separate_gdf(__data, *args, **kwargs):
+
+    groupings = __data.grouper.groupings
+
+    df = __data.obj
+
+    f_separate = separate.registry[pd.DataFrame]
+    out = f_separate(df, *args, **kwargs)
+
+    return out.groupby(groupings)
+
+
 
 # Install Siu =================================================================
 

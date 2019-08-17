@@ -16,6 +16,12 @@ def test_separate_default(df):
             data_frame(season = ["S1", "S1"], episode = ["E1", "E2"])
             )
 
+def test_separate_grouped(df):
+    assert_equal_query(
+            df.groupby(['label']),
+            separate("label", into = ["season", "episode"], remove = False),
+            df.assign(season = ["S1", "S1"], episode = ["E1", "E2"])
+            )
 
 def test_separate_sep_arg(df):
     assert_equal_query(
