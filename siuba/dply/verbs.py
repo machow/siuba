@@ -986,7 +986,20 @@ def semi_join(left, right = None, on = None):
     else:
         on_cols = on
 
-    return left.merge(right.loc[:,on_cols], how = 'inner', on = on_cols)
+    # get our semi join on ----
+    if len(on_cols) == 1:
+        col_name = on_cols[0]
+        indx = left[col_name].isin(right[col_name])
+        return left.loc[indx]
+
+    # Not a super efficient approach. Effectively, an inner join with what would
+    # be duplicate rows removed.
+    merger = _MergeOperation(left, right, left_on = on_cols, right_on = on_cols)
+    _, l_indx, _ = merger._get_join_info()
+
+
+    range_indx = pd.RangeIndex(len(left))
+    return left.loc[range_indx.isin(l_indx)]
 
 
 @singledispatch2(pd.DataFrame)
