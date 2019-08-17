@@ -781,10 +781,19 @@ def _semi_join(left, right = None, on = None):
     bool_clause = _create_join_conds(left_sel, right_sel, on)
 
     # create inner join ----
-    join = left_sel.join(right_sel, onclause = bool_clause)
+    exists_clause = sql.select(
+            [sql.literal(1)],
+            from_obj = right_sel,
+            whereclause = bool_clause
+            )
 
     # only keep left hand select's columns ----
-    sel = sql.select(left_sel.columns, from_obj = join)
+    sel = sql.select(
+            left_sel.columns,
+            from_obj = left_sel,
+            whereclause = sql.exists(exists_clause)
+            )
+
     return left.append_op(sel)
 
 

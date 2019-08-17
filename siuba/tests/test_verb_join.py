@@ -126,6 +126,14 @@ def test_basic_semi_join(backend, df1, df2):
             DF1.iloc[:2,]
             )
 
+@backend_sql("TODO: need to not use a pandas merge")
+def test_semi_join_no_cross(backend, df1, df2):
+    df_ii = backend.load_df(data_frame(ii = [1,1]))
+    assert_frame_sort_equal(
+            semi_join(df1, df_ii, {"ii": "ii"}) >> collect(),
+            DF1.iloc[:1,]
+            )
+
 def test_basic_anti_join(backend, df1, df2):
     assert_frame_sort_equal(
             anti_join(df1, df2, on = {"ii": "ii"}) >> collect(),
