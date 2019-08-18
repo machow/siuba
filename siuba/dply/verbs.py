@@ -18,7 +18,7 @@ DPLY_FUNCTIONS = (
         "spread", "gather",
         "nest", "unnest",
         "expand", "complete",
-        "separate",
+        "separate", "unite", "extract",
         # Joins ----
         "join", "inner_join", "full_join", "left_join", "right_join", "semi_join", "anti_join",
         # TODO: move to vectors
@@ -1094,7 +1094,7 @@ def complete(__data, *args, fill = None):
 import warnings
 
 @singledispatch2(pd.DataFrame)
-def separate(__data, col, into, sep = "\W+",
+def separate(__data, col, into, sep = r"[^a-zA-Z0-9]",
              remove = True, convert = False,
              extra = "warn", fill = "warn"
             ):
@@ -1186,6 +1186,137 @@ def _separate_gdf(__data, *args, **kwargs):
 
     return out.groupby(groupings)
 
+
+def _coerce_to_str(arr):
+    """Return either original series, or ser.astype(str)"""
+    if pd.api.types.is_string_dtype(arr):
+        return arr
+
+    return arr.astype(str)
+
+
+# unite ----
+
+from functools import reduce
+
+@singledispatch2(pd.DataFrame)
+def unite(__data, col, *args, sep = "_", remove = True):
+    """Combine multiple columns into a single column. Return DataFrame that column included.
+
+    Args:
+        __data:  a DataFrame
+        col: name of the to-be-created column (string).
+        *args: names of each column to combine.
+        sep: separater joining each column being combined.
+        remove: whether to remove the combined columns from the returned DataFrame.
+
+    """
+    unite_col_names = list(map(simple_varname, args))
+    out_col_name = simple_varname(col)
+
+    # validations ----
+    if None in unite_col_names:
+        raise ValueError("*args must be string, or simple column name, e.g. _.col_name")
+
+    missing_cols = set(unite_col_names) - set(__data.columns)
+    if missing_cols:
+        raise ValueError("columns %s not in DataFrame.columns" %missing_cols)
+
+
+    unite_cols = [_coerce_to_str(__data[col_name]) for col_name in unite_col_names]
+
+    if out_col_name in __data:
+        raise ValueError("col argument %s already a column in data" % out_col_name)
+
+    # perform unite ----
+    # TODO: this is probably not very efficient. Maybe try with transform or apply?
+    res = reduce(lambda x,y: x + sep + y, unite_cols)
+
+    out_df = __data.copy()
+    out_df[out_col_name] = res
+
+    if remove:
+        return out_df.drop(columns = unite_col_names)
+
+    return out_df
+
+@unite.register(DataFrameGroupBy)
+def _unite_gdf(__data, *args, **kwargs):
+    # TODO: consolidate these trivial group by dispatched funcs
+
+    groupings = __data.grouper.groupings
+
+    df = __data.obj
+
+    f_unite = unite.registry[pd.DataFrame]
+    out = f_unite(df, *args, **kwargs)
+
+    return out.groupby(groupings)
+
+
+# extract ----
+
+@singledispatch2(pd.DataFrame)
+def extract(
+        __data, col, into, regex = r"(\w+)",
+        remove = True, convert = False,
+        flags = 0
+        ):
+    """Pull out len(into) fields from character strings. Return DataFrame with a column added for each piece.
+
+    Args:
+        __data:  a DataFrame
+        col: name of column to split (either string, or siu expression).
+        into: names of resulting columns holding each entry in pulled out fields.
+        regex: regular expression used to extract field. Passed to col.str.extract method.
+        remove: whether to remove col from the returned DataFrame.
+        convert: whether to attempt to convert the split columns to numerics.
+        flags: flags from the re module, passed to col.str.extract.
+
+    """
+
+    col_name = simple_varname(col)
+    n_into = len(into)
+
+    all_splits = __data[col_name].str.extract(regex, flags)
+    n_split_cols = len(all_splits.columns)
+
+    if n_split_cols != n_into:
+        raise ValueError("Split into %s pieces, but expected %s" % (n_split_cols, n_into))
+
+    # end up with only the into columns, correctly named ----
+    new_names = dict(zip(all_splits.columns, into))
+    keep_splits = all_splits.rename(columns = new_names)
+
+    # attempt to convert columns to numeric ----
+    if convert:
+        # TODO: better strategy here? 
+        for k in keep_splits:
+            try:
+                keep_splits[k] = pd.to_numeric(keep_splits[k])
+            except ValueError:
+                pass
+
+    
+    out = pd.concat([__data, keep_splits], axis = 1)
+
+    if remove:
+        return out.drop(columns = col_name)
+
+    return out
+
+@extract.register(DataFrameGroupBy)
+def _extract_gdf(__data, *args, **kwargs):
+    # TODO: consolidate these trivial group by dispatched funcs
+
+    groupings = __data.grouper.groupings
+
+    df = __data.obj
+
+    f_extract = extract.registry[pd.DataFrame]
+    out = f_extract(df, *args, **kwargs)
+
+    return out.groupby(groupings)
 
 
 # Install Siu =================================================================
