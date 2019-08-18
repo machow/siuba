@@ -124,20 +124,20 @@ def na_if(x, y):
 
 
 @register_symbolic
-def near():
+def near(x):
     NotImplementedError("near not implemented") 
 
 
 @register_symbolic
-def nth():
+def nth(x):
     NotImplementedError("nth not implemented") 
 
 
 @register_symbolic
-def first():
+def first(x):
     NotImplementedError("first not implemented")
 
 
 @register_symbolic
-def last():
+def last(x):
     NotImplementedError("last not implemented")
