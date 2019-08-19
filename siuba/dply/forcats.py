@@ -51,7 +51,7 @@ def fct_collapse(fct, recat, group_other = None):
     # need to know existing to new cat
     # need to know new cat to new code
     cat_to_new = {k: None for k in fct.categories}
-    new_cat_set = {k: True for k in fct.categories} 
+    new_cat_set = {k: True for k in fct.categories}
     for new_name, v in recat.items():
         v = [v] if not np.ndim(v) else v
         for old_name in v:
@@ -74,12 +74,15 @@ def fct_collapse(fct, recat, group_other = None):
     # map from old cat to new code ----
     # calculate new codes
     new_cat_set = {k: ii for ii, k in enumerate(new_cat_set)}
-    # map old cats to them
-    remap_code = {old: new_cat_set[new] for old, new in cat_to_new.items()}
+    # map old cats to new codes (but keep unchanged cats the same)
+    remap_code = {old: new_cat_set[new] if new else new_cat_set[old] for old, new in cat_to_new.items()}
+    # map old cats to new cats
+    cat_to_new = {old: new if new else old for old, new in cat_to_new.items()}
 
     new_codes = fct.map(remap_code)
-    new_cats = list(new_cat_set.keys())
-    return pd.Categorical.from_codes(new_codes, new_cats)
+    new_cats = set(cat_to_new.values())
+
+    return pd.Categorical.from_codes(new_codes.dropna().astype(int), new_cats)
 
 
 # fct_lump --------------------------------------------------------------------
@@ -89,7 +92,7 @@ def fct_collapse(fct, recat, group_other = None):
 def fct_lump(fct, n = None, prop = None, w = None, other_level = "Other", ties = None):
     if ties is not None:
         raise NotImplementedError("ties is not implemented")
-    
+
     if n is None and prop is None:
         raise NotImplementedError("Either n or prop must be specified")
 
@@ -97,7 +100,7 @@ def fct_lump(fct, n = None, prop = None, w = None, other_level = "Other", ties =
         raise NotImplementedError("prop arg is not implemented")
 
     keep_cats = _fct_lump_n_cats(fct, n, w, other_level, ties)
-    return fct_collapse(fct, {k:k for k in keep_cats}, group_other = other_level) 
+    return fct_collapse(fct, {k:k for k in keep_cats}, group_other = other_level)
 
 def _fct_lump_n_cats(fct, n, w, other_level, ties):
     # TODO: currently always selects n, even if ties
@@ -125,4 +128,3 @@ def fct_rev(fct):
     rev_levels = list(reversed(fct.categories))
 
     return fct.reorder_categories(rev_levels)
-    
