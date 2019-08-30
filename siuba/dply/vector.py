@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from functools import singledispatch
-from ..siu import symbolic_dispatch
+from siuba.siu import symbolic_dispatch
 
 
 def _expand_bool(x, f):
@@ -57,11 +57,12 @@ def dense_rank(x):
 
     Example:
 
-        >>> dense_rank(Series([1,3,3,5]))
+        >>> dense_rank(pd.Series([1,3,3,5]))
         0    1.0
         1    2.0
         2    2.0
         3    3.0
+        dtype: float64
 
 
     """
@@ -163,8 +164,8 @@ def lead(x, n = 1, default = None):
         dtype: float64
 
         >>> lead(pd.Series([1,2,3]), n=1, default = 99)
-        0    2.0
-        1    3.0
+        0     2.0
+        1     3.0
         2    99.0
         dtype: float64
 
