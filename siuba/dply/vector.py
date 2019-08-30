@@ -71,6 +71,7 @@ def dense_rank(x):
 
 @symbolic_dispatch
 def percent_rank(x):
+    """TODO: Not Implemented"""
     NotImplementedError("PRs welcome")
 
 
@@ -120,6 +121,7 @@ def row_number(x):
 
 @symbolic_dispatch
 def ntile(x, n):
+    """TODO: Not Implemented"""
     NotImplementedError("ntile not implemented")
 
 
@@ -144,6 +146,7 @@ def between(x, left, right):
 
 @symbolic_dispatch
 def coalesce(*args):
+    """TODO: Not Implemented"""
     NotImplementedError("coalesce not implemented")
 
 
@@ -264,19 +267,23 @@ def na_if(x, y):
 
 @symbolic_dispatch
 def near(x):
+    """TODO: Not Implemented"""
     NotImplementedError("near not implemented") 
 
 
 @symbolic_dispatch
 def nth(x):
+    """TODO: Not Implemented"""
     NotImplementedError("nth not implemented") 
 
 
 @symbolic_dispatch
 def first(x):
+    """TODO: Not Implemented"""
     NotImplementedError("first not implemented")
 
 
 @symbolic_dispatch
 def last(x):
+    """TODO: Not Implemented"""
     NotImplementedError("last not implemented")
