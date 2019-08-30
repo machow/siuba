@@ -1,21 +1,10 @@
 import pandas as pd
 import numpy as np
-from ..siu import create_sym_call, Symbolic
-from functools import singledispatch
-
-# TODO: move into siu
-def register_symbolic(f):
-    @f.register(Symbolic)
-    def _dispatch_symbol(__data, *args, **kwargs):
-        return create_sym_call(f, __data.source, *args, **kwargs)
-
-    return f
-
+from siuba.siu import symbolic_dispatch
 
 # fct_reorder -----------------------------------------------------------------
 
-@register_symbolic
-@singledispatch
+@symbolic_dispatch
 def fct_reorder(fct, x, func = np.median):
     x_vals = x.values if isinstance(x, pd.Series) else x
     s = pd.Series(x_vals, index = fct)
@@ -29,8 +18,7 @@ def fct_reorder(fct, x, func = np.median):
 
 # fct_recode ------------------------------------------------------------------
 
-@register_symbolic
-@singledispatch
+@symbolic_dispatch
 def fct_recode(fct, **kwargs):
     if not isinstance(fct, pd.Categorical):
         fct = pd.Categorical(fct)
@@ -41,8 +29,7 @@ def fct_recode(fct, **kwargs):
 
 # fct_collapse ----------------------------------------------------------------
 
-@register_symbolic
-@singledispatch
+@symbolic_dispatch
 def fct_collapse(fct, recat, group_other = None):
     if not isinstance(fct, pd.Categorical):
         fct = pd.Categorical(fct)
@@ -84,8 +71,7 @@ def fct_collapse(fct, recat, group_other = None):
 
 # fct_lump --------------------------------------------------------------------
 
-@register_symbolic
-@singledispatch
+@symbolic_dispatch
 def fct_lump(fct, n = None, prop = None, w = None, other_level = "Other", ties = None):
     if ties is not None:
         raise NotImplementedError("ties is not implemented")
@@ -116,8 +102,7 @@ def _get_values(x):
 
 # fct_rev ---------------------------------------------------------------------
 
-@register_symbolic
-@singledispatch
+@symbolic_dispatch
 def fct_rev(fct):
     if not isinstance(fct, pd.Categorical):
         fct = pd.Categorical(fct)
