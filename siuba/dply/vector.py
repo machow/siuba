@@ -1,87 +1,174 @@
 import pandas as pd
 import numpy as np
 from functools import singledispatch
-from ..siu import Symbolic, create_sym_call,Call
+from ..siu import symbolic_dispatch
 
-
-def register_symbolic(f):
-    # TODO: don't use singledispatch if it has already been done
-    f = singledispatch(f)
-    @f.register(Symbolic)
-    def _dispatch_symbol(__data, *args, **kwargs):
-        return create_sym_call(f, __data.source, *args, **kwargs)
-
-    return f
 
 def _expand_bool(x, f):
-    return x.expanding().apply(f).astype(bool)
+    return x.expanding().apply(f, raw = True).astype(bool)
 
-@register_symbolic
+@symbolic_dispatch
 def cumall(x):
+    """Return a same-length array. For each entry, indicates whether that entry and all previous are True-like.
+
+    Example:
+        >>> cumall(pd.Series([True, False, False]))
+        0     True
+        1    False
+        2    False
+        dtype: bool
+
+    """
     return _expand_bool(x, np.all)
 
 
-@register_symbolic
+@symbolic_dispatch
 def cumany(x):
+    """Return a same-length array. For each entry, indicates whether that entry or any previous are True-like.
+
+    Example:
+        >>> cumany(pd.Series([False, True, False]))
+        0    False
+        1     True
+        2     True
+        dtype: bool
+
+    """
     return _expand_bool(x, np.any)
 
 
-@register_symbolic
+@symbolic_dispatch
 def cummean(x):
+    """Return a same-length array, containing the cumulative mean."""
     return x.expanding().mean()
 
-@register_symbolic
+@symbolic_dispatch
 def desc(x):
-    return x.sort_values()
+    """Return array sorted in descending order."""
+    return x.sort_values(ascending = False).reset_index(drop = True)
 
 
-@register_symbolic
+@symbolic_dispatch
 def dense_rank(x):
+    """Return the dense rank.
+    
+    This method of ranking returns values ranging from 1 to the number of unique entries.
+    Ties are all given the same ranking.
+
+    Example:
+
+        >>> dense_rank(Series([1,3,3,5]))
+        0    1.0
+        1    2.0
+        2    2.0
+        3    3.0
+
+
+    """
     return x.rank(method = "dense")
 
 
-@register_symbolic
+@symbolic_dispatch
 def percent_rank(x):
     NotImplementedError("PRs welcome")
 
 
-@register_symbolic
+@symbolic_dispatch
 def min_rank(x):
+    """Return the min rank. See pd.Series.rank for details.
+
+    """
     return x.rank(method = "min")
 
 
-@register_symbolic
+@symbolic_dispatch
 def cume_dist(x):
+    """Return the cumulative distribution corresponding to each value in x.
+
+    This reflects the proportion of values that are less than or equal to each value.
+
+    """
     return x.rank(method = "max") / x.count()
 
 
-@register_symbolic
+@symbolic_dispatch
 def row_number(x):
+    """Return the row number (position) for each value in x, beginning with 1.
+
+    Example:
+        >>> row_number(pd.Series([7,8,9]))
+        0    1
+        1    2
+        2    3
+        dtype: int64
+
+    """
     if isinstance(x, pd.DataFrame):
         n = x.shape[0]
     else:
         n = len(x)
-    return np.arange(1, n + 1)
+    
+    arr = np.arange(1, n + 1)
+
+    # could use single dispatch, but for now ensure output data type matches input
+    if isinstance(x, pd.Series):
+        return x._constructor(arr, pd.RangeIndex(n), fastpath = True)
+
+    return arr
 
 
-@register_symbolic
+@symbolic_dispatch
 def ntile(x, n):
     NotImplementedError("ntile not implemented")
 
 
-@register_symbolic
+@symbolic_dispatch
 def between(x, left, right):
+    """Return whether a value is between left and right (including either side).
+
+    Example:
+        >>> between(pd.Series([1,2,3]), 0, 2)
+        0     True
+        1     True
+        2    False
+        dtype: bool
+
+    Note:
+        This is a thin wrapper around pd.Series.between(left, right)
+    
+    """
     # note: NA -> False, in tidyverse NA -> NA
     return x.between(left, right)
     
 
-@register_symbolic
+@symbolic_dispatch
 def coalesce(*args):
     NotImplementedError("coalesce not implemented")
 
 
-@register_symbolic
+@symbolic_dispatch
 def lead(x, n = 1, default = None):
+    """Return an array with each value replaced by the next (or further forward) value in the array.
+
+    Arguments:
+        x: a pandas Series object
+        n: number of next values forward to replace each value with
+        default: what to replace the n final values of the array with
+
+    Example:
+        >>> lead(pd.Series([1,2,3]), n=1)
+        0    2.0
+        1    3.0
+        2    NaN
+        dtype: float64
+
+        >>> lead(pd.Series([1,2,3]), n=1, default = 99)
+        0    2.0
+        1    3.0
+        2    99.0
+        dtype: float64
+
+    """
     res = x.shift(-1*n)
 
     if default is not None:
@@ -90,8 +177,30 @@ def lead(x, n = 1, default = None):
     return res
 
 
-@register_symbolic
+@symbolic_dispatch
 def lag(x, n = 1, default = None):
+    """Return an array with each value replaced by the previous (or further backward) value in the array.
+
+    Arguments:
+        x: a pandas Series object
+        n: number of next values backward to replace each value with
+        default: what to replace the n final values of the array with
+
+    Example:
+        >>> lag(pd.Series([1,2,3]), n=1)
+        0    NaN
+        1    1.0
+        2    2.0
+        dtype: float64
+
+        >>> lag(pd.Series([1,2,3]), n=1, default = 99)
+        0    99.0
+        1     1.0
+        2     2.0
+        dtype: float64
+
+
+    """
     res = x.shift(n)
 
     if default is not None:
@@ -100,21 +209,50 @@ def lag(x, n = 1, default = None):
     return res
 
 
-@register_symbolic
+@symbolic_dispatch
 def n(x):
+    """Return the total number of elements in the array (or rows in a DataFrame).
+
+    Example:
+        >>> ser = pd.Series([1,2,3])
+        >>> n(ser)
+        3
+
+        >>> df = pd.DataFrame({'x': ser})
+        >>> n(df)
+        3
+
+    """
     if isinstance(x, pd.DataFrame):
         return x.shape[0]
 
     return len(x)
 
 
-@register_symbolic
+@symbolic_dispatch
 def n_distinct(x):
+    """Return the total number of distinct (i.e. unique) elements in an array.
+    
+    Example:
+        >>> n_distinct(pd.Series([1,1,2,2]))
+        2
+
+    """
     return len(x.unique())
 
 
-@register_symbolic
+@symbolic_dispatch
 def na_if(x, y):
+    """Return a array like x, but with values in y replaced by NAs.
+    
+    Examples:
+        >>> na_if(pd.Series([1,2,3]), [1,3])
+        0    NaN
+        1    2.0
+        2    NaN
+        dtype: float64
+        
+    """
     y = [y] if not np.ndim(y) else y
 
     tmp_x = x.copy(deep = True)
@@ -123,21 +261,21 @@ def na_if(x, y):
     return tmp_x
 
 
-@register_symbolic
+@symbolic_dispatch
 def near(x):
     NotImplementedError("near not implemented") 
 
 
-@register_symbolic
+@symbolic_dispatch
 def nth(x):
     NotImplementedError("nth not implemented") 
 
 
-@register_symbolic
+@symbolic_dispatch
 def first(x):
     NotImplementedError("first not implemented")
 
 
-@register_symbolic
+@symbolic_dispatch
 def last(x):
     NotImplementedError("last not implemented")
