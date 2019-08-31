@@ -31,12 +31,18 @@ def fct_reorder(fct, x, func = np.median):
 
 @register_symbolic
 @singledispatch
-def fct_recode(fct, **kwargs):
-    if not isinstance(fct, pd.Categorical):
-        fct = pd.Categorical(fct)
-
-    rev_kwargs = {v:k for k,v in kwargs.items()}
-    return fct.rename_categories(rev_kwargs)
+def fct_recode(fct, recat=None, **kwargs):
+    if recat and not isinstance(recat, dict):
+        raise TypeError("fct_recode requires named args or a dict.")
+    if recat and kwargs:
+        duplicate_keys = set(recat).intersection(set(kwargs))
+        if duplicate_keys:
+            raise ValueError(
+                "The following recode name(s) were specified more than once: {}" \
+                .format(duplicate_keys)
+            )
+    new_cats = {**recat, **kwargs} if recat else kwargs
+    return fct_collapse(fct, new_cats)
 
 
 # fct_collapse ----------------------------------------------------------------

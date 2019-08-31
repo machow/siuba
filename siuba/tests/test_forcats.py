@@ -29,13 +29,47 @@ def assert_cat_equal(a, b):
     assert_equal(a.codes, b.codes)
     assert a.ordered == b.ordered
 
+# fct_reorder -----------------------------------------------------------------
 
-def test_forcats_fct_recode(cat1):
+@pytest.mark.skip("TODO")
+def test_forcats_fct_reorder(cat1):
+    pass
+
+# fct_recode ------------------------------------------------------------------
+
+def test_forcats_fct_recode_rename(cat1):
+    """Test a single rename"""
     out1 = fct_recode(cat1, x="b")
     out2 = pd.Categorical(["a", "x", "c", "d"], ["a", "x", "c", "d"])
-
     assert_cat_equal(out1, out2)
 
+@pytest.mark.skip("TODO")
+def test_forcats_fct_recode_2_same_name(cat1):
+    """Test the case where new categories are defined in kwargs _and_ recat"""
+    pytest.raises(ValueError, fct_recode, cat1, recat={"x": "a"}, x="b")
+
+
+@pytest.mark.skip("TODO")
+def test_forcats_fct_recode_dict_and_kwargs(cat1):
+    pass
+
+@pytest.mark.skip("TODO")
+def test_forcats_fct_recode_remove(cat1):
+    """
+    # If you name the level NULL it will be removed
+    fct_recode(x, NULL = "apple", fruit = "banana")
+    """
+    pass
+
+@pytest.mark.skip("TODO")
+def test_forcats_fct_recode_warn(cat1):
+    """
+    # If you make a mistake you'll get a warning
+    fct_recode(x, fruit = "apple", fruit = "bananana")
+    """
+    pass
+
+# fct_collapse ----------------------------------------------------------------
 
 def test_forcats_fct_collapse(cat1):
     mapping1 = {
@@ -46,3 +80,15 @@ def test_forcats_fct_collapse(cat1):
     out2 = pd.Categorical(["y", "x", "c", "x"])
 
     assert_cat_equal(out1, out2)
+
+# fct_lump --------------------------------------------------------------------
+
+@pytest.mark.skip("TODO")
+def test_forcats_fct_lump(cat1):
+    pass
+
+# fct_rev ---------------------------------------------------------------------
+
+@pytest.mark.skip("TODO")
+def test_forcats_fct_rev(cat1):
+    pass
