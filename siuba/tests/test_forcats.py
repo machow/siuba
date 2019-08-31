@@ -34,13 +34,8 @@ def test_forcats_fct_collapse(cat1):
         "python": ["pandas", "plotnine"],
         "r": "dplyr",
     }
-    mapping2 = {
-        "pandas": "python",
-        "plotnine": "python",
-        "dplyr": "r",
-        "ggplot2": "ggplot2",
-    }
     out1 = fct_collapse(cat1, mapping1)
-    out2 = pd.Series(cat1.get_values()).apply(lambda x: mapping2[x]).astype("category")
+    # out2 = pd.Series(cat1.get_values()).apply(lambda x: mapping2[x]).astype("category")
+    out2 = pd.Categorical(["python", "r", "ggplot2", "python"])
 
     assert(out1.to_list() == out2.to_list())

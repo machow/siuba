@@ -74,15 +74,12 @@ def fct_collapse(fct, recat, group_other = None):
     # map from old cat to new code ----
     # calculate new codes
     new_cat_set = {k: ii for ii, k in enumerate(new_cat_set)}
-    # map old cats to new codes (but keep unchanged cats the same)
-    remap_code = {old: new_cat_set[new] if new else new_cat_set[old] for old, new in cat_to_new.items()}
-    # map old cats to new cats
-    cat_to_new = {old: new if new else old for old, new in cat_to_new.items()}
+    # map old cats to them
+    remap_code = {old: new_cat_set[new] for old, new in cat_to_new.items()}
 
     new_codes = fct.map(remap_code)
-    new_cats = set(cat_to_new.values())
-
-    return pd.Categorical.from_codes(new_codes.dropna().astype(int), new_cats)
+    new_cats = list(new_cat_set.keys())
+    return pd.Categorical.from_codes(new_codes, new_cats)
 
 
 # fct_lump --------------------------------------------------------------------
