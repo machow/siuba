@@ -1,26 +1,34 @@
 import pytest
+import pandas as pd
+from numpy.testing import assert_equal
+from pandas.testing import assert_series_equal, assert_index_equal
 from siuba.dply.forcats import fct_recode, fct_collapse
 
-import pandas as pd
-from pandas.testing import assert_series_equal
-
-@pytest.fixture(scope = "function")
+@pytest.fixture
 def series1():
     yield pd.Series(["pandas", "dplyr", "ggplot2", "plotnine"])
 
-@pytest.fixture(scope = "function")
+@pytest.fixture
 def cat1():
     yield pd.Categorical(["pandas", "dplyr", "ggplot2", "plotnine"])
 
-@pytest.fixture(scope = "function")
-def df1():
-    yield pd.DataFrame({
-        "repo": ["pandas", "dplyr", "ggplot2", "plotnine"],
-        "owner": ["pandas-dev", "tidyverse", "tidyverse", "has2k1"],
-        "language": ["python", "R", "R", "python"],
-        "stars": [17800, 2800, 3500, 1450],
-        "x": [1,2,3,None]
-        })
+# Need to ensure all functions...
+#  - 1. can take a series or array
+#  - 2. handle a symbolic or call
+#  - 3. handle names with spaces
+
+# just a little shorter to write...
+def factor(values, categories, ordered = False):
+    return pd.Categorical(values, categories, ordered)
+
+def assert_cat_equal(a, b):
+    assert isinstance(a, pd.Categorical)
+    assert isinstance(b, pd.Categorical)
+
+    assert_index_equal(a.categories, b.categories)
+    assert_equal(a.codes, b.codes)
+    assert a.ordered == b.ordered
+
 
 def test_forcats_fct_recode(cat1):
     out1 = fct_recode(cat1, R="dplyr")
@@ -35,7 +43,6 @@ def test_forcats_fct_collapse(cat1):
         "r": "dplyr",
     }
     out1 = fct_collapse(cat1, mapping1)
-    # out2 = pd.Series(cat1.get_values()).apply(lambda x: mapping2[x]).astype("category")
     out2 = pd.Categorical(["python", "r", "ggplot2", "python"])
 
-    assert(out1.to_list() == out2.to_list())
+    assert_cat_equal(out1, out2)
