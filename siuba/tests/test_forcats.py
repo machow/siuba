@@ -6,11 +6,11 @@ from siuba.dply.forcats import fct_recode, fct_collapse
 
 @pytest.fixture
 def series1():
-    yield pd.Series(["pandas", "dplyr", "ggplot2", "plotnine"])
+    yield pd.Series(["a", "b", "c", "d"])
 
 @pytest.fixture
 def cat1():
-    yield pd.Categorical(["pandas", "dplyr", "ggplot2", "plotnine"])
+    yield pd.Categorical(["a", "b", "c", "d"])
 
 # Need to ensure all functions...
 #  - 1. can take a series or array
@@ -31,18 +31,18 @@ def assert_cat_equal(a, b):
 
 
 def test_forcats_fct_recode(cat1):
-    out1 = fct_recode(cat1, R="dplyr")
-    out2 = cat1.rename_categories({"dplyr": "R"})
+    out1 = fct_recode(cat1, x="b")
+    out2 = pd.Categorical(["a", "x", "c", "d"], ["a", "x", "c", "d"])
 
-    assert(out1.to_list() == out2.to_list())
+    assert_cat_equal(out1, out2)
 
 
 def test_forcats_fct_collapse(cat1):
     mapping1 = {
-        "python": ["pandas", "plotnine"],
-        "r": "dplyr",
+        "x": ["b", "d"],
+        "y": "a",
     }
     out1 = fct_collapse(cat1, mapping1)
-    out2 = pd.Categorical(["python", "r", "ggplot2", "python"])
+    out2 = pd.Categorical(["y", "x", "c", "x"])
 
     assert_cat_equal(out1, out2)
