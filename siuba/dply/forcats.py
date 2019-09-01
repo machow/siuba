@@ -62,6 +62,7 @@ def fct_recode(fct, recat=None, **kwargs):
 
     if recat and not isinstance(recat, dict):
         raise TypeError("fct_recode requires named args or a dict.")
+
     if recat and kwargs:
         duplicate_keys = set(recat).intersection(set(kwargs))
         if duplicate_keys:
@@ -69,6 +70,7 @@ def fct_recode(fct, recat=None, **kwargs):
                 "The following recode name(s) were specified more than once: {}" \
                 .format(duplicate_keys)
             )
+
     new_cats = {**recat, **kwargs} if recat else kwargs
     return fct_collapse(fct, new_cats)
 
