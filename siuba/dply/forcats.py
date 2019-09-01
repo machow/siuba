@@ -100,7 +100,7 @@ def fct_collapse(fct, recat, group_other = None):
 
         >>> fct_collapse(['a', 'b', 'c'], {'ab': ['a', 'b']})
         [ab, ab, c]
-        Categories (2, object): [c, ab]
+        Categories (2, object): [ab, c]
 
     """
     if not isinstance(fct, pd.Categorical):
