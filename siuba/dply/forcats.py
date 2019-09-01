@@ -92,7 +92,7 @@ def fct_collapse(fct, recat, group_other = None):
     Examples:
         >>> fct_collapse(['a', 'b', 'c'], {'x': 'a'})
         [x, b, c]
-        Categories (3, object): [b, c, x]
+        Categories (3, object): [x, b, c]
 
         >>> fct_collapse(['a', 'b', 'c'], {'x': 'a'}, group_other = 'others')
         [x, others, others]
