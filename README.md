@@ -2,6 +2,7 @@ siuba
 =====
 
 [![Build Status](https://travis-ci.org/machow/siuba.svg?branch=master)](https://travis-ci.org/machow/siuba)
+[![Documentation Status](https://readthedocs.org/projects/siuba/badge/?version=latest)](https://siuba.readthedocs.io/en/latest/?badge=latest)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/machow/siuba/master)
 
 **Note: this library is currently in heavy development! For a nice example of siuba in action, see this [intro doc](https://siuba.readthedocs.io/en/latest/intro.html), or this [example analysis](https://github.com/machow/tidytuesday-py/blob/master/2019-01-08-tv-golden-age.ipynb)**

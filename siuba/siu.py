@@ -125,6 +125,23 @@ class Formatter:
 # =============================================================================
 
 class Call:
+    """
+    Representation of python operations.
+
+    This class is responsible for representing the pieces of a python expression,
+    as a function, along with its args and kwargs.
+
+    For example, "some_object.a" would be represented at the function "__getattr__",
+    with the args `some_object`, and `"a"`.
+
+    Args:
+        func: name of the function called. Class methods are represented using the names
+              they have when defined on the class.
+        *args: arguments the func call uses.
+        **kwargs: keyword arguments the func call uses.
+
+
+    """
     def __init__(self, func, *args, **kwargs):
         self.func = func
         self.args = args
@@ -200,7 +217,7 @@ class Call:
 
         for arg in all_args:
             if isinstance(arg, Call):
-                varnames.update(arg.op_vars())
+                varnames.update(arg.op_vars(attr_calls = attr_calls))
 
         return varnames
     
@@ -519,6 +536,28 @@ def explain(symbol):
         print(symbol.source)
     else: 
         print(symbol)
+
+
+# symbolic dispatch wrapper ---------------------------------------------------
+
+from functools import singledispatch
+
+def symbolic_dispatch(f):
+    # TODO: don't use singledispatch if it has already been done
+    f = singledispatch(f)
+    @f.register(Symbolic)
+    def _dispatch_symbol(__data, *args, **kwargs):
+        return create_sym_call(f, __data.source, *args, **kwargs)
+
+    @f.register(Call)
+    def _dispatch_call(__data, *args, **kwargs):
+        # TODO: want to just create call, for now use hack of creating a symbolic
+        #       call and getting the source off of it...
+        return create_sym_call(f, __data, *args, **kwargs).source
+
+    return f
+
+
 
 # Do some gnarly method setting -----------------------------------------------
 
