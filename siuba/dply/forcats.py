@@ -85,6 +85,10 @@ def fct_collapse(fct, recat, group_other = None):
                a list of existing categories, to be given the same name.
         group_other: an optional string, specifying what all other categories should be named.
 
+    Notes:
+        Resulting levels index is ordered according to the earliest level replaced.
+        If we rename the first and last levels to "c", then "c" is the first level.
+
     Examples:
         >>> fct_collapse(['a', 'b', 'c'], {'x': 'a'})
         [x, b, c]
@@ -106,30 +110,26 @@ def fct_collapse(fct, recat, group_other = None):
     # need to know existing to new cat
     # need to know new cat to new code
     cat_to_new = {k: None for k in fct.categories}
-    new_cat_set = {k: True for k in fct.categories}
     for new_name, v in recat.items():
         v = [v] if not np.ndim(v) else v
         for old_name in v:
             if cat_to_new[old_name] is not None:
                 raise Exception("category %s was already re-assigned"%old_name)
             cat_to_new[old_name] = new_name
-            del new_cat_set[old_name]
-            new_cat_set[new_name] = True    # add new cat
 
     # collapse all unspecified cats to group_other if specified ----
     for k, v in cat_to_new.items():
         if v is None:
             if group_other is not None:
-                new_cat_set[group_other] = True
                 cat_to_new[k] = group_other
-                del new_cat_set[k]
             else:
                 cat_to_new[k] = k
 
     # map from old cat to new code ----
     # calculate new codes
-    new_cat_set = {k: ii for ii, k in enumerate(new_cat_set)}
-    # map old cats to them
+    ordered_cats = {new: True for old, new in cat_to_new.items()}
+    new_cat_set = {k: ii for ii, k in enumerate(ordered_cats)}
+    # map old cats to new codes
     remap_code = {old: new_cat_set[new] for old, new in cat_to_new.items()}
 
     new_codes = fct.map(remap_code)

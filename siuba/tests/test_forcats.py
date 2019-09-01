@@ -77,7 +77,7 @@ def test_forcats_fct_collapse(cat1):
         "y": "a",
     }
     out1 = fct_collapse(cat1, mapping1)
-    out2 = pd.Categorical(["y", "x", "c", "x"])
+    out2 = pd.Categorical(["y", "x", "c", "x"], ["y", "x", "c"])
 
     assert_cat_equal(out1, out2)
 
