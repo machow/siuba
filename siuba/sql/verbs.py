@@ -199,10 +199,13 @@ class LazyTbl:
             # verbs that can use strings as accessors, like group_by, or
             # arrange, need to convert those strings into a getitem call
             return str_to_get_item_call(call)
+        elif isinstance(call, sql.elements.ColumnClause):
+            return Lazy(call)
         elif not isinstance(call, Call):
             # verbs that use literal strings, need to convert them to a call
             # that returns a sqlalchemy "literal" object
             return Lazy(sql.literal(call))
+
 
         f_dict1 = self.funcs['scalar']
         f_dict2 = self.funcs['window' if window else 'aggregate']
@@ -302,6 +305,10 @@ def _repr_grouped_df_html_(self):
 
 # Main Funcs 
 # =============================================================================
+
+# sql raw --------------
+
+sql_raw = sql.literal_column
 
 # show query -----------
 
