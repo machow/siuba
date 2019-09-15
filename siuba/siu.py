@@ -328,6 +328,12 @@ class MetaArg(Call):
         return x
 
 
+# Trees and Visitors ==========================================================
+from .error import ShortException
+
+class FunctionLookupError(ShortException): pass
+
+
 class CallVisitor:
     """
     A node visitor base class that walks the call tree and calls a
@@ -385,8 +391,8 @@ class CallTreeLocal(CallListener):
 
         try:
             local_func = self.local[name]
-        except KeyError:
-            raise Exception("No local entry %s"% name)
+        except KeyError as err:
+            raise FunctionLookupError("Missing translation for function call: %s"% name)
 
 
         return cls(

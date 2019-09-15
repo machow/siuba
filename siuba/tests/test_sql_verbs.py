@@ -55,6 +55,27 @@ def test_lazy_tbl_manual_columns(db):
     with pytest.raises(AttributeError):
         tbl.tbl.columns.email_address
 
+# SqlFunctionLookupError ------------------------------------------------------
+
+from siuba import _
+from siuba.sql import arrange, filter, mutate, summarize, SqlFunctionLookupError
+from siuba.siu import strip_symbolic
+
+def test_lazy_tbl_shape_call_error(db):
+    tbl = LazyTbl(db, 'addresses')
+
+    call = strip_symbolic(_.id.asdkfjsdf())
+    with pytest.raises(SqlFunctionLookupError) as err:
+        tbl.shape_call(call)
+
+        # suppresses context for shorter stack trace
+        assert err.__suppress_context__ == True
+
+
+
+# TODO: remove these old tests? should be redundant ===========================
+
+
 # mutate ----------------------------------------------------------------------
 
 def test_sql_mutate(db):

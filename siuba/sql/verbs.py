@@ -22,7 +22,7 @@ from .utils import get_dialect_funcs
 
 from sqlalchemy import sql
 import sqlalchemy
-from siuba.siu import Call, CallTreeLocal, str_to_getitem_call, Lazy
+from siuba.siu import Call, CallTreeLocal, str_to_getitem_call, Lazy, FunctionLookupError
 # TODO: currently needed for select, but can we remove pandas?
 from pandas import Series
 import pandas as pd
@@ -36,6 +36,9 @@ from sqlalchemy.sql import schema
 
 
 # Helpers ---------------------------------------------------------------------
+
+class SqlFunctionLookupError(FunctionLookupError): pass
+
 
 class CallListener:
     """Generic listener. Each exit is called on a node's copy."""
@@ -193,7 +196,11 @@ class LazyTbl:
     def copy(self, **kwargs):
         return self.__class__(**{**self.__dict__, **kwargs})
 
-    def shape_call(self, call, window = True, str_accessors = False):
+    def shape_call(
+            self,
+            call, window = True, str_accessors = False,
+            verb_name = None, arg_name = None
+            ):
         # TODO: error if mutate receives a literal value?
         if str_accessors and isinstance(call, str):
             # verbs that can use strings as accessors, like group_by, or
@@ -217,7 +224,17 @@ class LazyTbl:
                 call_sub_attr = self.call_sub_attr
                 )
 
-        return call_shaper.enter(call)
+        # raise informative error message if missing translation
+        try:
+            return call_shaper.enter(call)
+        except FunctionLookupError as err:
+            raise SqlFunctionLookupError.from_verb(
+                    verb_name or "Unknown",
+                    arg_name or "Unknown",
+                    err,
+                    short = True
+                    )
+
 
     def track_call_windows(self, call, columns = None, window_cte = None):
         """Returns tuple of (new column expression, list of window exprs)"""
@@ -399,9 +416,9 @@ def _filter(__data, *args, **kwargs):
 
     conds = []
     windows = []
-    for arg in args:
+    for ii, arg in enumerate(args):
         if isinstance(arg, Call):
-            new_call = __data.shape_call(arg)
+            new_call = __data.shape_call(arg, verb_name = "Filter", arg_name = ii)
             #var_cols = new_call.op_vars(attr_calls = False)
 
             col_expr, win_cols = __data.track_call_windows(
@@ -439,7 +456,7 @@ def _mutate(__data, **kwargs):
 
     # evaluate each call
     for colname, func in kwargs.items():
-        new_call = __data.shape_call(func)
+        new_call = __data.shape_call(func, verb_name = "Mutate", arg_name = colname)
 
         sel = _mutate_select(sel, colname, new_call, labs, __data)
         labs.add(colname)
@@ -502,14 +519,23 @@ def _arrange(__data, *args):
     last_op = __data.last_op
     cols = lift_inner_cols(last_op)
 
-    new_calls = tuple(
-            __data.shape_call(expr, window = False) if callable(expr) else expr
-            for expr in args
-            )
+    
+    new_calls = []
+    for ii, expr in enumerate(args):
+        if callable(expr):
+            res = __data.shape_call(
+                    expr, window = False,
+                    verb_name = "Arrange", arg_name = ii
+                    )
+
+        else:
+            res = expr
+
+        new_calls.append(res)
 
     sort_cols = _create_order_by_clause(cols, *new_calls)
 
-    order_by = __data.order_by + new_calls
+    order_by = __data.order_by + tuple(new_calls)
     return __data.append_op(last_op.order_by(*sort_cols), order_by = order_by)
 
 
@@ -594,7 +620,13 @@ def _summarize(__data, **kwargs):
     #   - need to detect any window functions...
     sel = __data.last_op._clone()
 
-    new_calls = {k: __data.shape_call(expr, window = False) for k, expr in kwargs.items()}
+    new_calls = {}
+    for k, expr in kwargs.items():
+        new_calls[k] = __data.shape_call(
+                expr, window = False,
+                verb_name = "Summarize", arg_name = k
+                )
+
     needs_cte = [col_expr_requires_cte(call, sel) for call in new_calls.values()]
 
     # create select statement ----
