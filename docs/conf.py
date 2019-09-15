@@ -6,6 +6,8 @@
 # Select nbsphinx and, if needed, add a math extension (mathjax or pngmath):
 extensions = [
     'nbsphinx',
+    'sphinx.ext.autodoc',
+    'sphinx.ext.napoleon'
     #'sphinx.ext.mathjax',
 ]
 

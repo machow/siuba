@@ -39,6 +39,14 @@
 
     api_tidy/*
 
+.. toctree::
+    :maxdepth: 2
+    :caption: Extras
+    :hidden:
+    :glob:
+
+    api_extra/*
+
 
 Siuba
 =====
