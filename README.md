@@ -7,6 +7,8 @@ siuba
 [![Documentation Status](https://readthedocs.org/projects/siuba/badge/?version=latest)](https://siuba.readthedocs.io/en/latest/?badge=latest)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/machow/siuba/master)
 
+<img width="30%" align="right" src="./docs/siuba_small.svg">
+
 siuba is a port of [dplyr](https://github.com/tidyverse/dplyr) and other R libraries, which support a data analysis workflow built around 5 common actions performed on tabular data:
 
 * `select()` - keep certain columns of the data.
@@ -19,8 +21,6 @@ These actions can be preceeded by a `group_by()`, which causes them to be applie
 The actual calculations can be executed in pandas or SQL (currently, postgres, redshift, or sqlite).
 
 For examples of siuba in action, see the [siuba documentation](https://siuba.readthedocs.io/en/latest/intro.html).
-
-<img width="30%" align="right" src="./docs/siuba_small.svg">
 
 Installation
 ------------
