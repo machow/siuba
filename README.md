@@ -1,11 +1,26 @@
 siuba
 =====
 
+*library for scrappy data analysis, with seamless support for pandas and SQL*
+
 [![Build Status](https://travis-ci.org/machow/siuba.svg?branch=master)](https://travis-ci.org/machow/siuba)
 [![Documentation Status](https://readthedocs.org/projects/siuba/badge/?version=latest)](https://siuba.readthedocs.io/en/latest/?badge=latest)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/machow/siuba/master)
 
-**Note: this library is currently in heavy development! For a nice example of siuba in action, see this [intro doc](https://siuba.readthedocs.io/en/latest/intro.html), or this [example analysis](https://github.com/machow/tidytuesday-py/blob/master/2019-01-08-tv-golden-age.ipynb)**
+siuba is a port of [dplyr](https://github.com/tidyverse/dplyr) and other R libraries, which support a data analysis workflow built around 5 common actions performed on tabular data:
+
+* `select()` - keep certain columns of the data.
+* `filter()` - keep certain rows of the data.
+* `mutate()` - create or modify an existing column of data.
+* `summarize()` - reduce one or more columns down to a single number.
+* `arrange()` - reorder the rows of the data.
+
+These actions can be preceeded by a `group_by()`, which causes them to be applied individually to grouped rows of data. Moreover, many SQL concepts, such as `distinct()`, `count()`, and joins are implemented.
+The actual calculations can be executed in pandas or SQL (currently, postgres, redshift, or sqlite).
+
+For examples of siuba in action, see the [siuba documentation](https://siuba.readthedocs.io/en/latest/intro.html).
+
+<img width="30%" align="right" src="./docs/siuba_small.svg">
 
 Installation
 ------------
