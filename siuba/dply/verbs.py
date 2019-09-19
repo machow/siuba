@@ -1083,6 +1083,25 @@ def spread(__data, key, value, fill = None, reset_index = True):
     
     return wide
 
+
+@spread.register(DataFrameGroupBy)
+def _spread_gdf(__data, *args, **kwargs):
+
+    groupings = __data.grouper.groupings
+
+    df = __data.obj
+
+    f_spread = spread.registry[pd.DataFrame]
+    out = f_spread(df, *args, **kwargs)
+
+    # regroup, using group names ----
+    group_names = [x.name for x in groupings]
+    if any([name is None for name in group_names]):
+        raise ValueError("spread can only work on grouped DataFrame if all groupings "
+                         "have names. Groups are: %s" %group_names)
+
+    return out.groupby(group_names)
+
 # Expand/Complete ====================================================================
 from pandas.core.reshape.util import cartesian_product
 
