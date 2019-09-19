@@ -99,7 +99,8 @@ def simple_varname(call):
         return call
 
     # check for expr like _.some_var or _["some_var"]
-    if (call.func in {"__getitem__", "__getattr__"}
+    if (isinstance(call, Call)
+        and call.func in {"__getitem__", "__getattr__"}
         and isinstance(call.args[0], MetaArg)
         and isinstance(call.args[1], str)
         ):
@@ -323,9 +324,11 @@ def filter(__data, *args):
     # and iloc can't use a boolean series
     if isinstance(crnt_indx, bool) or isinstance(crnt_indx, np.bool_):
         # iloc can do slice, but not a bool series
-        return __data.iloc[slice(None) if crnt_indx else slice(0),:]
+        result = __data.iloc[slice(None) if crnt_indx else slice(0),:]
+    else:
+        result = __data.loc[crnt_indx,:]
 
-    return __data.loc[crnt_indx,:]
+    return result.reset_index(drop = True)
 
 @filter.register(DataFrameGroupBy)
 def _filter(__data, *args):
