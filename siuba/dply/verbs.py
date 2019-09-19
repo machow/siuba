@@ -1049,7 +1049,7 @@ def gather(__data, key = "key", value = "value", *args, drop_na = False, convert
     long = pd.melt(__data, id_vars, value_vars, key, value)
 
     if drop_na:
-        return long[~long[value].isna()]
+        return long[~long[value].isna()].reset_index(drop = True)
 
     return long
 
@@ -1057,10 +1057,21 @@ def gather(__data, key = "key", value = "value", *args, drop_na = False, convert
 
 # Spread ======================================================================
 
+def _get_single_var_select(columns, x):
+    od = var_select(columns, *var_create(x))
+
+    if len(od) != 1:
+        raise ValueError("Expected single variable, received: %s" %list(od))
+
+    return next(iter(od))
+
 @singledispatch2(pd.DataFrame)
 def spread(__data, key, value, fill = None, reset_index = True):
-    id_cols = [col for col in __data.columns if col not in {key, value}]
-    wide = __data.set_index(id_cols + [key]).unstack(level = -1)
+    key_col = _get_single_var_select(__data.columns, key)
+    val_col = _get_single_var_select(__data.columns, value)
+
+    id_cols = [col for col in __data.columns if col not in (key_col, val_col)]
+    wide = __data.set_index(id_cols + [key_col]).unstack(level = -1)
     
     if fill is not None:
         wide.fillna(fill, inplace = True)
