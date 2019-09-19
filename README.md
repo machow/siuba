@@ -1,7 +1,7 @@
 siuba
 =====
 
-*scrappy data analysis with seamless support for pandas and SQL*
+*scrappy data analysis, with seamless support for pandas and SQL*
 
 [![Build Status](https://travis-ci.org/machow/siuba.svg?branch=master)](https://travis-ci.org/machow/siuba)
 [![Documentation Status](https://readthedocs.org/projects/siuba/badge/?version=latest)](https://siuba.readthedocs.io/en/latest/?badge=latest)
