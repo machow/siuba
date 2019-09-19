@@ -11,14 +11,14 @@ siuba
 
 siuba is a port of [dplyr](https://github.com/tidyverse/dplyr) and other R libraries, which support a tabular data analysis workflow centered on 5 common actions:
 
-* `select()` - keep certain columns of the data.
-* `filter()` - keep certain rows of the data.
+* `select()` - keep certain columns of data.
+* `filter()` - keep certain rows of data.
 * `mutate()` - create or modify an existing column of data.
 * `summarize()` - reduce one or more columns down to a single number.
-* `arrange()` - reorder the rows of the data.
+* `arrange()` - reorder the rows of data.
 
 These actions can be preceeded by a `group_by()`, which causes them to be applied individually to grouped rows of data. Moreover, many SQL concepts, such as `distinct()`, `count()`, and joins are implemented.
-The actual calculations can be executed in pandas or SQL (currently, postgres, redshift, or sqlite).
+Inputs to these functions can be a pandas `DataFrame` or SQL connection (currently postgres, redshift, or sqlite).
 
 For examples of siuba in action, see the [siuba documentation](https://siuba.readthedocs.io/en/latest/intro.html).
 
