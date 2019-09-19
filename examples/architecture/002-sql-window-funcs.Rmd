@@ -1,0 +1,155 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.1'
+      jupytext_version: 1.1.1
+  kernelspec:
+    display_name: Python 3
+    language: python
+    name: python3
+---
+
+# Implementing SQL window functions
+
+## Problem
+
+The main challenge with SQL window function translations is that the translation
+function has two jobs.
+
+* **call handling**: take a call and its arguments (e.g. the column a SQL func is being used on),
+  and convert is to the appropriate sqlalchemy element.
+* **group context**: incorporate existing grouping and ordering information.
+
+For example, consider the following commands...
+
+* `_.x.sum()`
+* `_.x.cumsum()`
+
+In postgres, both should generate an expression like...
+
+```
+SUM(x) OVER (partition by ... [order by ... range ...])
+```
+
+where the order by and range clauses will indicate when we are doing a cumulative sum.
+
+## Other systems
+
+In dbplyr, functions set a global variable during translation, which is then accessed
+by inner functions.
+
+## A potential solution and its shortcomings
+
+While it might be tempting to implement a translation function like...
+
+```{python}
+from sqlalchemy import sql
+def cumsum(col, group_by, order_by):
+    return sql.func.sum().over(group_by = group_by, order_by = order_by)
+```
+
+this creates two challenges
+
+* it requires passing order and group by information into the translator
+* it restricts the arguments you can pass to the translated function
+
+
+### Passing grouping info
+
+```{python}
+_.x.cumsum() + 1
+```
+
+<!-- #region -->
+In that case the call to cumsum will be nested inside a binary operation.
+
+One solution to this issue is to use a tree visit, to visit and execute each
+operation in the expression above.
+
+
+### Taking up call arguments
+
+Moreover, in the approach above, we need to reserve
+the parameters `group_by` and `order_by`.
+This is an issue if these arguments could in theory have been passed to `cumsum`.
+
+For example, below is a practical use case, where we might want our translator
+to handle (e.g. add to its parameters) the `skipna` arg.
+<!-- #endregion -->
+
+```{python}
+_.x.cumsum(skipna = True)
+```
+
+In which case, you might want translator to use to the argument.
+This comes up in dbplyr, where a warning is given if you use a function like
+`mean(na.rm = FALSE)`, since the argument causes R's mean to behave differently
+from sql.
+
+## Solution
+
+Since... 
+
+* we already need a tree visitor to handle expressions like `_.x.cumsum() + 1`,
+  so can do further processing on their outputs.
+* sqlalchemy elements like `sql.func.sum().over()` are pretty well structured.
+
+it seems simplest to...
+
+* create very light subclasses of sqlalchemy's Over clause for operations that will handle
+  `group_by` and `order_by` info differently.  Give them a single method like `set_over`.
+* have the tree visitor, which is doing evaluation, use this method to enhance them
+  with grouping info.
+
+This has the benefit of enabling full **call handling**, with any arguments, while
+also incorporating group context.
+
+## Demonstration
+
+```{python}
+from sqlalchemy import sql
+from siuba.sql.verbs import track_call_windows, CallTreeLocal
+from siuba.siu import _, strip_symbolic
+
+# Define custom Over Clause, recognized by siuba ----
+from siuba.sql.translate import CustomOverClause
+
+class AggOver(sql.elements.Over, CustomOverClause):
+    def set_over(self, group_by, order_by = None):
+        self.partition_by = group_by
+        return self
+
+
+# Shape call, so it will return sql expression ----
+f_mean = lambda col: AggOver(sql.func.mean(col))
+
+local_funcs = {'mean': f_mean}
+
+call_shaper = CallTreeLocal(
+    local_funcs,
+    rm_attr = ('str', 'dt'),
+    call_sub_attr = ('dt',)
+    )
+
+symbol3 = _.id.mean() + 1
+call3 = strip_symbolic(symbol3)
+func_call3 = call_shaper.enter(call3)
+
+# Put grouping info on sql expression ----
+
+sel = sql.select([sql.column('id'), sql.column('x'), sql.column('y')])
+
+col, windows = track_call_windows(
+    func_call3,
+    sel.columns,
+    group_by = ['x', 'y'],
+    order_by = []
+    )
+
+print(col)
+print(windows)
+
+```
