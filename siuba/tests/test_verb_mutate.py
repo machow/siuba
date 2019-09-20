@@ -43,25 +43,36 @@ def test_select_mutate_filter(dfs):
             data_frame(x = 1, y = 2)
             )
 
-@pytest.mark.skip("TODO: check most recent vars for efficient mutate (#41)")
-def test_mutate_smart_nesting(dfs):
+@backend_sql
+def test_mutate_smart_nesting(backend, dfs):
     # y and z both use x, so should create only 1 extra query
     lazy_tbl = dfs >> mutate(x = _.a + 1, y = _.x + 1, z = _.x + 1)
 
-    query = lazy_tbl.last_op.fromclause
+    # should have form
+    # SELECT ..., x + 1 as y, x + 1 as z FROM (
+    # SELECT ..., a + 1 as x FROM
+    # <TABLENAME>) some_alias
+    inner_alias = lazy_tbl.last_op.froms[0]
+    inner_select = inner_alias.element
+    orig_table = inner_select.froms[0]
 
-    assert query is lazy_tbl.ops[0]
-    assert isinstance(query.fromclause, sqlalchemy.Table )
+    assert orig_table is lazy_tbl.tbl
 
 
-@pytest.mark.skip("TODO: does pandas backend preserve order? (#42)")
 def test_mutate_reassign_column_ordering(dfs):
     assert_equal_query(
             dfs,
-            mutate(c = 3, a = 1, b = 2),
-            data_frame(a = 1, b = 2, c = 3)
+            mutate(c = 3, a = 1),
+            data_frame(a = [1,1,1], b = [9,8,7], c = [3,3,3])
             )
 
+@pytest.mark.skip("TODO: in SQL this returns a table with 1 row")
+def test_mutate_reassign_all_cols_keeps_rowsize(dfs):
+    assert_equal_query(
+            dfs,
+            mutate(a = 1, b = 2),
+            data_frame(a = [1,1,1], b = [2,2,2])
+            )
 
 @backend_sql
 @backend_notimpl("sqlite")
