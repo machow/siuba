@@ -1,5 +1,9 @@
+"""
+This file is for pandas specific verb operations.
+"""
+
 import pytest
-from siuba.dply.verbs import mutate
+from siuba.dply.verbs import mutate, arrange, filter
 from siuba.siu import _
 
 import pandas as pd
@@ -14,6 +18,25 @@ def df1():
         "stars": [17800, 2800, 3500, 1450],
         "x": [1,2,3,None]
         })
+
+
+# verify indexes are reset ----
+
+@pytest.mark.parametrize('f, expr', [
+    (filter, lambda d: d.x < 2),
+    (arrange, lambda d: -d.x)
+    ])
+def test_verb_accepts_non_range_indexing(df1, f, expr):
+    tmp_df = df1.copy()
+    tmp_df.index = [4,3,2,1]
+
+    res1 = f(tmp_df, expr)
+    res2 = f(df1, expr)
+
+    assert_frame_equal(res1, res2)
+
+
+# mutate ------
 
 def test_dply_mutate(df1):
     op_stars_1k = lambda d: d.stars * 1000
