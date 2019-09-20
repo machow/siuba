@@ -106,15 +106,20 @@ def lift_inner_cols(tbl):
 
     return sql.base.ImmutableColumnCollection(data, cols)
 
-def col_expr_requires_cte(call, sel):
+def col_expr_requires_cte(call, sel, is_mutate = False):
     """Return whether a variable assignment needs a CTE"""
 
     call_vars = set(call.op_vars(attr_calls = False))
 
     columns = lift_inner_cols(sel)
     sel_labs = set(k for k,v in columns.items() if isinstance(v, sql.elements.Label))
+
+    # I use the acronym fwg sol (frog soul) to remember sql clause eval order
+    # from, where, group by, select, order by, limit
+    # group clause evaluated before select clause, so not issue for mutate
+    group_needs_cte = not is_mutate and len(sel._group_by_clause)
     
-    return (   len(sel._group_by_clause)
+    return (   group_needs_cte
             or len(sel._order_by_clause)
             or not sel_labs.isdisjoint(call_vars)
             )
@@ -452,14 +457,15 @@ def _mutate(__data, **kwargs):
 
     # track labeled columns in set
     sel = __data.last_op
-    labs = set(k for k,v in sel.columns.items() if isinstance(v, sql.elements.Label))
 
     # evaluate each call
     for colname, func in kwargs.items():
+        # keep set of columns labeled (aliased) in this select statement
+        # need to use inner cols, since sel.columns uses ColumnClause, not Label
+        labs = set(k for k,v in lift_inner_cols(sel).items() if isinstance(v, sql.elements.Label))
         new_call = __data.shape_call(func, verb_name = "Mutate", arg_name = colname)
 
         sel = _mutate_select(sel, colname, new_call, labs, __data)
-        labs.add(colname)
 
     return __data.append_op(sel)
 
@@ -471,13 +477,11 @@ def _mutate_select(sel, colname, func, labs, __data):
     function handles whether to add a column to the existing select statement,
     or to use it as a subquery.
     """
-    replace_col = False
+    replace_col = colname in sel.columns
     # Call objects let us check whether column expr used a derived column
     # e.g. SELECT a as b, b + 1 as c raises an error in SQL, so need subquery
-    call_vars = func.op_vars(attr_calls = False)
-    if labs.isdisjoint(call_vars):
+    if not col_expr_requires_cte(func, sel, is_mutate = True):
         # New column may be able to modify existing select
-        replace_col = colname in sel.columns
         columns = lift_inner_cols(sel)
 
     else:

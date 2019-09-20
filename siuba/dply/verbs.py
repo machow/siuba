@@ -251,7 +251,13 @@ def mutate(__data, **kwargs):
         
     """
     
-    return __data.assign(**kwargs)
+    orig_cols = __data.columns
+    result = __data.assign(**kwargs)
+
+    new_cols = result.columns[~result.columns.isin(orig_cols)]
+
+    return result.loc[:, [*orig_cols, *new_cols]]
+
 
 
 @mutate.register(DataFrameGroupBy)
