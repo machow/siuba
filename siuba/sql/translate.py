@@ -137,7 +137,9 @@ base_scalar = dict(
         # I was lazy here and wrote lambdas directly ---
         # TODO: I think these are postgres specific?
         hour = lambda col: sql.func.date_trunc('hour', col),
+        day = lambda col: sql.func.date_trunc('day', col),
         week = lambda col: sql.func.date_trunc('week', col),
+        month = lambda col: sql.func.date_trunc('month', col),
         isna = sql_colmeth("is_", None),
         isnull = sql_colmeth("is_", None),
         # dply.vector funcs ----
