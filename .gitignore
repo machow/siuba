@@ -1,5 +1,9 @@
 # Vim Swapfiles
 .*.swp
+.*.swo
+
+# Temporary folder for experimenting with things
+tmp
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
