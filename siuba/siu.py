@@ -5,15 +5,19 @@ import itertools
 BINARY_LEVELS = {
         "__add__": 2,
         "__sub__": 2,
+
         "__mul__": 1,
         "__matmul__": 1,
         "__truediv__": 1,
         "__floordiv__": 1,
         "__mod__": 1,
         "__divmod__": 1,
+
         "__pow__": 0,
+
         "__lshift__": 3,
         "__rshift__": 3,
+
         "__and__": 4,
         "__xor__": 4,
         "__or__": 4,
@@ -23,6 +27,7 @@ BINARY_LEVELS = {
         "__ne__": 5,
         "__ge__": 5,
         "__le__": "5",
+
         "__getattr__": 0
         }
 
@@ -62,16 +67,13 @@ MISC_OPS = {
         "__getitem__": "["
         }
 
-RIGHT_ASSOC_OPS = {
-        "__pow__": "**",
-        "__lpow__": "**"
-        }
-
 ALL_OPS = {**BINARY_OPS, **UNARY_OPS, **MISC_OPS}
 
-for k, v in {**BINARY_OPS}.items():
+for k, v in BINARY_OPS.copy().items():
     BINARY_OPS[k.replace("__", "__r", 1)] = v
 
+for k, v in BINARY_LEVELS.copy().items():
+    BINARY_LEVELS[k.replace("__", "__r", 1)] = v
 
 class Formatter:
     def __init__(self): pass
@@ -149,17 +151,22 @@ class Call:
 
     def __repr__(self):
         # TODO: format binary, unary, call, associative
-        op_repr = BINARY_OPS.get(self.func, None)
-        if op_repr:
+        if self.func in BINARY_OPS:
+            op_repr = BINARY_OPS[self.func]
             fmt = "({args[0]} {func} {args[1]})"
+        elif self.func in UNARY_OPS:
+            op_repr = UNARY_OPS[self.func]
+            fmt = "({func}{args[0]})"
         elif self.func == "getattr":
             op_repr = "."
             fmt = "({args[0]}{func}{args[1]})"
         else:
             op_repr, rest = self.args[0], self.args[1:]
-            arg_str = ", ".join(map(str, rest))
-            kwarg_str = ", ".join(str(k) + " = " + str(v) for k,v in self.kwargs.items())
-            fmt = "{}({}, {})".format(op_repr, arg_str, kwarg_str)
+            arg_str = map(repr, rest)
+            kwarg_str = (str(k) + " = " + repr(v) for k,v in self.kwargs.items())
+
+            combined_arg_str = ",".join(itertools.chain(arg_str, kwarg_str))
+            fmt = "{}({})".format(op_repr, combined_arg_str)
             return fmt
 
         return fmt.format(
@@ -185,11 +192,19 @@ class Call:
 
         return arg
 
+    def copy(self):
+        args, kwargs = self.map_subcalls(self.copy)
+        return self.__class__(self.func, *args, **kwargs)
+
     def map_subcalls(self, f):
         new_args = tuple(f(arg) if isinstance(arg, Call) else arg for arg in self.args)
         new_kwargs = {k: f(v) if isinstance(v, Call) else v for k,v in self.kwargs.items()}
 
         return new_args, new_kwargs
+
+    def iter_subcalls(self, f):
+        yield from iter(arg for arg in self.args if instance(arg, Call))
+        yield from iter(v for k,v in self.kwargs.items() if isinstance(v, Call))
 
     def op_vars(self, attr_calls = True):
         """Return set of all variable names used in Call
@@ -255,10 +270,7 @@ class Lazy(Call):
 
 class UnaryOp(Call):
     def __repr__(self):
-        if self.func in RIGHT_ASSOC_OPS:
-            fmt = "{func}{args[0]}"
-        else:
-            fmt = "{args[0]}{func}"
+        fmt = "{func}{args[0]}"
 
         func = UNARY_OPS[self.func]
         return fmt.format(func = func, args = self.args, kwargs = self.kwargs)
@@ -354,6 +366,12 @@ class CallVisitor:
         
         node.map_subcalls(self.visit)
 
+    @classmethod
+    def quick_visitor(cls, visit_dict, node):
+        """Class method to quickly define and run a custom visitor."""
+
+        qv = type('QuickVisitor', cls, visit_dict)
+        qv.visit(node)
 
 class CallListener:
     """Generic listener. Each exit is called on a node's copy."""
@@ -376,12 +394,49 @@ class CallListener:
     def generic_exit(self, node):
         return node
 
+    def enter_if_call(self, x):
+        if isinstance(x, Call):
+            return self.enter(x)
+
+        return x
+
+def get_attr_chain(node, max_n):
+    # TODO: need to make custom calls their own Call class, then will not have to
+    #       do these kinds of checks, since a __call__ will always be on a Call obj
+    if not isinstance(node, Call):
+        return [], node
+
+    out = []
+    ttl_n = 0
+    crnt_node = node
+    while ttl_n < max_n:
+        if crnt_node.func != "__getattr__": break
+
+        obj, attr = crnt_node.args
+        out.append(attr)
+
+        ttl_n += 1
+        crnt_node = obj
+
+    return list(reversed(out)), crnt_node
+
+
+from inspect import isclass
 
 class CallTreeLocal(CallListener):
-    def __init__(self, local, rm_attr = None, call_sub_attr = None):
+    def __init__(
+            self,
+            local,
+            rm_attr = None,
+            call_sub_attr = None,
+            chain_sub_attr = False,
+            replace_calls = True
+            ):
         self.local = local
         self.rm_attr = set(rm_attr or [])
         self.call_sub_attr = set(call_sub_attr or [])
+        self.chain_sub_attr = chain_sub_attr
+        self.replace_calls = replace_calls
 
     def create_local_call(self, name, prev_obj, cls, func_args = None, func_kwargs = None):
         # need call attr name (arg[0].args[1]) 
@@ -394,6 +449,8 @@ class CallTreeLocal(CallListener):
         except KeyError as err:
             raise FunctionLookupError("Missing translation for function call: %s"% name)
 
+        if isclass(local_func) and issubclass(local_func, Exception):
+            raise local_func
 
         return cls(
                 "__call__",
@@ -403,56 +460,71 @@ class CallTreeLocal(CallListener):
                 **func_kwargs
                 )
 
+    def enter(self, node):
+        # if no enter metthod for operators, like __invert__, try to get from local
+        method = 'enter_' + node.func
+        if not hasattr(self, method) and node.func in self.local:
+            args, kwargs = node.map_subcalls(self.enter)
+            return self.create_local_call(node.func, args[0], Call, args[1:], kwargs)
+
+        return super().enter(node)
+
     def enter___getattr__(self, node):
         obj, attr = node.args
         if obj.func == "__getattr__" and obj.args[1] in self.call_sub_attr:
-            args, kwargs = node.map_subcalls(self.enter)
-            visited_obj = args[0]
+            prev_obj, prev_attr = obj.args
 
             # TODO: should always call exit?
-            return self.create_local_call(attr, visited_obj, node.__class__)
+            if self.chain_sub_attr:
+                # use chained attribute to look up local function instead
+                # e.g. dt.round, rather than round
+                attr = prev_attr + '.' + attr
+            return self.create_local_call(attr, prev_obj, Call)
 
         return self.generic_enter(node)
 
-    def exit___getattr__(self, node):
-        # remove, e.g. the str attribute, so we can dispatch pandas str method calls
-        if node.args[1] in self.rm_attr:
-            obj = node.args[0]
-            return obj
+    def enter___call__(self, node):
+        """
+        Overview:
+             variables      _.x.method(1)         row_number(_.x, 1)
+             ---------      -------------        --------------------
+            
+                            █─'__call__'         █─'__call__'                           
+             obj            ├─█─.                ├─<function row_number
+                            │ ├─█─.              ├─█─.                                  
+                            │ │ ├─_              │ ├─_                                  
+                            │ │ └─'x'            │ └─'x'                                
+                            │ └─'method'         │                                   
+                            └─1                  └─1
+        """
+        obj, *rest = node.args
+        args = tuple(self.enter_if_call(child) for child in rest)
+        kwargs = {k: self.enter_if_call(child) for k, child in node.kwargs.items()}
 
-        obj, crnt_attr = node.args
-        # e.g. _.somecol.str.endswith
-        if obj.func == "__getattr__" and obj.args[1] in self.rm_attr:
-            prev_obj = obj.args[0]
-            return node.__class__(node.func, prev_obj, crnt_attr)
+        attr_chain, target = get_attr_chain(obj, max_n = 2)
+        if attr_chain:
+            # want _.x.method() -> method(_.x), need to transform
+            if attr_chain[0] in self.call_sub_attr and self.chain_sub_attr:
+                # e.g. _.dt.round()
+                call_name = ".".join(attr_chain)
+                entered_target = self.enter_if_call(target)
+            else:
+                call_name = attr_chain[-1]
+                entered_target = self.enter_if_call(obj.args[0])
 
-        return self.generic_exit(node)
+        elif node.obj_name() is not None and self.replace_calls:
+            # want function(_.x) -> new_function(_.x), has form
+            call_name = node.obj_name()
+            # the first argument is basically "self"
+            entered_target, *args = args
+        else:
+            # default to generic enter
+            return self.generic_enter(node)
 
-    def exit___call__(self, node):
-        # make sure to transform subcalls, no matter what happens
-        obj = node.args[0]
-        call_name = node.obj_name()
-        if isinstance(obj, Call) and obj.func == "__getattr__":
-            # since obj is getting the call we're interested in, we pull the call
-            # from local and replace obj with whatever was earlier on the chain
-            # e.g. _.a.b() has the form <prev_obj>.<obj>(), want <obj>(prev_obj>)
-            prev_obj, attr = obj.args
-            return self.create_local_call(
-                    attr, prev_obj, node.__class__,
-                    node.args[1:], node.kwargs
-                    )
-        elif call_name is not None:
-            # node is calling, e.g., a literal function
-            # use the function's name to replace with local call
-            return self.create_local_call(
-                    call_name, node.args[1], node.__class__,
-                    node.args[2:], node.kwargs
-                    )
-        
-        # otherwise, fall back to copying node
-        return node.__class__(node.func, *node.args, **node.kwargs)
-
-
+        return self.create_local_call(
+                call_name, entered_target, node.__class__,
+                args, kwargs
+                )
 
 
 # Also need NodeTransformer
