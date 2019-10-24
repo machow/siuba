@@ -11,7 +11,7 @@ test:
 	pytest --dbs="sqlite,postgresql" siuba/
 
 test-travis:
-	py.test --nbval $(filter-out %postgres.ipynb, $(NOTEBOOK_TESTS))
+	#py.test --nbval $(filter-out %postgres.ipynb, $(NOTEBOOK_TESTS))
 	pytest --dbs="sqlite,postgresql" siuba/
 
 examples/%.ipynb:
