@@ -1,5 +1,5 @@
 import pytest
-from .helpers import assert_equal_query, Backend, SqlBackend, data_frame
+from .helpers import assert_equal_query, PandasBackend, SqlBackend, data_frame
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -9,7 +9,7 @@ def pytest_addoption(parser):
 params_backend = [
     pytest.param(lambda: SqlBackend("postgresql"), id = "postgresql", marks=pytest.mark.postgresql),
     pytest.param(lambda: SqlBackend("sqlite"), id = "sqlite", marks=pytest.mark.sqlite),
-    pytest.param(lambda: Backend("pandas"), id = "pandas", marks=pytest.mark.pandas)
+    pytest.param(lambda: PandasBackend("pandas"), id = "pandas", marks=pytest.mark.pandas)
     ]
 
 @pytest.fixture(params = params_backend, scope = "session")
