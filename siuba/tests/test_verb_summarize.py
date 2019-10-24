@@ -98,3 +98,11 @@ def test_summarize_unnamed_args(df):
             pd.DataFrame({'n(_)': 4})
             )
 
+
+@pytest.mark.skip("TODO: Summarize should fail when result len > 1 (#138)")
+def test_frame_mode_returns_many():
+    with pytest.raises(ValueError):
+        df = data_frame(x = [1, 2, 3])
+        res = summarize(df, result = _.x.mode())
+
+
