@@ -28,7 +28,7 @@ students = pd.DataFrame({
 g_students = students.groupby('student_id')
 ```
 
-# Problem: combining grouped operations is slow
+## Problem: combining grouped operations is slow
 
 If you just need to make a single calculation, then pandas methods are very fast. For example, take the code below, which calculates the minimum score for each student.
 
