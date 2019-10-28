@@ -1,8 +1,5 @@
 from .groupby import DataFrameGroupBy, GroupByAgg, SeriesGroupBy, broadcast_group_elements, _regroup
-from siuba.siu import CallTreeLocal, strip_symbolic, Call
-from siuba.dply.verbs import singledispatch2
 import pandas as pd
-import operator as op
 
 
 def is_literal(el):

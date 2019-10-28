@@ -427,13 +427,20 @@ class CallTreeLocal(CallListener):
     def __init__(
             self,
             local,
-            rm_attr = None,
             call_sub_attr = None,
             chain_sub_attr = False,
             replace_calls = True
             ):
+        """
+        Arguments:
+            local: a dictionary mapping func_name: func, used to replace call expressions.
+            call_sub_attr: a set of attributes signaling any subattributes are property
+                           methods. Eg. {'dt'} to signify in _.dt.year, year is a property call.
+            chain_sub_attr: whether to included the attributes in the above argument, when looking up
+                           up a replacement for the property call. E.g. does local have a 'dt.year' entry.
+            replace_calls: whether all calls, including custom call objects should be replaced.
+        """
         self.local = local
-        self.rm_attr = set(rm_attr or [])
         self.call_sub_attr = set(call_sub_attr or [])
         self.chain_sub_attr = chain_sub_attr
         self.replace_calls = replace_calls

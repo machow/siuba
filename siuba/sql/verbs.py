@@ -225,7 +225,6 @@ class LazyTbl:
         funcs = {**f_dict1, **f_dict2}
         call_shaper = CallTreeLocal(
                 funcs,
-                rm_attr = self.rm_attr,
                 call_sub_attr = self.call_sub_attr
                 )
 
