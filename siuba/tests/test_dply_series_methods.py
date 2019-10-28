@@ -1,6 +1,6 @@
 from siuba.siu import Symbolic, strip_symbolic
 from siuba.spec.series import spec
-from .helpers import data_frame, assert_equal_query, backend_pandas
+from .helpers import data_frame, assert_equal_query, backend_pandas, SqlBackend
 import pytest
 # TODO: dot, corr, cov
 
@@ -111,6 +111,9 @@ def test_frame_expr(entry):
 @backend_pandas
 #@pytest.mark.skip_backend('sqlite')
 def test_frame_mutate(backend, entry):
+    if isinstance(backend, SqlBackend) and entry['result'].get('op') == 'bool':
+        pytest.xfail()
+
     crnt_data = data[entry['accessor']]
     df = backend.load_df(crnt_data)
 

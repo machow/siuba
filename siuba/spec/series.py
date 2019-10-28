@@ -4,8 +4,11 @@ from siuba.siu import Symbolic, strip_symbolic
 _ = Symbolic()
 
 class Result:
+    def __init__(self, **kwargs):
+        self.options = kwargs
+
     def to_dict(self):
-        return {'type': self.__class__.__name__}
+        return {'type': self.__class__.__name__, **self.options}
 
 class Elwise(Result): pass
 class Agg(Result): pass 
@@ -29,39 +32,39 @@ funcs = {
     # Attributes 
     ## ------------------------------------------------------------------------
     '_special_methods': {
-        '__invert__': _.__invert__()         >> Elwise(),
-        '__and__': _.__and__(_)              >> Elwise(),
-        '__or__': _.__or__(_)                >> Elwise(),
-        '__xor__': _.__xor__(_)              >> Elwise(),
+        '__invert__': _.__invert__()         >> Elwise(op = 'bool'),
+        '__and__': _.__and__(_)              >> Elwise(op = 'bool'),
+        '__or__': _.__or__(_)                >> Elwise(op = 'bool'),
+        '__xor__': _.__xor__(_)              >> Elwise(op = 'bool'),
         '__neg__': _.__neg__()               >> Elwise(),
         '__pos__': _.__pos__()               >> Elwise(),
-        '__rand__': _.__rand__(_)            >> Elwise(),
-        '__ror__': _.__ror__(_)              >> Elwise(),
-        '__rxor__': _.__rxor__(_)            >> Elwise(),
+        '__rand__': _.__rand__(_)            >> Elwise(op = 'bool'),
+        '__ror__': _.__ror__(_)              >> Elwise(op = 'bool'),
+        '__rxor__': _.__rxor__(_)            >> Elwise(op = 'bool'),
         # copied from binary section below
-        '__add__': _.add(_)               >> Elwise(),
-        '__sub__': _.sub(_)               >> Elwise(),
-        '__truediv__': _.truediv(_)       >> Elwise(),
-        '__floordiv__': _.floordiv(_)     >> Elwise(),
-        '__mul__': _.mul(_)               >> Elwise(),
-        '__mod__': _.mod(_)               >> Elwise(),
-        '__pow__': _.pow(_)               >> Elwise(),
-        '__lt__': _.lt(_)                 >> Elwise(),
-        '__gt__': _.gt(_)                 >> Elwise(),
-        '__le__': _.le(_)                 >> Elwise(),
-        '__ge__': _.ge(_)                 >> Elwise(), 
-        '__ne__': _.ne(_)                 >> Elwise(), 
-        '__eq__': _.eq(_)                 >> Elwise(), 
-        '__div__': _.div(_)               >> Elwise(), 
-        '__round__': _.round(2)           >> Elwise(), 
-        '__radd__': _.radd(_)             >> Elwise(), 
-        '__rsub__': _.rsub(_)             >> Elwise(), 
-        '__rmul__': _.rmul(_)             >> Elwise(), 
-        '__rdiv__': _.rdiv(_)             >> Elwise(), 
-        '__rtruediv__': _.rtruediv(_)     >> Elwise(),
-        '__rfloordiv__': _.rfloordiv(_)   >> Elwise(),
-        '__rmod__': _.rmod(_)             >> Elwise(),
-        '__rpow__': _.rpow(_)             >> Elwise(),
+        '__add__': _.__add__(_)               >> Elwise(),
+        '__sub__': _.__sub__(_)               >> Elwise(),
+        '__truediv__': _.__truediv__(_)       >> Elwise(),
+        '__floordiv__': _.__floordiv__(_)     >> Elwise(),
+        '__mul__': _.__mul__(_)               >> Elwise(),
+        '__mod__': _.__mod__(_)               >> Elwise(),
+        '__pow__': _.__pow__(_)               >> Elwise(),
+        '__lt__': _.__lt__(_)                 >> Elwise(),
+        '__gt__': _.__gt__(_)                 >> Elwise(),
+        '__le__': _.__le__(_)                 >> Elwise(),
+        '__ge__': _.__ge__(_)                 >> Elwise(), 
+        '__ne__': _.__ne__(_)                 >> Elwise(), 
+        '__eq__': _.__eq__(_)                 >> Elwise(), 
+        '__div__': _.__div__(_)               >> Elwise(), 
+        '__round__': _.__round__(2)           >> Elwise(), 
+        '__radd__': _.__radd__(_)             >> Elwise(), 
+        '__rsub__': _.__rsub__(_)             >> Elwise(), 
+        '__rmul__': _.__rmul__(_)             >> Elwise(), 
+        '__rdiv__': _.__rdiv__(_)             >> Elwise(), 
+        '__rtruediv__': _.__rtruediv__(_)     >> Elwise(),
+        '__rfloordiv__': _.__rfloordiv__(_)   >> Elwise(),
+        '__rmod__': _.__rmod__(_)             >> Elwise(),
+        '__rpow__': _.__rpow__(_)             >> Elwise(),
         },
     'attributes': {
         # method
