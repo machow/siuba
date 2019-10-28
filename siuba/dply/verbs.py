@@ -262,9 +262,17 @@ def mutate(__data, **kwargs):
 
 @mutate.register(DataFrameGroupBy)
 def _mutate(__data, **kwargs):
+    groupings = __data.grouper.groupings
+    orig_index = __data.obj.index
+
     df = __data.apply(lambda d: d.assign(**kwargs))
     
-    return _regroup(df)
+    # will drop all but original index
+    group_by_lvls = list(range(df.index.nlevels - 1))
+    g_df = df.reset_index(group_by_lvls, drop = True).loc[orig_index].groupby(groupings)
+
+    return g_df
+
 
 
 
@@ -338,12 +346,16 @@ def filter(__data, *args):
 
 @filter.register(DataFrameGroupBy)
 def _filter(__data, *args):
+    groupings = __data.grouper.groupings
     df_filter = filter.registry[pd.DataFrame]
 
-    filtered = __data.apply(df_filter, *args)
+    df = __data.apply(df_filter, *args)
 
-    return _regroup(filtered)
+    # will drop all but original index, then sort by it
+    group_by_lvls = list(range(df.index.nlevels - 1))
+    ordered = df.reset_index(group_by_lvls, drop = True).sort_index().reset_index(drop = True)
 
+    return ordered.groupby([ping.name for ping in groupings])
 
 
 # Summarize ===================================================================

@@ -148,7 +148,8 @@ def test_pandas_grouped_frame_fast_mutate(entry):
     dst = mutate(gdf, result = call_expr)
 
     # fix mutate's current bad behavior of reordering rows ---
-    dst_obj_fixed = dst.obj.reset_index('g', drop = True).loc[pd.RangeIndex(len(gdf.obj))]
+    # (fixed in issue #139)
+    dst_obj_fixed = dst.obj
 
     # TODO: apply mark to skip failing tests, rather than downcast
     # pandas grouped aggs, when not using cython, _try_cast back to original type

@@ -103,7 +103,13 @@ def assert_frame_sort_equal(a, b):
 
 def assert_equal_query(tbl, lazy_query, target):
     out = collect(lazy_query(tbl))
-    assert_frame_sort_equal(out, target)
+
+    if isinstance(tbl, pd.DataFrame):
+        df_a = ungroup(out).reset_index(drop = True)
+        df_b = ungroup(target).reset_index(drop = True)
+        assert_frame_equal(df_a, df_b)
+    else:
+        assert_frame_sort_equal(out, target)
 
 
 PREFIX_TO_TYPE = {

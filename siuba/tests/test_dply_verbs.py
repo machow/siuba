@@ -3,7 +3,7 @@ This file is for pandas specific verb operations.
 """
 
 import pytest
-from siuba.dply.verbs import mutate, arrange, filter
+from siuba.dply.verbs import mutate, arrange, filter, ungroup
 from siuba.siu import _
 
 import pandas as pd
@@ -44,6 +44,18 @@ def test_dply_mutate(df1):
     out2 = df1.assign(stars_1k = op_stars_1k)
 
     assert_frame_equal(out1, out2)
+
+def test_dply_grouped_mutate_of_agg_order():
+    # see issue #139
+    df = pd.DataFrame({
+        'g': ['b', 'a', 'b'],
+        'x':[0, 1, 2]
+        })
+    gdf = df.groupby('g')
+    
+    out = mutate(gdf, g_min = lambda d: d.x.min())
+
+    assert_frame_equal(ungroup(out), df.assign(g_min = [0, 1, 0]))
 
 def test_dply_mutate_sym(df1):
     op_stars_1k = _.stars * 1000
