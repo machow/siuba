@@ -104,3 +104,31 @@ def _fast_filter_default(__data, *args, **kwargs):
     # by default dispatch to regular mutate
     f = filter.registry[type(__data)]
     return f(__data, *args, **kwargs)
+
+
+# Fast summarize ----
+
+@singledispatch2(DataFrameGroupBy)
+def fast_summarize(__data, **kwargs):
+    """Warning: this function is experimental"""
+    groupings = __data.grouper.groupings
+
+    # TODO: better way of getting this frame?
+    out = __data.grouper.result_index.to_frame()
+    
+    for name, expr in kwargs.items():
+        res = grouped_eval(__data, expr)
+        out[name] = res
+
+    out.reset_index(drop = True)
+    return out
+
+
+@fast_summarize.register(object)
+def _fast_summarize_default(__data, **kwargs):
+    # TODO: had to register object second, since singledispatch2 sets object dispatch
+    #       to be a pipe (e.g. unknown types become a pipe by default)
+    # by default dispatch to regular mutate
+    f = mutate.registry[type(__data)]
+    return f(__data, **kwargs)
+
