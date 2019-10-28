@@ -1,0 +1,117 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.1'
+      jupytext_version: 1.2.4
+  kernelspec:
+    display_name: Python 3
+    language: python
+    name: python3
+---
+
+# Optimized grouped pandas operations
+
+```{python}
+import numpy as np
+import pandas as pd
+
+np.random.seed(123)
+students = pd.DataFrame({
+    'student_id': np.repeat(np.arange(2000), 10),
+    'course_id': np.random.randint(1, 20, 20000),
+    'score': np.random.randint(1, 100, 20000)
+})
+
+g_students = students.groupby('student_id')
+```
+
+# Problem: combining grouped operations is slow
+
+If you just need to make a single calculation, then pandas methods are very fast. For example, take the code below, which calculates the minimum score for each student.
+
+```{python}
+# %%timeit
+g_students.score.min()
+```
+
+This took very little time (less than a millisecond, which is 1 thousandth of a second!).
+
+However, now suppose you wanted to do something more complex. Let's say you wanted to get rows corresponding to each students minimum score. In pandas, there are two ways to do this: 
+
+* transform with a lambda
+* by using both the `students` and `g_student` data frames.
+
+These are shown below.
+
+```{python}
+# %%timeit
+is_student_min = g_students.score.transform(lambda x: x == x.min())
+df_min1 = students[is_student_min]
+```
+
+```{python}
+# %%timeit
+is_student_min = students.score == g_students.score.transform('min')
+df_min2 = students[is_student_min]
+```
+
+Note that while the first one could be expressed using only the grouped data (`g_student`), it took over a second to run!
+
+On the other hand, while the other was fairly quick, it required juggling two forms of the data.
+
+Siuba attempts to optimize these operations to be quick AND require less data juggling.
+
+
+## Siuba filtering is succinct AND performant
+
+```{python}
+from siuba.experimental.pd_groups import fast_mutate, fast_filter, fast_summarize
+from siuba import _
+```
+
+```{python}
+# %%timeit
+df_min3 = fast_filter(g_students, _.score == _.score.min())
+```
+
+```{python}
+# %%timeit
+fast_mutate(students, is_low_score = _.score == _.score.min())
+```
+
+```{python}
+# %%timeit
+fast_summarize(g_students, lowest_percent = _.score.min() / 100.)
+```
+
+## How do the optimizations work?
+
+Siuba replaces important parts of the call tree--like `==` and `score()`--with functions that take a grouped series and return a grouped series. Because it then becomes grouped series all the way down, these operations are nicely composable.
+
+```{python}
+_.score == _.score.min()
+```
+
+
+After the expressions are executed, the verb in charge handles the output. For example, `fast_filter` uses the result (usually a boolean Series) to keep only rows where the result is True.
+
+An example is shown below, for how siuba replaces the "mean" function.
+
+```{python}
+from siuba.experimental.pd_groups.translate import method_agg_op
+
+f_mean = method_agg_op('mean', False, None)
+
+# result is a subclass of SeriesGroupBy
+res_agg = f_mean(g_students.score)
+
+print(res_agg)
+print(res_agg.obj.head())
+```
+
+## Defining custom grouped operations
+
+TODO: coming soon

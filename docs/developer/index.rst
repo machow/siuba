@@ -6,4 +6,5 @@ Developer docs
 
     call_trees.Rmd
     sql-translators.ipynb
+    pandas-group-ops.Rmd
 
