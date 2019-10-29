@@ -47,6 +47,8 @@ class Backend:
     def __repr__(self):
         return "{0}({1})".format(self.__class__.__name__, repr(self.name))
 
+class PandasBackend(Backend):
+    pass
 
 class SqlBackend(Backend):
     table_name_indx = 0
@@ -72,18 +74,42 @@ class SqlBackend(Backend):
         return copy_to_sql(df, self.unique_table_name(), self.engine)
 
 
+def robust_multiple_sort(df, by):
+    """Sort a DataFrame on multiple columns, slower but more reliable than df.sort_values
+
+    Note: pandas errors when you sort by multiple columns, and one has unhashable objects.
+          however, it can "sort" a single column with unhashable objects.
+
+          e.g. df.sort_values(by = ['a', 'b']) may cause an error
+
+    This implementation chains sort_values on single columns. In this case,
+    pandas sorts a list based on its first entry ¯\_(ツ)_/¯.
+    """
+
+    from functools import reduce
+
+    out = reduce(lambda data, col: data.sort_values(col), by, df)
+
+    return out.reset_index(drop = True)
+
 def assert_frame_sort_equal(a, b):
     """Tests that DataFrames are equal, even if rows are in different order"""
     df_a = ungroup(a)
     df_b = ungroup(b)
-    sorted_a = df_a.sort_values(by = df_a.columns.tolist()).reset_index(drop = True)
-    sorted_b = df_b.sort_values(by = df_b.columns.tolist()).reset_index(drop = True)
+    sorted_a = robust_multiple_sort(df_a, list(df_b.columns)).reset_index(drop = True)
+    sorted_b = robust_multiple_sort(df_b, list(df_b.columns)).reset_index(drop = True)
 
     assert_frame_equal(sorted_a, sorted_b)
 
 def assert_equal_query(tbl, lazy_query, target):
     out = collect(lazy_query(tbl))
-    assert_frame_sort_equal(out, target)
+
+    if isinstance(tbl, pd.DataFrame):
+        df_a = ungroup(out).reset_index(drop = True)
+        df_b = ungroup(target).reset_index(drop = True)
+        assert_frame_equal(df_a, df_b)
+    else:
+        assert_frame_sort_equal(out, target)
 
 
 PREFIX_TO_TYPE = {
@@ -136,6 +162,21 @@ def backend_sql(msg):
         @wraps(f)
         def wrapper(backend, *args, **kwargs):
             if not isinstance(backend, SqlBackend):
+                pytest.skip(msg)
+            else:
+                return f(backend, *args, **kwargs)
+        return wrapper
+    return outer
+
+def backend_pandas(msg):
+    # allow decorating without an extra call
+    if callable(msg):
+        return backend_pandas(None)(msg)
+
+    def outer(f):
+        @wraps(f)
+        def wrapper(backend, *args, **kwargs):
+            if not isinstance(backend, PandasBackend):
                 pytest.skip(msg)
             else:
                 return f(backend, *args, **kwargs)
