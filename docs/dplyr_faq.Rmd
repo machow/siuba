@@ -1,0 +1,88 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.1'
+      jupytext_version: 1.2.4
+  kernelspec:
+    display_name: Python 3
+    language: python
+    name: python3
+---
+
+```{python nbsphinx=hidden}
+import pandas as pd
+pd.set_option("display.max_rows", 5)
+```
+
+# For dplyr users
+
+Below is a list of surprising cases people coming from dplyr might hit.
+
+
+## Why did you choose `>>` and not `%>%`
+
+Unfortunately, `%>%` is not valid python syntax. The [operator precedence](https://docs.python.org/3.7/reference/expressions.html#operator-precedence) for `>>` is not too bad!
+
+
+## How do I use something like n_distinct in siuba?
+
+Many of the "missing" dplyr functions can be found in the `siuba.dply.vector` module.
+Oftentimes, you can find an analogous function in pandas, though. In this case, `ndistinct`.
+
+```{python}
+import pandas as pd
+from siuba.dply.vector import n_distinct
+from siuba import _, summarize
+
+# Two ways on a series
+ser = pd.Series(['a', 'a', 'b'])
+
+n_distinct(ser)
+ser.nunique()
+```
+
+```{python}
+# used in siuba
+df = pd.DataFrame({
+    'somecol': ser
+    })
+
+# Two ways using summarize
+# n_distinct
+summarize(df, n = n_distinct(_.somecol))
+
+# nunique
+summarize(df, n = _.somecol.nunique())
+```
+
+## My column name is also a pandas method
+
+When a column has the same name as a method, you can't get it using attribute access.
+If you try, pandas will give you the function instead.
+
+```{python}
+# %%capture
+
+import pandas as pd
+from siuba import _, summarize
+
+df = pd.DataFrame({'sum': [1,2,3]})   
+df.sum.sum()
+```
+
+To work around this you can use indexing to access the column.
+
+```{python}
+df['sum'].sum()
+```
+
+The same applies to siuba!
+
+```{python}
+summarize(df, ttl = _['sum'].sum())
+```
+
+(In the future, siuba can fix this pandas issue to behave more like R, so that attribute access and calling a method are treated differently)

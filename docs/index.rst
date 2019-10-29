@@ -5,6 +5,7 @@
     intro.Rmd
     intro_sql_basic.ipynb
     intro_sql_interm.ipynb
+    dplyr_faq.Rmd
     developer/index.rst
 
 .. toctree::
