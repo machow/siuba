@@ -5,7 +5,7 @@ jupyter:
       extension: .Rmd
       format_name: rmarkdown
       format_version: '1.1'
-      jupytext_version: 1.1.1
+      jupytext_version: 1.2.4
   kernelspec:
     display_name: Python 3
     language: python
@@ -32,6 +32,12 @@ df1
 
 ```{python}
 df2
+```
+
+**⚠️Note on piping:** Currently, when you use a join in a pipe, you need to pass `_` as the first argument. This is because it requires two DataFrames. For single DataFrame verbs it is optional.
+
+```{python}
+df1 >> inner_join(_, df2, on = "id")
 ```
 
 ### Inner join
