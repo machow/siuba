@@ -1,5 +1,7 @@
 ---
 jupyter:
+  nbsphinx:
+    allow_errors: true
   jupytext:
     text_representation:
       extension: .Rmd
@@ -64,8 +66,6 @@ When a column has the same name as a method, you can't get it using attribute ac
 If you try, pandas will give you the function instead.
 
 ```{python}
-# %%capture
-
 import pandas as pd
 from siuba import _, summarize
 
