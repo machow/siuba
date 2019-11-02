@@ -57,6 +57,12 @@ data_str = data_frame(
     x = ['abc', 'cde', 'fg', 'h']
     )
 
+data_bool = data_frame(
+    g = ['a', 'a', 'b', 'b'],
+    x = [True, False, True, False],
+    y = [True, True, False, False]
+        )
+
 data_default = data_frame(
     g = ['a', 'a', 'a', 'b', 'b', 'b'],
     x = [10, 11, 11, 13, 13, 13],
@@ -66,7 +72,8 @@ data_default = data_frame(
 data = {
     'dt': data_dt,
     'str': data_str,
-    None: data_default
+    None: data_default,
+    'bool': data_bool
 }
 
 # Tests =======================================================================
@@ -108,13 +115,18 @@ def test_frame_expr(entry):
     assert_src_array_equal(res, dst)
 
 
-@backend_pandas
+#@backend_pandas
 #@pytest.mark.skip_backend('sqlite')
 def test_frame_mutate(backend, entry):
-    if isinstance(backend, SqlBackend) and entry['result'].get('op') == 'bool':
-        pytest.xfail()
+    if backend.name in entry['result'].get('xfail', []):
+        pytest.xfail("Spec'd failure")
 
-    crnt_data = data[entry['accessor']]
+    if isinstance(backend, SqlBackend) and entry['result'].get('op') == 'bool':
+        crnt_data = data['bool']
+
+    else:
+        crnt_data = data[entry['accessor']]
+
     df = backend.load_df(crnt_data)
 
     # TODO: once reading from yaml, no need to repr
@@ -124,6 +136,15 @@ def test_frame_mutate(backend, entry):
     dst_series = eval(str_expr, {'_': crnt_data})
     dst = crnt_data.assign(result = dst_series)
     
+    # check if explicitly marked as NotImplemented
+    if backend.name in entry['result'].get('not_impl', []):
+        with pytest.raises(NotImplementedError):
+            mutate(df, result = call_expr) >> collect()
+
+        # we're done
+        return         
+
+    # otherwise, verify returns same result as mutate
     assert_equal_query(df, mutate(result = call_expr), dst)
 
 

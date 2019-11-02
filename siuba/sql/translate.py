@@ -88,14 +88,17 @@ def sql_agg(name):
     sa_func = getattr(sql.func, name)
     return lambda col: sa_func(col)
 
-def sql_scalar(name, *args):
+def sql_scalar(name):
     sa_func = getattr(sql.func, name)
-    return lambda col: sa_func(col, *args)
+    return lambda col, *args: sa_func(col, *args)
 
 def sql_colmeth(meth, *outerargs):
     def f(col, *args):
         return getattr(col, meth)(*outerargs, *args)
     return f
+
+def sql_not_impl():
+    return NotImplementedError
 
 def sql_astype(col, _type):
     mappings = {
@@ -156,7 +159,41 @@ base_scalar = dict(
         dict = dict,
         # TODO: don't use singledispatch to add sql support to case_when
         case_when = case_when,
-        if_else = if_else
+        if_else = if_else,
+
+        # POSTGRES compatility ------------------------------------------------
+        # _special_methods
+        __round__ = sql_scalar("round"),
+
+        #
+        copy = sql_not_impl(),
+
+        # binary
+        add = sql_colmeth('__add__'),
+        sub = sql_colmeth('__sub__'),
+        #truediv
+        #floordiv
+        mul = sql_colmeth('__mul__'),
+        mod = sql_colmeth('__mod__'),
+        #pow = sql_colmeth('__pow__'),
+        lt = sql_colmeth('__lt__'),
+        gt = sql_colmeth('__gt__'),
+        le = sql_colmeth('__le__'),
+        ge = sql_colmeth('__ge__'),
+        ne = sql_colmeth('__ne__'),
+        eq = sql_colmeth('__eq__'),
+        #round = sql_scalar("round"),
+        radd = sql_colmeth('__radd__'),
+        rsub = sql_colmeth('__rsub__'),
+        #rtruediv
+        #rfloordiv
+        rmul = sql_colmeth('__rmul__'),
+        rmod = sql_colmeth('__rmod__'),
+
+        #
+        clip = lambda col, lower, upper: sql.func.least(sql.func.greatest(col, lower), upper),
+
+
         )
 
 base_agg = dict(
@@ -169,7 +206,8 @@ base_agg = dict(
         # need better handeling of vector funcs
         # TODO: delete this, len() is not a method anywhere, or vect func
         len = lambda col: sql.func.count(),
-        n_distinct = lambda col: sql.func.count(sql.func.distinct(col))
+        n_distinct = lambda col: sql.func.count(sql.func.distinct(col)),
+
         )
 
 base_win = dict(
@@ -205,9 +243,13 @@ base_win = dict(
         # cumulative funcs ---
         #avg("id") OVER (PARTITION BY "email" ORDER BY "id" ROWS UNBOUNDED PRECEDING)
         #cummean = win_agg("
-        cumsum = win_cumul("sum")
+        cumsum = win_cumul("sum"),
         #cummin
         #cummax
+
+        # POSTGRES compatibility ----------------------------------------------
+        # TODO: need to wrap
+        prod = lambda col: sql.func.exp(sql.func.sum(sql.func.log(col)))
 
         )
 
