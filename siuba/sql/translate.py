@@ -10,10 +10,12 @@ This module holds default translations from pandas syntax to sql for 3 kinds of 
 """
 
 from sqlalchemy import sql
-from sqlalchemy.sql import sqltypes as types
+from sqlalchemy.sql import sqltypes as types, func as fn
 from functools import singledispatch
 from .verbs import case_when, if_else
 import warnings
+
+# Custom over clause handling  ================================================
 
 # TODO: must make these take both tbl, col as args, since hard to find window funcs
 def sa_is_window(clause):
@@ -33,10 +35,6 @@ def sa_modify_window(clause, group_by = None, order_by = None):
     return clause
 
 from sqlalchemy.sql.elements import Over
-# windowed agg (group by)
-# agg
-# windowed scalar
-# ordered set agg
 
 class CustomOverClause: pass
 
@@ -66,6 +64,10 @@ class CumlOver(Over, CustomOverClause):
         return self
 
 
+# Translator creation funcs ===================================================
+
+# Windows ----
+
 def win_absent(name):
     def not_implemented(*args, **kwargs):
         raise NotImplementedError("SQL dialect does not support {}.".format(name))
@@ -84,6 +86,50 @@ def win_agg(name):
     sa_func = getattr(sql.func, name)
     return lambda col: AggOver(sa_func(col))
 
+
+# Ordered and theoretical set aggregates ----
+
+def set_agg(name):
+    sa_func = getattr(sql.func, name)
+    return lambda col, *args: sa_func(*args).within_group(col)
+
+# Datetime ----
+
+def sql_extract(name):
+    return lambda col: sql.func.extract(name, col)
+
+def sql_func_extract_dow_monday(col):
+    # make monday = 0 rather than sunday
+    monday0 = sql.cast(sql.func.extract('dow', col) + 6, types.Integer) % 7
+    # cast to numeric, since that's what extract('dow') returns
+    return sql.cast(monday0, types.Numeric)
+
+def sql_is_first_of(name, reference):
+    return lambda col: fn.date_trunc(name, col) == fn.date_trunc(reference, col)
+
+def sql_func_last_day_in_period(col, period):
+    return fn.date_trunc(period, col) + sql.text("interval '1 %s - 1 day'" % period)
+
+def sql_func_days_in_month(col):
+    return fn.extract('day', sql_func_last_day_in_period(col, 'month'))
+
+def sql_is_last_day_of(period):
+    def f(col):
+        last_day = sql_func_last_day_in_period(col, period)
+        return fn.date_trunc('day', col) == last_day
+
+    return f
+
+def sql_func_floor_date(col, unit):
+    # see https://www.postgresql.org/docs/9.1/functions-datetime.html#FUNCTIONS-DATETIME-TRUNC
+    # valid values: 
+    #   microseconds, milliseconds, second, minute, hour,
+    #   day, week, month, quarter, year, decade, century, millennium
+    # TODO: implement in siuba.dply.lubridate
+    return fn.date_trunc(unit, col)
+
+# Others ----
+
 def sql_agg(name):
     sa_func = getattr(sql.func, name)
     return lambda col: sa_func(col)
@@ -100,18 +146,28 @@ def sql_colmeth(meth, *outerargs):
 def sql_not_impl():
     return NotImplementedError
 
-def sql_astype(col, _type):
+
+# Custom implementations ----
+
+def sql_func_astype(col, _type):
     mappings = {
             str: types.Text,
+            'str': types.Text,
             int: types.Integer,
+            'int': types.Integer,
             float: types.Numeric,
-            bool: types.Boolean
+            'float': types.Numeric,
+            bool: types.Boolean,
+            'bool': types.Boolean
             }
     try:
         sa_type = mappings[_type]
     except KeyError:
         raise ValueError("sql astype currently only supports type objects: str, int, float, bool")
     return sql.cast(col, sa_type)
+
+
+# Base translations ===========================================================
 
 base_scalar = dict(
         # infix operators -----
@@ -136,13 +192,13 @@ base_scalar = dict(
         atan2 = sql_scalar("atan2"),
         cos = sql_scalar("cos"),
         cot = sql_scalar("cot"),
-        astype = sql_astype,
+        astype = sql_func_astype,
         # I was lazy here and wrote lambdas directly ---
         # TODO: I think these are postgres specific?
-        hour = lambda col: sql.func.date_trunc('hour', col),
-        week = lambda col: sql.func.date_trunc('week', col),
         isna = sql_colmeth("is_", None),
         isnull = sql_colmeth("is_", None),
+        notna = lambda col: ~col.is_(None),
+        fillna = sql.functions.coalesce,
         # dply.vector funcs ----
         desc = lambda col: col.desc(),
         
@@ -190,10 +246,58 @@ base_scalar = dict(
         rmul = sql_colmeth('__rmul__'),
         rmod = sql_colmeth('__rmod__'),
 
-        #
-        clip = lambda col, lower, upper: sql.func.least(sql.func.greatest(col, lower), upper),
+        # computations ---
+        clip = lambda col, lower, upper: fn.least(fn.greatest(col, lower), upper),
 
+        # datetime_properties ---
+        date = sql_not_impl(),
+        time = sql_not_impl(),
+        timetz = sql_not_impl(),
+        year = sql_extract('year'),# , sql.cast(col, sql.sqltypes.Date)),
+        month = sql_extract('month'),
+        day = sql_extract('day'),
+        hour = sql_extract('hour'),
+        minute = sql_extract('minute'),
+        second = sql_extract('second'),
+        #microsecond = sql_extract('microsecond'), # TODO: postgres includes seconds
+        nanosecond = sql_not_impl(),
+        week = sql_extract('week'),
+        weekofyear = sql_extract('week'),
+        dayofweek = sql_func_extract_dow_monday,
+        weekday = sql_func_extract_dow_monday,
+        dayofyear = sql_extract('doy'),
+        quarter = sql_extract('quarter'),
+        is_month_start = sql_is_first_of('day', 'month'),
+        is_month_end = sql_is_last_day_of('month'),
+        is_quarter_start = sql_is_first_of('day', 'quarter'),
+        #is_quarter_end = sql_is_last_day_of('quarter'),
+        is_year_start = sql_is_first_of('day', 'year'),
+        is_year_end = sql_is_last_day_of('year'),
+        is_leap_year = sql_not_impl(),
+        daysinmonth = sql_func_days_in_month,
+        days_in_month = sql_func_days_in_month,
+        tz = sql_not_impl(),
+        freq = sql_not_impl(),
 
+        # datetime methods ---
+        #to_period = ,
+        ## dt.to_pydatetime
+        #tz_localize = 
+        ## dt.tz_convert
+        #normalize = 
+        #strftime = 
+        #round = 
+        #floor = 
+        #ceil = 
+        #month_name = 
+        #day_name =
+        # TODO: slotting in a floor_date method, since I can't do my job
+        #       or make common SQL queries without it....
+        floor_date = sql_func_floor_date,
+
+        # TODO: this should be date_floor
+        #hour = lambda col: sql.func.date_trunc('hour', col),
+        #week = lambda col: sql.func.date_trunc('week', col),
         )
 
 base_agg = dict(
@@ -207,7 +311,10 @@ base_agg = dict(
         # TODO: delete this, len() is not a method anywhere, or vect func
         len = lambda col: sql.func.count(),
         n_distinct = lambda col: sql.func.count(sql.func.distinct(col)),
+        nunique = lambda col: sql.func.count(sql.func.distinct(col)),
 
+        # POSTGRES compatibility ----------------------------------------------
+        quantile = set_agg("percentile_cont"),
         )
 
 base_win = dict(
@@ -248,9 +355,9 @@ base_win = dict(
         #cummax
 
         # POSTGRES compatibility ----------------------------------------------
-        # TODO: need to wrap
-        prod = lambda col: sql.func.exp(sql.func.sum(sql.func.log(col)))
-
+        # computations
+        #prod = lambda col: AggOver(fn.exp(fn.sum(fn.log(col)))),
+        std = win_agg("stddev_samp"),
         )
 
 # based on https://github.com/tidyverse/dbplyr/blob/master/R/backend-.R

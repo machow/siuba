@@ -27,16 +27,15 @@ def sql_str_cat(col, others, sep, join = None):
     if join is not None:
         raise NotImplementedError("join argument of cat not supported")
 
-
 scalar = SqlTranslator(
         base_scalar,
         log = sql_log,
         round = sql_round,
         contains = sql_str_contains,
-        year = lambda col: sql.func.extract('year', sql.cast(col, sql.sqltypes.Date)),
+        #year = lambda col: sql.func.extract('year', sql.cast(col, sql.sqltypes.Date)),
         concat = sql.func.concat,
         cat = sql.func.concat,
-        str_c = sql.func.concat
+        str_c = sql.func.concat,
         )
 
 aggregate = SqlTranslator(

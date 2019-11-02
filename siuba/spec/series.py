@@ -27,6 +27,12 @@ CATEGORIES_STRING = {
         }
 
 
+# TODO: test cases
+#   * doesn't work in mutate (no_mutate = ['postgresql'])
+#   * returns float rather than int (sql_type = 'float')
+#   * requires boolean or float input (op = 'bool')
+#   * won't be implemented (in some backend) (not_impl = ['postgresql'])
+#   * isn't implemented now, but will be (xfail = ['postgresql'])
 funcs = {
     ## ------------------------------------------------------------------------
     # Attributes 
@@ -96,7 +102,7 @@ funcs = {
     # Conversion 
     ## ------------------------------------------------------------------------
     'conversion': {
-        #'astype': _.astype('str')       >> Elwise(),
+        'astype': _.astype('str')       >> Elwise(),
         # infer_objects
         'copy': _.copy()              >> Elwise(not_impl = ['postgresql']),
         # bool
@@ -203,17 +209,17 @@ funcs = {
         #'nlargest': _.nlargest()      >> Window(),
         #'nsmallest': _.nsmallest()    >> Window(),
         'pct_change': _.pct_change()  >> Window(),
-        'prod': _.prod()              >> Agg(),
-        'quantile': _.quantile()      >> Agg(),
+        'prod': _.prod()              >> Agg(xfail = ['postgresql']),
+        'quantile': _.quantile(.75)      >> Agg(no_mutate = ['postgresql']),
         'rank': _.rank()              >> Window(),
-        'sem': _.sem()                >> Agg(),
-        'skew': _.skew()              >> Agg(),
+        'sem': _.sem()                >> Agg(xfail = ['postgresql']),
+        'skew': _.skew()              >> Agg(xfail = ['postgresql']),
         'std': _.std()                >> Agg(),
-        'sum': _.sum()                >> Agg(),
+        'sum': _.sum()                >> Agg(xfail = ['postgresql']), # TODO: pg returns float
         'var': _.var()                >> Agg(),
         #'kurtosis': _.kurtosis()      >> Agg(),  # TODO: doesn't exist on GDF
         # unique
-        'nunique': _.nunique()        >> Agg(),
+        'nunique': _.nunique()        >> Agg(no_mutate = ['postgresql']),
         #'is_unique': _.is_unique      >> Agg(),  # TODO: all is_... properties not on GDF
         #'is_monotonic': _.is_monotonic >> Agg(),
         #'is_monotonic_increasing': _.is_monotonic_increasing >> Agg(),
@@ -311,32 +317,32 @@ funcs = {
     # Datetime properties 
     ## ------------------------------------------------------------------------
     'datetime_properties': {
-        'dt.date': _.dt.date                             >> Elwise(),
-        'dt.time': _.dt.time                             >> Elwise(),
-        'dt.timetz': _.dt.timetz                         >> Elwise(),
-        'dt.year': _.dt.year                             >> Elwise(),
-        'dt.month': _.dt.month                           >> Elwise(),
-        'dt.day': _.dt.day                               >> Elwise(),
-        'dt.hour': _.dt.hour                             >> Elwise(),
-        'dt.minute': _.dt.minute                         >> Elwise(),
-        'dt.second': _.dt.second                         >> Elwise(),
-        'dt.microsecond': _.dt.microsecond               >> Elwise(),
-        'dt.nanosecond': _.dt.nanosecond                 >> Elwise(),
-        'dt.week': _.dt.week                             >> Elwise(),
-        'dt.weekofyear': _.dt.weekofyear                 >> Elwise(),
-        'dt.dayofweek': _.dt.dayofweek                   >> Elwise(),
-        'dt.weekday': _.dt.weekday                       >> Elwise(),
-        'dt.dayofyear': _.dt.dayofyear                   >> Elwise(),
-        'dt.quarter': _.dt.quarter                       >> Elwise(),
+        'dt.date': _.dt.date                         >> Elwise(not_impl = ['postgresql']), # TODO: all 3, not pandas objects
+        'dt.time': _.dt.time                             >> Elwise(not_impl = ['postgresql']),
+        'dt.timetz': _.dt.timetz                         >> Elwise(not_impl = ['postgresql']),
+        'dt.year': _.dt.year                             >> Elwise(sql_type = 'float'),
+        'dt.month': _.dt.month                           >> Elwise(sql_type = 'float'),
+        'dt.day': _.dt.day                               >> Elwise(sql_type = 'float'),
+        'dt.hour': _.dt.hour                             >> Elwise(sql_type = 'float'),
+        'dt.minute': _.dt.minute                         >> Elwise(sql_type = 'float'),
+        'dt.second': _.dt.second                         >> Elwise(sql_type = 'float'),
+        'dt.microsecond': _.dt.microsecond               >> Elwise(sql_type = 'float', xfail = ['postgresql']),
+        'dt.nanosecond': _.dt.nanosecond                 >> Elwise(not_impl = ['postgresql']),
+        'dt.week': _.dt.week                             >> Elwise(sql_type = 'float'),
+        'dt.weekofyear': _.dt.weekofyear                 >> Elwise(sql_type = 'float'),
+        'dt.dayofweek': _.dt.dayofweek                   >> Elwise(sql_type = 'float'),
+        'dt.weekday': _.dt.weekday                       >> Elwise(sql_type = 'float'),
+        'dt.dayofyear': _.dt.dayofyear                   >> Elwise(sql_type = 'float'),
+        'dt.quarter': _.dt.quarter                       >> Elwise(sql_type = 'float'),
         'dt.is_month_start': _.dt.is_month_start         >> Elwise(),
         'dt.is_month_end': _.dt.is_month_end             >> Elwise(),
         'dt.is_quarter_start': _.dt.is_quarter_start     >> Elwise(),
-        'dt.is_quarter_end': _.dt.is_quarter_end         >> Elwise(),
+        'dt.is_quarter_end': _.dt.is_quarter_end         >> Elwise(xfail = ['postgresql']),
         'dt.is_year_start': _.dt.is_year_start           >> Elwise(),
         'dt.is_year_end': _.dt.is_year_end               >> Elwise(),
-        'dt.is_leap_year': _.dt.is_leap_year             >> Elwise(),
-        'dt.daysinmonth': _.dt.daysinmonth               >> Elwise(),
-        'dt.days_in_month': _.dt.days_in_month           >> Elwise(),
+        'dt.is_leap_year': _.dt.is_leap_year             >> Elwise(not_impl = ['postgresql']),
+        'dt.daysinmonth': _.dt.daysinmonth               >> Elwise(sql_type = 'float'),
+        'dt.days_in_month': _.dt.days_in_month           >> Elwise(sql_type = 'float'),
         'dt.tz': _.dt.tz                                 >> Singleton(),
         'dt.freq': _.dt.freq                             >> Singleton(),
         },
@@ -344,17 +350,17 @@ funcs = {
     # Datetime methods 
     ## ------------------------------------------------------------------------
     'datetime_methods': {
-        'dt.to_period': _.dt.to_period('D')             >> Elwise(),
+        'dt.to_period': _.dt.to_period('D')             >> Elwise(xfail = ["postgresql"]),
         # dt.to_pydatetime                                              # TODO: datetime objects converted back to numpy?
-        'dt.tz_localize': _.dt.tz_localize('UTC')       >> Elwise(),
+        'dt.tz_localize': _.dt.tz_localize('UTC')       >> Elwise(xfail = ["postgresql"]),
         # dt.tz_convert                                                 # TODO: need custom test
-        'dt.normalize': _.dt.normalize()                >> Elwise(),
-        'dt.strftime': _.dt.strftime('%d')              >> Elwise(),
-        'dt.round': _.dt.round('D')                     >> Elwise(),
-        'dt.floor': _.dt.floor('D')                     >> Elwise(),
-        'dt.ceil': _.dt.ceil('D')                       >> Elwise(),
-        'dt.month_name': _.dt.month_name()              >> Elwise(),
-        'dt.day_name': _.dt.day_name()                  >> Elwise(),
+        'dt.normalize': _.dt.normalize()                >> Elwise(xfail = ["postgresql"]),
+        'dt.strftime': _.dt.strftime('%d')              >> Elwise(xfail = ["postgresql"]),
+        'dt.round': _.dt.round('D')                     >> Elwise(xfail = ["postgresql"]),
+        'dt.floor': _.dt.floor('D')                     >> Elwise(xfail = ["postgresql"]),
+        'dt.ceil': _.dt.ceil('D')                       >> Elwise(xfail = ["postgresql"]),
+        'dt.month_name': _.dt.month_name()              >> Elwise(xfail = ["postgresql"]),
+        'dt.day_name': _.dt.day_name()                  >> Elwise(xfail = ["postgresql"]),
         },
     ## ------------------------------------------------------------------------
     # Period properties 
