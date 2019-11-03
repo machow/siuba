@@ -115,9 +115,9 @@ def test_frame_expr(entry):
     assert_src_array_equal(res, dst)
 
 
-@backend_pandas
-#@pytest.mark.skip_backend('sqlite')
-def test_frame_mutate(backend, entry):
+#@backend_pandas
+@pytest.mark.skip_backend('sqlite')
+def test_frame_mutate(skip_backend, backend, entry):
     # CASE 1: Needs to be implmented
     if backend.name in entry['result'].get('xfail', []):
         pytest.xfail("TODO: impelement this translation")

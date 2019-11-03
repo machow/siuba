@@ -128,6 +128,23 @@ def sql_func_floor_date(col, unit):
     # TODO: implement in siuba.dply.lubridate
     return fn.date_trunc(unit, col)
 
+
+# Strings ----
+
+def sql_str_strip(name):
+    
+    strip_func = getattr(fn, name)
+    def f(col, to_strip = " \t\n\v\f\r"):
+        return strip_func(col, to_strip)
+
+    return f
+
+def sql_func_capitalize(col):
+    first_char = fn.upper(fn.left(col, 1)) 
+    rest = fn.right(col, fn.length(col) - 1)
+    return first_char.op('||')(rest)
+
+
 # Others ----
 
 def sql_agg(name):
@@ -176,8 +193,6 @@ base_scalar = dict(
 
         # sqlalchemy.ColumnElement methods ----
         cast = sql_colmeth("cast"),
-        startswith = sql_colmeth("startswith"),
-        endswith = sql_colmeth("endswith"),
         between = sql_colmeth("between"),
         isin = sql_colmeth("in_"),
 
@@ -202,13 +217,6 @@ base_scalar = dict(
         # dply.vector funcs ----
         desc = lambda col: col.desc(),
         
-        # TODO: string methods
-        #str.len,
-        #str.upper,
-        #str.lower,
-        #str.replace_all or something similar,
-        #str_detect or similar,
-        #str_trim func to cut text off sides
         # TODO: move to postgres specific
         n = lambda col: sql.func.count(),
         # TODO: this is to support a DictCall (e.g. used in case_when)
@@ -295,9 +303,62 @@ base_scalar = dict(
         #       or make common SQL queries without it....
         floor_date = sql_func_floor_date,
 
-        # TODO: this should be date_floor
-        #hour = lambda col: sql.func.date_trunc('hour', col),
-        #week = lambda col: sql.func.date_trunc('week', col),
+
+        # string methdos ---
+        
+        capitalize = sql_func_capitalize,
+        #casefold = ,
+        #cat  = ,
+        center = sql_not_impl(),
+        contains = sql_not_impl(),
+#        count = ,
+#        # str.decode
+#        encode = ,
+        endswith = sql_colmeth("endswith"),
+#        #extract = 
+#        # str.extractall
+#        find = ,
+#        findall = ,
+#        #get
+#        #index
+#        #join
+        len = sql.func.length,
+#        ljust = ,
+        lower = sql.func.lower,
+        # TODO: whitespace options based loosely on builtin string.isspace
+        lstrip = sql_str_strip('ltrim'),
+#        match = ,
+#        # str.normalize
+#        pad = ,
+#        # str.partition
+#        # str.repeat
+#        replace = ,
+#        rfind = ,
+#        # str.rindex
+#        rjust = ,
+#        # str.rpartition
+        rstrip = sql_str_strip('rtrim'),
+#        slice = ,
+#        slice_replace = ,
+#        split = ,
+#        rsplit = ,
+        startswith = sql_colmeth("startswith"),
+        strip = sql_str_strip('trim'),
+#        swapcase = ,
+        title = sql.func.initcap,
+#        # str.translate
+        upper = sql.func.upper,
+#        wrap = ,
+#        # str.zfill
+#        isalnum = ,
+#        isalpha = ,
+#        isdigit = ,
+#        isspace = ,
+#        islower = ,
+#        isupper = ,
+#        istitle = ,
+#        isnumeric = ,
+#        isdecimal = ,
         )
 
 base_agg = dict(
@@ -308,8 +369,6 @@ base_agg = dict(
         count = sql_agg("count"),
         # TODO: generalize case where doesn't use col
         # need better handeling of vector funcs
-        # TODO: delete this, len() is not a method anywhere, or vect func
-        len = lambda col: sql.func.count(),
         n_distinct = lambda col: sql.func.count(sql.func.distinct(col)),
         nunique = lambda col: sql.func.count(sql.func.distinct(col)),
 
@@ -343,7 +402,6 @@ base_win = dict(
 
         # counts ----
         count = win_agg("count"),
-        len = lambda col: sql.func.count().over(),
         #n
         #n_distinct
 

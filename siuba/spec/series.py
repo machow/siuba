@@ -394,55 +394,55 @@ funcs = {
         'str.capitalize': _.str.capitalize()              >> Elwise(),
         #'str.casefold': _.str.casefold()                  >> Elwise(),   #TODO: introduced in v0.25.1
         # str.cat                                                         #TODO: can be Agg OR Elwise, others arg
-        'str.center': _.str.center(3)                     >> Elwise(),
+        'str.center': _.str.center(3)                     >> Elwise(not_impl = ['postgresql']),
         'str.contains': _.str.contains('a')               >> Elwise(),
-        'str.count': _.str.count('a')                     >> Elwise(),
+        'str.count': _.str.count('a')                     >> Elwise(xfail = ['postgresql']),
         # str.decode                                                      # TODO custom testing
-        'str.encode': _.str.encode('utf-8')               >> Elwise(),
-        'str.endswith': _.str.endswith('a|b')             >> Elwise(),
+        'str.encode': _.str.encode('utf-8')               >> Elwise(xfail = ['postgresql']),
+        'str.endswith': _.str.endswith('a|b')             >> Elwise(xfail = ['postgresql']),
         #'str.extract': _.str.extract('(a)(b)')                           # TODO: returns DataFrame
         # str.extractall
-        'str.find': _.str.find('a|c')                     >> Elwise(),
-        'str.findall': _.str.findall('a|c')               >> Elwise(),
+        'str.find': _.str.find('a|c')                     >> Elwise(xfail = ['postgresql']),
+        'str.findall': _.str.findall('a|c')               >> Elwise(xfail = ['postgresql']),
         # str.get                                                         # TODO: custom test
         # str.index                                                       # TODO: custom test
         # str.join                                                        # TODO: custom test
         'str.len': _.str.len()                            >> Elwise(),
-        'str.ljust': _.str.ljust(5)                       >> Elwise(),
+        'str.ljust': _.str.ljust(5)                       >> Elwise(xfail = ['postgresql']), # pg formatstr function
         'str.lower': _.str.lower()                        >> Elwise(),
         'str.lstrip': _.str.lstrip()                      >> Elwise(),
-        'str.match': _.str.match('a|c')                   >> Elwise(),
+        'str.match': _.str.match('a|c')                   >> Elwise(xfail = ['postgresql']),
         # str.normalize
-        'str.pad': _.str.pad(5)                           >> Elwise(),
+        'str.pad': _.str.pad(5)                           >> Elwise(xfail = ['postgresql']),
         # str.partition
         # str.repeat
-        'str.replace': _.str.replace('a|b', 'c')          >> Elwise(),
-        'str.rfind': _.str.rfind('a')                     >> Elwise(),
+        'str.replace': _.str.replace('a|b', 'c')          >> Elwise(xfail = ['postgresql']),
+        'str.rfind': _.str.rfind('a')                     >> Elwise(xfail = ['postgresql']),
         # str.rindex
-        'str.rjust': _.str.rjust(5)                       >> Elwise(),
+        'str.rjust': _.str.rjust(5)                       >> Elwise(xfail = ['postgresql']),
         # str.rpartition
         'str.rstrip': _.str.rstrip()                      >> Elwise(),
-        'str.slice': _.str.slice(step = 2)                >> Elwise(),
-        'str.slice_replace': _.str.slice_replace(2, repl = 'x')   >> Elwise(),
-        'str.split': _.str.split('a|b')                   >> Elwise(),
-        'str.rsplit': _.str.rsplit('a|b', n = 1)          >> Elwise(),
+        'str.slice': _.str.slice(step = 2)                >> Elwise(xfail = ['postgresql']),
+        'str.slice_replace': _.str.slice_replace(2, repl = 'x')   >> Elwise(xfail = ['postgresql']),
+        'str.split': _.str.split('a|b')                   >> Elwise(xfail = ['postgresql']),
+        'str.rsplit': _.str.rsplit('a|b', n = 1)          >> Elwise(xfail = ['postgresql']),
         'str.startswith': _.str.startswith('a|b')         >> Elwise(),
         'str.strip': _.str.strip()                        >> Elwise(),
-        'str.swapcase': _.str.swapcase()                  >> Elwise(),
+        'str.swapcase': _.str.swapcase()                  >> Elwise(xfail = ['postgresql']),
         'str.title': _.str.title()                        >> Elwise(),
         # str.translate
         'str.upper': _.str.upper()                        >> Elwise(),
-        'str.wrap': _.str.wrap(2)                         >> Elwise(),
+        'str.wrap': _.str.wrap(2)                         >> Elwise(xfail = ['postgresql']),
         # str.zfill
-        'str.isalnum': _.str.isalnum()                    >> Elwise(),
-        'str.isalpha': _.str.isalpha()                    >> Elwise(),
-        'str.isdigit': _.str.isdigit()                    >> Elwise(),
-        'str.isspace': _.str.isspace()                    >> Elwise(),
-        'str.islower': _.str.islower()                    >> Elwise(),
-        'str.isupper': _.str.isupper()                    >> Elwise(),
-        'str.istitle': _.str.istitle()                    >> Elwise(),
-        'str.isnumeric': _.str.isnumeric()                >> Elwise(),
-        'str.isdecimal': _.str.isdecimal()                >> Elwise(),
+        'str.isalnum': _.str.isalnum()                    >> Elwise(xfail = ['postgresql']),
+        'str.isalpha': _.str.isalpha()                    >> Elwise(xfail = ['postgresql']),
+        'str.isdigit': _.str.isdigit()                    >> Elwise(xfail = ['postgresql']),
+        'str.isspace': _.str.isspace()                    >> Elwise(xfail = ['postgresql']),
+        'str.islower': _.str.islower()                    >> Elwise(xfail = ['postgresql']),
+        'str.isupper': _.str.isupper()                    >> Elwise(xfail = ['postgresql']),
+        'str.istitle': _.str.istitle()                    >> Elwise(xfail = ['postgresql']),
+        'str.isnumeric': _.str.isnumeric()                >> Elwise(xfail = ['postgresql']),
+        'str.isdecimal': _.str.isdecimal()                >> Elwise(xfail = ['postgresql']),
         # str.get_dummies
         },
     'categories': {
