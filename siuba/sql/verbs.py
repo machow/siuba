@@ -152,7 +152,7 @@ class LazyTbl:
     def __init__(
             self, source, tbl, columns = None,
             ops = None, group_by = tuple(), order_by = tuple(), funcs = None,
-            rm_attr = ('str', 'dt'), call_sub_attr = ('dt',)
+            rm_attr = ('str', 'dt'), call_sub_attr = ('dt', 'str')
             ):
         """Create a representation of a SQL table.
 

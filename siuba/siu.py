@@ -511,9 +511,9 @@ class CallTreeLocal(CallListener):
         attr_chain, target = get_attr_chain(obj, max_n = 2)
         if attr_chain:
             # want _.x.method() -> method(_.x), need to transform
-            if attr_chain[0] in self.call_sub_attr and self.chain_sub_attr:
+            if attr_chain[0] in self.call_sub_attr:
                 # e.g. _.dt.round()
-                call_name = ".".join(attr_chain)
+                call_name = ".".join(attr_chain) if self.chain_sub_attr else attr_chain[-1]
                 entered_target = self.enter_if_call(target)
             else:
                 call_name = attr_chain[-1]
