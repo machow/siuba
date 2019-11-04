@@ -82,7 +82,7 @@ funcs = {
         # shape
         # nbytes
         # ndim
-        # size
+        # size                              # TODO: good to support, is a method on grouped series...
         # strides
         # itemsize
         # base
