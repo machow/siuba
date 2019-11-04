@@ -21,7 +21,8 @@ for name, entry in spec.items():
 call_listener = CallTreeLocal(
         out,
         call_sub_attr = ('str', 'dt', 'cat'),
-        chain_sub_attr = True
+        chain_sub_attr = True,
+        dispatch_cls = SeriesGroupBy
         )
 
 

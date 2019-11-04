@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from functools import singledispatch
 from siuba.siu import symbolic_dispatch
+from siuba.experimental.pd_groups.groupby import DataFrameGroupBy, SeriesGroupBy, GroupByAgg
 
 
 def _expand_bool(x, f):
@@ -231,6 +232,11 @@ def n(x):
         return x.shape[0]
 
     return len(x)
+
+@n.register(SeriesGroupBy)
+@n.register(DataFrameGroupBy)
+def _n_grouped(x):
+    return GroupByAgg.from_result(x.size(), x)
 
 
 @symbolic_dispatch
