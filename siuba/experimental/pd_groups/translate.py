@@ -63,12 +63,30 @@ def method_el_op2(name, **kwargs):
     f.__qualname__ = name
     return f
 
+def method_win_op(name, is_property, accessor):
+    def f(__ser, *args, **kwargs):
+        if not isinstance(__ser, SeriesGroupBy):
+            raise TypeError("All methods must operate on a grouped Series objects")
+        
+        if accessor:
+            method = getattr(getattr(__ser, accessor), name)
+        else:
+            method = getattr(__ser, name)
+
+        res = method(*args, **kwargs) if not is_property else method
+        return _regroup(res, __ser)
+
+    f.__name__ = name
+    f.__qualname__ = name
+    return f
+
+
 GROUP_METHODS = { 
         ("Elwise", 1): method_el_op,
         ("Elwise", 2): method_el_op2,
         ("Agg", 1): method_agg_op,
-        ("Window", 1): not_implemented,
-        ("Window", 2): not_implemented,
+        ("Window", 1): method_win_op,
+        ("Window", 2): method_win_op,
         ("Singleton", 1): not_implemented
         }
 
