@@ -665,25 +665,42 @@ def explain(symbol):
 
 # symbolic dispatch wrapper ---------------------------------------------------
 
-from functools import singledispatch
+from functools import singledispatch, update_wrapper
+import inspect
 
-def symbolic_dispatch(f):
-    # TODO: don't use singledispatch if it has already been done
-    f = singledispatch(f)
-    @f.register(Symbolic)
-    def _dispatch_symbol(__data, *args, **kwargs):
-        return create_sym_call(FuncArg(f), __data.source, *args, **kwargs)
-
-    @f.register(Call)
-    def _dispatch_call(__data, *args, **kwargs):
-        # TODO: want to just create call, for now use hack of creating a symbolic
-        #       call and getting the source off of it...
-        return create_sym_call(FuncArg(f), __data, *args, **kwargs).source
+def _dispatch_not_impl(func_name):
+    def f(x, *args, **kwargs):
+        raise TypeError("singledispatch function {func_name} not implemented for type {type}"
+                            .format(func_name = func_name, type = type(x))
+                            )
 
     return f
 
+def symbolic_dispatch(f = None, cls = object):
+    if f is None:
+        return lambda f: symbolic_dispatch(f, cls)
+
+    # TODO: don't use singledispatch if it has already been done
+    dispatch_func = singledispatch(f)
+
+    if cls is not object:
+        dispatch_func.register(cls, f)
+        dispatch_func.register(object, _dispatch_not_impl(dispatch_func.__name__))
 
 
+    @dispatch_func.register(Symbolic)
+    def _dispatch_symbol(__data, *args, **kwargs):
+        return create_sym_call(FuncArg(dispatch_func), __data.source, *args, **kwargs)
+
+    @dispatch_func.register(Call)
+    def _dispatch_call(__data, *args, **kwargs):
+        # TODO: want to just create call, for now use hack of creating a symbolic
+        #       call and getting the source off of it...
+        return create_sym_call(FuncArg(dispatch_func), __data, *args, **kwargs).source
+
+    return dispatch_func
+
+    
 # Do some gnarly method setting -----------------------------------------------
 
 def create_binary_op(op_name):

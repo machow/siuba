@@ -2,13 +2,43 @@ import pandas as pd
 import numpy as np
 from functools import singledispatch
 from siuba.siu import symbolic_dispatch
-from siuba.experimental.pd_groups.groupby import DataFrameGroupBy, SeriesGroupBy, GroupByAgg
+from pandas.core.groupby import SeriesGroupBy, GroupBy
+from pandas.core.frame import NDFrame
+from pandas import Series
 
+from siuba.experimental.pd_groups.groupby import GroupByAgg, _regroup
+from siuba.experimental.pd_groups.translate import method_agg_op
+
+# Utils =======================================================================
 
 def _expand_bool(x, f):
     return x.expanding().apply(f, raw = True).astype(bool)
 
-@symbolic_dispatch
+def group_value_splits(g, to_series = False):
+    indices = g.grouper.indices
+    for g_key, inds in indices.items():
+        array = g.obj.values[inds]
+        if to_series:
+            indx = pd.RangeIndex._simple_new(range(len(array)))
+            yield pd.Series(array, index = indx, dtype = g.obj.dtype, fastpath = True)
+
+        else:
+            yield array
+
+
+def alias_series_agg(name):
+    method = method_agg_op(name, is_property = False, accessor = False)
+
+    def decorator(dispatcher):
+        dispatcher.register(SeriesGroupBy, method)
+        return dispatcher
+
+    return decorator
+
+
+# Single dispatch functions ===================================================
+
+@symbolic_dispatch(cls = Series)
 def cumall(x):
     """Return a same-length array. For each entry, indicates whether that entry and all previous are True-like.
 
@@ -23,7 +53,7 @@ def cumall(x):
     return _expand_bool(x, np.all)
 
 
-@symbolic_dispatch
+@symbolic_dispatch(cls = Series)
 def cumany(x):
     """Return a same-length array. For each entry, indicates whether that entry or any previous are True-like.
 
@@ -38,18 +68,29 @@ def cumany(x):
     return _expand_bool(x, np.any)
 
 
-@symbolic_dispatch
+@symbolic_dispatch(cls = Series)
 def cummean(x):
     """Return a same-length array, containing the cumulative mean."""
     return x.expanding().mean()
 
-@symbolic_dispatch
+
+@cummean.register(SeriesGroupBy)
+def _cummean_grouped(x):
+    grouper = x.grouper
+    n_entries = x.obj.notna().groupby(grouper).cumsum()
+
+    res = x.cumsum() / n_entries
+
+    return res.groupby(grouper)
+
+
+@symbolic_dispatch(cls = Series)
 def desc(x):
     """Return array sorted in descending order."""
     return x.sort_values(ascending = False).reset_index(drop = True)
 
 
-@symbolic_dispatch
+@symbolic_dispatch(cls = Series)
 def dense_rank(x):
     """Return the dense rank.
     
@@ -94,6 +135,8 @@ def cume_dist(x):
     return x.rank(method = "max") / x.count()
 
 
+# row_number ------------------------------------------------------------------
+
 @symbolic_dispatch
 def row_number(x):
     """Return the row number (position) for each value in x, beginning with 1.
@@ -117,14 +160,29 @@ def row_number(x):
     if isinstance(x, pd.Series):
         return x._constructor(arr, pd.RangeIndex(n), fastpath = True)
 
-    return arr
+    return pd.Series(arr)
 
+
+@row_number.register(GroupBy)
+def _row_number_grouped(g: GroupBy) -> GroupBy:
+    out = np.ones(len(g.obj), dtype = int)
+
+    indices = g.grouper.indices
+    for g_key, inds in indices.items():
+        out[inds] = np.arange(1, len(inds) + 1, dtype = int)
+    
+    return _regroup(out, g)
+
+
+# ntile -----------------------------------------------------------------------
 
 @symbolic_dispatch
 def ntile(x, n):
     """TODO: Not Implemented"""
     NotImplementedError("ntile not implemented")
 
+
+# between ---------------------------------------------------------------------
 
 @symbolic_dispatch
 def between(x, left, right):
@@ -145,11 +203,15 @@ def between(x, left, right):
     return x.between(left, right)
     
 
+# coalesce --------------------------------------------------------------------
+
 @symbolic_dispatch
 def coalesce(*args):
     """TODO: Not Implemented"""
     NotImplementedError("coalesce not implemented")
 
+
+# lead ------------------------------------------------------------------------
 
 @symbolic_dispatch
 def lead(x, n = 1, default = None):
@@ -168,19 +230,25 @@ def lead(x, n = 1, default = None):
         dtype: float64
 
         >>> lead(pd.Series([1,2,3]), n=1, default = 99)
-        0     2.0
-        1     3.0
-        2    99.0
-        dtype: float64
+        0     2
+        1     3
+        2    99
+        dtype: int64
 
     """
-    res = x.shift(-1*n)
-
-    if default is not None:
-        res.iloc[-n:] = default
+    res = x.shift(-1*n, fill_value = default)
 
     return res
 
+
+@lead.register(SeriesGroupBy)
+def _lead_grouped(x, n = 1, default = None):
+    res = x.shift(-1*n, fill_value = default)
+
+    return _regroup(res, x)
+
+
+# lag -------------------------------------------------------------------------
 
 @symbolic_dispatch
 def lag(x, n = 1, default = None):
@@ -214,7 +282,15 @@ def lag(x, n = 1, default = None):
     return res
 
 
-@symbolic_dispatch
+@lag.register(SeriesGroupBy)
+def _lag_grouped(x, n = 1, default = None):
+    res = x.shift(n, fill_value = default)
+
+    return _regroup(res, x)
+
+# n ---------------------------------------------------------------------------
+
+@symbolic_dispatch(cls = NDFrame)
 def n(x):
     """Return the total number of elements in the array (or rows in a DataFrame).
 
@@ -233,12 +309,15 @@ def n(x):
 
     return len(x)
 
-@n.register(SeriesGroupBy)
-@n.register(DataFrameGroupBy)
-def _n_grouped(x):
+
+@n.register(GroupBy)
+def _n_grouped(x: GroupBy) -> GroupByAgg:
     return GroupByAgg.from_result(x.size(), x)
 
 
+# n_distinct ------------------------------------------------------------------
+
+@alias_series_agg('nunique')
 @symbolic_dispatch
 def n_distinct(x):
     """Return the total number of distinct (i.e. unique) elements in an array.
@@ -248,8 +327,10 @@ def n_distinct(x):
         2
 
     """
-    return len(x.unique())
+    return x.nunique()
 
+
+# na_if -----------------------------------------------------------------------
 
 @symbolic_dispatch
 def na_if(x, y):
