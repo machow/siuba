@@ -14,18 +14,6 @@ from siuba.experimental.pd_groups.translate import method_agg_op
 def _expand_bool(x, f):
     return x.expanding().apply(f, raw = True).astype(bool)
 
-def group_value_splits(g, to_series = False):
-    indices = g.grouper.indices
-    for g_key, inds in indices.items():
-        array = g.obj.values[inds]
-        if to_series:
-            indx = pd.RangeIndex._simple_new(range(len(array)))
-            yield pd.Series(array, index = indx, dtype = g.obj.dtype, fastpath = True)
-
-        else:
-            yield array
-
-
 def alias_series_agg(name):
     method = method_agg_op(name, is_property = False, accessor = False)
 
