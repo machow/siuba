@@ -446,6 +446,8 @@ def get_attr_chain(node, max_n):
 
 
 from inspect import isclass, isfunction
+from typing import get_type_hints
+from .utils import is_dispatch_func_subtype
 
 class CallTreeLocal(CallListener):
     def __init__(
@@ -453,7 +455,8 @@ class CallTreeLocal(CallListener):
             local,
             call_sub_attr = None,
             chain_sub_attr = False,
-            dispatch_cls = None
+            dispatch_cls = None,
+            result_cls = None
             ):
         """
         Arguments:
@@ -464,11 +467,14 @@ class CallTreeLocal(CallListener):
                            up a replacement for the property call. E.g. does local have a 'dt.year' entry.
             dispatch_cls: if custom calls are dispatchers, dispatch on this class. If none, use their name
                           to try and get their corresponding local function.
+            result_cls: if custom calls are dispatchers, require their result annotation to be a subclass
+                          of this class.
         """
         self.local = local
         self.call_sub_attr = set(call_sub_attr or [])
         self.chain_sub_attr = chain_sub_attr
         self.dispatch_cls = dispatch_cls
+        self.result_cls = result_cls
 
     def create_local_call(self, name, prev_obj, cls, func_args = None, func_kwargs = None):
         # need call attr name (arg[0].args[1]) 
@@ -525,9 +531,25 @@ class CallTreeLocal(CallListener):
             and self.dispatch_cls is not None
             ):
             # allow custom functions that dispatch on dispatch_cls
-            f_for_cls = func.registry[self.dispatch_cls]
-            return node.__class__(f_for_cls)
+            f_for_cls = func.dispatch(self.dispatch_cls)
+            if (self.result_cls is None
+                or is_dispatch_func_subtype(f_for_cls, self.dispatch_cls, self.result_cls)
+                ):
+                # matches return annotation type (or not required)
+                return node.__class__(f_for_cls)
+            
+            raise FunctionLookupError(
+                    "External function {name} can dispatch on the class {dispatch_cls}, but "
+                    "must also have result annotation of (sub)type {result_cls}"
+                        .format(
+                            name = func.__name__,
+                            dispatch_cls = self.dispatch_cls,
+                            result_cls = self.result_cls
+                            )
+                    )
 
+        # doesn't raise an error so we can look in locals for now
+        # TODO: remove behavior, once all SQL dispatch funcs moved from locals
         return self.generic_enter(node)
 
     def enter___call__(self, node):

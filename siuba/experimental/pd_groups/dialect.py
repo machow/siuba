@@ -22,7 +22,8 @@ call_listener = CallTreeLocal(
         out,
         call_sub_attr = ('str', 'dt', 'cat'),
         chain_sub_attr = True,
-        dispatch_cls = SeriesGroupBy
+        dispatch_cls = GroupByAgg,
+        result_cls = SeriesGroupBy
         )
 
 

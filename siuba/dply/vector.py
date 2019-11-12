@@ -99,13 +99,13 @@ def dense_rank(x):
     return x.rank(method = "dense")
 
 
-@symbolic_dispatch
+@symbolic_dispatch(cls = Series)
 def percent_rank(x):
     """TODO: Not Implemented"""
     NotImplementedError("PRs welcome")
 
 
-@symbolic_dispatch
+@symbolic_dispatch(cls = Series)
 def min_rank(x):
     """Return the min rank. See pd.Series.rank for details.
 
@@ -113,7 +113,7 @@ def min_rank(x):
     return x.rank(method = "min")
 
 
-@symbolic_dispatch
+@symbolic_dispatch(cls = Series)
 def cume_dist(x):
     """Return the cumulative distribution corresponding to each value in x.
 
@@ -125,7 +125,7 @@ def cume_dist(x):
 
 # row_number ------------------------------------------------------------------
 
-@symbolic_dispatch
+@symbolic_dispatch(cls = NDFrame)
 def row_number(x):
     """Return the row number (position) for each value in x, beginning with 1.
 
@@ -164,7 +164,7 @@ def _row_number_grouped(g: GroupBy) -> GroupBy:
 
 # ntile -----------------------------------------------------------------------
 
-@symbolic_dispatch
+@symbolic_dispatch(cls = Series)
 def ntile(x, n):
     """TODO: Not Implemented"""
     NotImplementedError("ntile not implemented")
@@ -172,7 +172,7 @@ def ntile(x, n):
 
 # between ---------------------------------------------------------------------
 
-@symbolic_dispatch
+@symbolic_dispatch(cls = Series)
 def between(x, left, right):
     """Return whether a value is between left and right (including either side).
 
@@ -193,7 +193,7 @@ def between(x, left, right):
 
 # coalesce --------------------------------------------------------------------
 
-@symbolic_dispatch
+@symbolic_dispatch(cls = Series)
 def coalesce(*args):
     """TODO: Not Implemented"""
     NotImplementedError("coalesce not implemented")
@@ -201,7 +201,7 @@ def coalesce(*args):
 
 # lead ------------------------------------------------------------------------
 
-@symbolic_dispatch
+@symbolic_dispatch(cls = Series)
 def lead(x, n = 1, default = None):
     """Return an array with each value replaced by the next (or further forward) value in the array.
 
@@ -238,7 +238,7 @@ def _lead_grouped(x, n = 1, default = None):
 
 # lag -------------------------------------------------------------------------
 
-@symbolic_dispatch
+@symbolic_dispatch(cls = Series)
 def lag(x, n = 1, default = None):
     """Return an array with each value replaced by the previous (or further backward) value in the array.
 
@@ -306,7 +306,7 @@ def _n_grouped(x: GroupBy) -> GroupByAgg:
 # n_distinct ------------------------------------------------------------------
 
 @alias_series_agg('nunique')
-@symbolic_dispatch
+@symbolic_dispatch(cls = Series)
 def n_distinct(x):
     """Return the total number of distinct (i.e. unique) elements in an array.
     
@@ -320,7 +320,7 @@ def n_distinct(x):
 
 # na_if -----------------------------------------------------------------------
 
-@symbolic_dispatch
+@symbolic_dispatch(cls = Series)
 def na_if(x, y):
     """Return a array like x, but with values in y replaced by NAs.
     
@@ -340,25 +340,25 @@ def na_if(x, y):
     return tmp_x
 
 
-@symbolic_dispatch
+@symbolic_dispatch(cls = Series)
 def near(x):
     """TODO: Not Implemented"""
     NotImplementedError("near not implemented") 
 
 
-@symbolic_dispatch
+@symbolic_dispatch(cls = Series)
 def nth(x):
     """TODO: Not Implemented"""
     NotImplementedError("nth not implemented") 
 
 
-@symbolic_dispatch
+@symbolic_dispatch(cls = Series)
 def first(x):
     """TODO: Not Implemented"""
     NotImplementedError("first not implemented")
 
 
-@symbolic_dispatch
+@symbolic_dispatch(cls = Series)
 def last(x):
     """TODO: Not Implemented"""
     NotImplementedError("last not implemented")

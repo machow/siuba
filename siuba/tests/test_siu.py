@@ -80,6 +80,7 @@ def test_call_tree_local_sub_attr_property_missing(ctl):
     with pytest.raises(FunctionLookupError):
         ctl.enter(strip_symbolic(_.str.f_b))
 
+# symbolic dispatch and call tree local ----
 class SomeClass: pass
 
 @pytest.fixture
@@ -115,3 +116,36 @@ def test_call_tree_local_dispatch_cls_subclass(f_dispatch):
     call = Call("__call__", FuncArg(f_dispatch), MetaArg('_'))
     new_call = ctl.enter(call)
     assert new_call('na') == 'some class'
+
+
+# strict symbolic dispatch and call tree local ----
+
+@pytest.fixture
+def f_dispatch_strict():
+    @symbolic_dispatch(cls = SomeClass)
+    def f(x):
+        return 'some class'
+
+    yield f
+
+def test_strict_dispatch_strict_default_fail(f_dispatch_strict):
+    class Other(object): pass
+
+    obj = Other()
+
+    with pytest.raises(TypeError):
+        f_dispatch_strict(obj)
+
+def test_call_tree_local_dispatch_fail(f_dispatch_strict):
+    ctl = CallTreeLocal(
+            {'f_a': lambda self: self},
+            dispatch_cls = object
+            )
+
+    call = Call("__call__", FuncArg(f_dispatch_strict), MetaArg('_'))
+
+    # should be the default failure dispatch for object
+    new_call = ctl.enter(call)
+    with pytest.raises(TypeError):
+        new_call('na')
+ 
