@@ -1,9 +1,15 @@
 # TODO: move siu.py into its own folder, add this to it (w/ Call Trees)
-from typing import _Any, _Union, TypeVar
+from typing import Any, Union, TypeVar
 import inspect
 
+def is_union(x):
+    return getattr(x, '__origin__', None) is Union
+
+def get_union_args(x):
+    return getattr(x, '__args__', getattr(x, '__union_args__', None))
+
 def is_flex_subclass(x, cls):
-    if isinstance(x, _Any):
+    if x is Any:
         return True
     
     return issubclass(x, cls)
@@ -37,9 +43,9 @@ def is_dispatch_func_subtype(f, input_cls, output_cls):
         return False
     
     # Case 2: fancy annotations: Union, generic TypeVar
-    if isinstance(res_type, _Union) and hasattr(res_type, '__args__'):
+    if is_union(res_type) and get_union_args(res_type):
+        sub_types = get_union_args(res_type)
         # passes if any unioned types are subclasses
-        sub_types = res_type.__args__
         return any(map(lambda x: is_flex_subclass(x, output_cls), sub_types))
     elif isinstance(res_type, TypeVar):
         if res_type == par_type0:
