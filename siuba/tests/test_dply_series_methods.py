@@ -13,8 +13,8 @@ import pkg_resources
 def filter_on_result(spec, types):
     return [k for k,v in spec.items() if v['result']['type'] in types]
 
-SPEC_IMPLEMENTED = filter_on_result(spec, {"Agg", "Elwise"})
-SPEC_NOTIMPLEMENTED = filter_on_result(spec, {"Window", "Singleton"})
+SPEC_IMPLEMENTED = filter_on_result(spec, {"Agg", "Elwise", "Window"})
+SPEC_NOTIMPLEMENTED = filter_on_result(spec, {"Singleton"})
 SPEC_AGG = filter_on_result(spec, {"Agg"})
 
 _ = Symbolic()

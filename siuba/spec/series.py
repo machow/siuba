@@ -178,7 +178,7 @@ funcs = {
         'abs': _.abs()                >> Elwise(),
         'all': _.all()                >> Agg(),
         'any': _.any()                >> Agg(),
-        'autocorr': _.autocorr()      >> Window(),
+        # 'autocorr': _.autocorr()      >> Window(),  # TODO: doesn't exist on GDF
         'between': _.between(2, 5)    >> Elwise(),
         'clip': _.clip(2, 5)          >> Elwise(),
         # clip_lower                                # TODO: deprecated

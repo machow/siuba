@@ -90,3 +90,44 @@ def test_agg_groupby_broadcasted_equal_to_transform(f_op, f_dst):
     assert_series_equal(broadcasted, dst, check_names = False)
 
 
+# Test user-defined functions =================================================
+
+from .dialect import fast_mutate
+from siuba.siu import symbolic_dispatch, _, FunctionLookupError
+from typing import Any
+
+def test_fast_grouped_custom_user_funcs():
+    @symbolic_dispatch
+    def f(x):
+        return x.mean()
+
+    @f.register(SeriesGroupBy)
+    def _f_grouped(x) -> GroupByAgg:
+        return GroupByAgg.from_result(x.mean() + 10, x)
+
+    gdf = data_default.groupby('g')
+    g_out = fast_mutate(gdf, result1 = f(_.x), result2 = _.x.mean() + 10)
+    out = g_out.obj
+    assert (out.result1 == out.result2).all()
+
+
+def test_fast_grouped_custom_user_func_default():
+    @symbolic_dispatch
+    def f(x) -> Any:
+        return GroupByAgg.from_result(x.mean() + 10, x)
+
+    gdf = data_default.groupby('g')
+    g_out = fast_mutate(gdf, result1 = f(_.x), result2 = _.x.mean() + 10)
+    out = g_out.obj
+    assert (out.result1 == out.result2).all()
+
+def test_fast_grouped_custom_user_func_fail():
+    @symbolic_dispatch
+    def f(x):
+        return GroupByAgg.from_result(x.mean(), x)
+
+    gdf = data_default.groupby('g')
+    with pytest.raises(FunctionLookupError):
+        g_out = fast_mutate(gdf, result1 = f(_.x), result2 = _.x.mean() + 10)
+
+
