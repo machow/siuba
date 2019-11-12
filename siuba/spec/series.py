@@ -184,7 +184,7 @@ funcs = {
         'abs': _.abs()                >> Elwise(),
         'all': _.all()                >> Agg(op = 'bool'),
         'any': _.any()                >> Agg(op = 'bool'),
-        'autocorr': _.autocorr()      >> Window(),
+        #'autocorr': _.autocorr()      >> Window(), # TODO: missing on GDF
         'between': _.between(2, 5)    >> Elwise(),
         'clip': _.clip(2, 5)          >> Elwise(),
         # clip_lower                                # TODO: deprecated
@@ -192,10 +192,10 @@ funcs = {
         #'corr': _.corr(_)             >> Agg(),
         'count': _.count()            >> Agg(),
         #'cov': _.cov(_)               >> Agg(),
-        'cummax': _.cummax()          >> Window(),
-        'cummin': _.cummin()          >> Window(),
-        'cumprod': _.cumprod()        >> Window(),
-        'cumsum': _.cumsum()          >> Window(),
+        'cummax': _.cummax()          >> Window(xfail = ['postgresql']),
+        'cummin': _.cummin()          >> Window(xfail = ['postgresql']),
+        'cumprod': _.cumprod()        >> Window(xfail = ['postgresql']),
+        'cumsum': _.cumsum()          >> Window(xfail = ['postgresql']),
         # describe
         'diff': _.diff()              >> Window(),
         # factorize
@@ -208,10 +208,10 @@ funcs = {
         #'mode': _.mode()              >> Agg(),   # TODO: doesn't exist on GDF, can return > 1 result
         #'nlargest': _.nlargest()      >> Window(),
         #'nsmallest': _.nsmallest()    >> Window(),
-        'pct_change': _.pct_change()  >> Window(),
+        'pct_change': _.pct_change()  >> Window(xfail = ['postgresql']),
         'prod': _.prod()              >> Agg(xfail = ['postgresql']),
         'quantile': _.quantile(.75)      >> Agg(no_mutate = ['postgresql']),
-        'rank': _.rank()              >> Window(),
+        'rank': _.rank()              >> Window(xfail = ['postgresql']),
         'sem': _.sem()                >> Agg(xfail = ['postgresql']),
         'skew': _.skew()              >> Agg(xfail = ['postgresql']),
         'std': _.std()                >> Agg(),
