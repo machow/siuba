@@ -86,6 +86,14 @@ def win_agg(name):
     sa_func = getattr(sql.func, name)
     return lambda col: AggOver(sa_func(col))
 
+def sql_func_diff(col, periods = 1):
+    if periods > 0:
+        return CumlOver(col - sql.func.lag(col, periods))
+    elif periods < 0:
+        return CumlOver(col - sql.func.lead(col, abs(periods)))
+
+    raise ValueError("periods argument to sql diff cannot be 0")
+
 
 # Ordered and theoretical set aggregates ----
 
@@ -411,6 +419,7 @@ base_win = dict(
         cumsum = win_cumul("sum"),
         #cummin
         #cummax
+        diff = sql_func_diff,
 
         # POSTGRES compatibility ----------------------------------------------
         # computations
