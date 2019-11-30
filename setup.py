@@ -23,7 +23,10 @@ setup(
     url='https://github.com/machow/siuba',
     keywords=['package', ],
     install_requires = [
-        "pandas"
+        "pandas>=0.24.0",
+        "numpy>=1.12.0",
+        "SQLAlchemy>=1.1.18",
+        "psycopg2>=2.7.0",
     ],
     include_package_data=True,
     classifiers=[
