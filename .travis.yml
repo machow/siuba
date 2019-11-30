@@ -7,9 +7,18 @@ python:
   - "3.7-dev"  # 3.7 development branch
   - "3.8-dev"
 # command to install dependencies
-install:
-  - pip install -r requirements.txt
-  - pip install .
+jobs:
+  include:
+  - install:
+      - pip install -r requirements.txt
+      - pip install .
+  - install:
+      - pip install numpy==1.17.4 pandas==0.24.2 SQLAlchemy==1.2.19 psycopg2==2.8.4
+      - pip install pytest==4.4.2 hypothesis==4.50.2
+  - install:
+      - pip install numpy==1.17.4 pandas~=0.25.3 SQLAlchemy~=1.3.11 psycopg2~=2.8.4
+      - pip install pytest==4.4.2 hypothesis==4.50.2
+      
 # command to run tests
 services:
   - postgresql
