@@ -22,12 +22,13 @@ setup(
     author_email='mc_al_gh_siuba@fastmail.com',
     url='https://github.com/machow/siuba',
     keywords=['package', ],
-    install_requires = [
+    install_requires=[
         "pandas>=0.24.0",
         "numpy>=1.12.0",
         "SQLAlchemy>=1.1.18",
         "psycopg2>=2.7.0",
     ],
+    python_requires=">=3.6",
     include_package_data=True,
     classifiers=[
         'Programming Language :: Python :: 3',
