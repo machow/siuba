@@ -13,7 +13,31 @@ from sqlalchemy import sql
 from sqlalchemy.sql import sqltypes as types, func as fn
 from functools import singledispatch
 from .verbs import case_when, if_else
+
+# warning for when sql defaults differ from pandas ============================
 import warnings
+
+
+class SiubaSqlRuntimeWarning(UserWarning): pass
+
+def warn_arg_default(func_name, arg_name, arg, correct):
+    warnings.warn(
+            "\n{func_name} sql translation defaults "
+            "{arg_name} to {arg}. To return identical result as pandas, use "
+            "{arg_name} = {correct}.\n\n"
+            "This warning only displays once per function".format(
+                func_name = func_name, arg_name = arg_name, arg = repr(arg), correct = repr(correct)
+                ),
+            SiubaSqlRuntimeWarning
+            )
+
+# Custom dispatching in call trees ============================================
+from sqlalchemy.sql.elements import ColumnClause
+from sqlalchemy.sql.base import ImmutableColumnCollection
+
+class SqlColumn(ColumnClause): pass
+
+class SqlColumnAgg(SqlColumn): pass
 
 # Custom over clause handling  ================================================
 
@@ -22,6 +46,13 @@ def sa_is_window(clause):
     return isinstance(clause, sql.elements.Over) \
             or isinstance(clause, sql.elements.WithinGroup)
 
+def sa_get_over_clauses(clause):
+    windows = []
+    append_win = lambda col: windows.append(col)
+
+    sql.util.visitors.traverse(clause, {}, {"over": append_win})
+
+    return windows
 
 def sa_modify_window(clause, group_by = None, order_by = None):
     if group_by:
@@ -46,7 +77,8 @@ class AggOver(Over, CustomOverClause):
 
 class RankOver(Over, CustomOverClause): 
     def set_over(self, group_by, order_by = None):
-        self.partition_by = group_by
+        crnt_partition = getattr(self.partition_by, 'clauses', tuple())
+        self.partition_by = sql.elements.ClauseList(*crnt_partition, *group_by.clauses)
         return self
 
 
@@ -69,22 +101,32 @@ class CumlOver(Over, CustomOverClause):
 # Windows ----
 
 def win_absent(name):
-    def not_implemented(*args, **kwargs):
+    from typing import Any
+    def not_implemented(*args, **kwargs) -> Any:
         raise NotImplementedError("SQL dialect does not support {}.".format(name))
     
     return not_implemented
 
-def win_over(name):
+def win_over(name: str):
     sa_func = getattr(sql.func, name)
-    return lambda col: RankOver(sa_func(), order_by = col)
+    def f(col) -> RankOver:
+        return RankOver(sa_func(), order_by = col)
+
+    return f
 
 def win_cumul(name):
     sa_func = getattr(sql.func, name)
-    return lambda col: CumlOver(sa_func(col), rows = (None,0))
+    def f(col, *args, **kwargs) -> CumlOver:
+        return CumlOver(sa_func(col, *args, **kwargs), rows = (None,0))
+
+    return f
 
 def win_agg(name):
     sa_func = getattr(sql.func, name)
-    return lambda col: AggOver(sa_func(col))
+    def f(col, *args, **kwargs) -> AggOver:
+        return AggOver(sa_func(col, *args, **kwargs))
+
+    return f
 
 def sql_func_diff(col, periods = 1):
     if periods > 0:
@@ -164,7 +206,7 @@ def sql_scalar(name):
     return lambda col, *args: sa_func(col, *args)
 
 def sql_colmeth(meth, *outerargs):
-    def f(col, *args):
+    def f(col, *args) -> SqlColumn:
         return getattr(col, meth)(*outerargs, *args)
     return f
 
@@ -223,10 +265,8 @@ base_scalar = dict(
         notna = lambda col: ~col.is_(None),
         fillna = sql.functions.coalesce,
         # dply.vector funcs ----
-        desc = lambda col: col.desc(),
-        
+
         # TODO: move to postgres specific
-        n = lambda col: sql.func.count(),
         # TODO: this is to support a DictCall (e.g. used in case_when)
         dict = dict,
         # TODO: don't use singledispatch to add sql support to case_when
@@ -377,7 +417,6 @@ base_agg = dict(
         count = sql_agg("count"),
         # TODO: generalize case where doesn't use col
         # need better handeling of vector funcs
-        n_distinct = lambda col: sql.func.count(sql.func.distinct(col)),
         nunique = lambda col: sql.func.count(sql.func.distinct(col)),
 
         # POSTGRES compatibility ----------------------------------------------
@@ -385,12 +424,7 @@ base_agg = dict(
         )
 
 base_win = dict(
-        row_number = lambda col: CumlOver(sql.func.row_number()),
-        min_rank = win_over("rank"),
         rank = win_over("rank"),
-        dense_rank = win_over("dense_rank"),
-        percent_rank = win_over("percent_rank"),
-        cume_dist = win_over("cume_dist"),
         #first = win_over2("first"),
         #last = win_over2("last"),
         #nth = win_over3
@@ -429,8 +463,8 @@ base_win = dict(
 
 # based on https://github.com/tidyverse/dbplyr/blob/master/R/backend-.R
 base_nowin = dict(
-        row_number   = win_absent("ROW_NUMBER"),
-        min_rank     = win_absent("RANK"),
+        #row_number   = win_absent("ROW_NUMBER"),
+        #min_rank     = win_absent("RANK"),
         rank         = win_absent("RANK"),
         dense_rank   = win_absent("DENSE_RANK"),
         percent_rank = win_absent("PERCENT_RANK"),

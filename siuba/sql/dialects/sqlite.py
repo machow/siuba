@@ -1,7 +1,12 @@
 # sqlvariant, allow defining 3 namespaces to override defaults
-from ..translate import base_scalar, base_agg, base_nowin, SqlTranslator, win_agg
+from ..translate import SqlColumn, SqlColumnAgg, base_scalar, base_agg, base_nowin, SqlTranslator, win_agg
 import sqlalchemy.sql.sqltypes as sa_types
 from sqlalchemy import sql
+
+# Custom dispatching in call trees ============================================
+
+class SqliteColumn(SqlColumn): pass
+class SqliteColumnAgg(SqlColumnAgg, SqliteColumn): pass
 
 scalar = SqlTranslator(
         base_scalar,

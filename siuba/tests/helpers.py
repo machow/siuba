@@ -44,6 +44,9 @@ class Backend:
 
         return df
 
+    def load_cached_df(self, df):
+        return df
+
     def __repr__(self):
         return "{0}({1})".format(self.__class__.__name__, repr(self.name))
 
@@ -60,6 +63,7 @@ class SqlBackend(Backend):
 
         self.name = name
         self.engine = create_engine(self.sa_conn_fmt.format(**params))
+        self.cache = {}
 
     def dispose(self):
         self.engine.dispose()
@@ -72,6 +76,19 @@ class SqlBackend(Backend):
     def load_df(self, df = None, **kwargs):
         df = super().load_df(df, **kwargs)
         return copy_to_sql(df, self.unique_table_name(), self.engine)
+
+    def load_cached_df(self, df):
+        import hashlib
+        from pandas import util
+        hash_arr = util.hash_pandas_object(df, index=True).values
+        hashed = hashlib.sha256(hash_arr).hexdigest()
+
+        if hashed in self.cache:
+            return self.cache[hashed]
+        
+        res = self.cache[hashed] = self.load_df(df)
+
+        return res
 
 
 def robust_multiple_sort(df, by):
@@ -92,24 +109,24 @@ def robust_multiple_sort(df, by):
 
     return out.reset_index(drop = True)
 
-def assert_frame_sort_equal(a, b):
+def assert_frame_sort_equal(a, b, **kwargs):
     """Tests that DataFrames are equal, even if rows are in different order"""
     df_a = ungroup(a)
     df_b = ungroup(b)
     sorted_a = robust_multiple_sort(df_a, list(df_b.columns)).reset_index(drop = True)
     sorted_b = robust_multiple_sort(df_b, list(df_b.columns)).reset_index(drop = True)
 
-    assert_frame_equal(sorted_a, sorted_b)
+    assert_frame_equal(sorted_a, sorted_b, **kwargs)
 
-def assert_equal_query(tbl, lazy_query, target):
+def assert_equal_query(tbl, lazy_query, target, **kwargs):
     out = collect(lazy_query(tbl))
 
     if isinstance(tbl, pd.DataFrame):
         df_a = ungroup(out).reset_index(drop = True)
         df_b = ungroup(target).reset_index(drop = True)
-        assert_frame_equal(df_a, df_b)
+        assert_frame_equal(df_a, df_b, **kwargs)
     else:
-        assert_frame_sort_equal(out, target)
+        assert_frame_sort_equal(out, target, **kwargs)
 
 
 PREFIX_TO_TYPE = {

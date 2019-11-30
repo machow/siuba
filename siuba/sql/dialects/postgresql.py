@@ -1,10 +1,21 @@
 # sqlvariant, allow defining 3 namespaces to override defaults
 from ..translate import (
+        SqlColumn, SqlColumnAgg,
         base_scalar, base_agg, base_win, SqlTranslator, 
-        win_agg, sql_scalar
+        win_agg, sql_scalar,
         )
 import sqlalchemy.sql.sqltypes as sa_types
 from sqlalchemy import sql
+
+
+# Custom dispatching in call trees ============================================
+
+class PostgresqlColumn(SqlColumn): pass
+
+class PostgresqlColumnAgg(SqlColumnAgg, PostgresqlColumn): pass
+
+# Custom translations =========================================================
+
 
 def sql_log(col, base = None):
     if base is None:

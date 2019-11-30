@@ -17,8 +17,8 @@ from siuba.dply.verbs import (
         distinct,
         if_else
         )
-from .translate import sa_modify_window, sa_is_window, CustomOverClause
-from .utils import get_dialect_funcs
+from .translate import sa_get_over_clauses, CustomOverClause, SqlColumn, SqlColumnAgg
+from .utils import get_dialect_funcs, get_sql_classes
 
 from sqlalchemy import sql
 import sqlalchemy
@@ -69,9 +69,16 @@ class WindowReplacer(CallListener):
         self.windows = []
 
     def exit(self, node):
-        # evaluate
         col_expr = node(self.columns)
-        if isinstance(col_expr, CustomOverClause):
+
+        if not isinstance(col_expr, sql.elements.ClauseElement):
+            return col_expr
+
+        over_clauses = [x for x in sa_get_over_clauses(col_expr) if isinstance(x, CustomOverClause)]
+
+        # put groupings and orderings onto custom over clauses
+        for over in over_clauses:
+            # TODO: shouldn't mutate these over clauses
             group_by = sql.elements.ClauseList(
                     *[self.columns[name] for name in self.group_by]
                     )
@@ -79,18 +86,17 @@ class WindowReplacer(CallListener):
                     *_create_order_by_clause(self.columns, *self.order_by)
                     )
 
-            label = col_expr.set_over(group_by, order_by).label(None)
-            #label = sa_modify_window(col_expr, self.columns, self.group_by).label(None)
+            over.set_over(group_by, order_by)
 
+        if len(over_clauses) and self.window_cte is not None:
+            label = col_expr.label(None)
             self.windows.append(label)
 
-            if self.window_cte is not None:
-                self.window_cte.append_column(label)
-                win_col = self.window_cte.c.values()[-1]
-                return win_col
+            # optionally put into CTE, and return its resulting column
+            self.window_cte.append_column(label)
+            win_col = self.window_cte.c.values()[-1]
+            return win_col
                 
-            return label
-
         return col_expr
 
 
@@ -152,7 +158,9 @@ class LazyTbl:
     def __init__(
             self, source, tbl, columns = None,
             ops = None, group_by = tuple(), order_by = tuple(), funcs = None,
-            rm_attr = ('str', 'dt'), call_sub_attr = ('dt', 'str')
+            rm_attr = ('str', 'dt'), call_sub_attr = ('dt', 'str'),
+            dispatch_cls = None,
+            result_cls = sql.elements.ClauseElement
             ):
         """Create a representation of a SQL table.
 
@@ -178,7 +186,11 @@ class LazyTbl:
         
         # connection and dialect specific functions
         self.source = sqlalchemy.create_engine(source) if isinstance(source, str) else source
-        self.funcs = get_dialect_funcs(self.source.dialect.name) if funcs is None else funcs
+
+        dialect = self.source.dialect.name
+        self.funcs = get_dialect_funcs(dialect) if funcs is None else funcs
+        self.dispatch_cls = get_sql_classes(dialect) if dispatch_cls is None else dispatch_cls
+        self.result_cls = result_cls
 
         self.tbl = self._create_table(tbl, columns, self.source)
 
@@ -192,6 +204,8 @@ class LazyTbl:
         self.rm_attr = rm_attr
         self.call_sub_attr = call_sub_attr
 
+        self.result_cls = result_cls
+
 
     def append_op(self, op, **kwargs):
         cpy = self.copy(**kwargs)
@@ -204,9 +218,10 @@ class LazyTbl:
     def shape_call(
             self,
             call, window = True, str_accessors = False,
-            verb_name = None, arg_name = None
+            verb_name = None, arg_name = None,
             ):
         # TODO: error if mutate receives a literal value?
+        # TODO: dispatch_cls currently unused
         if str_accessors and isinstance(call, str):
             # verbs that can use strings as accessors, like group_by, or
             # arrange, need to convert those strings into a getitem call
@@ -218,14 +233,21 @@ class LazyTbl:
             # that returns a sqlalchemy "literal" object
             return Lazy(sql.literal(call))
 
-
+        # set up locals funcs dict
         f_dict1 = self.funcs['scalar']
         f_dict2 = self.funcs['window' if window else 'aggregate']
 
         funcs = {**f_dict1, **f_dict2}
+
+        # determine dispatch class
+        cls_name = 'window' if window else 'aggregate'
+        dispatch_cls = self.dispatch_cls[cls_name]
+
         call_shaper = CallTreeLocal(
                 funcs,
-                call_sub_attr = self.call_sub_attr
+                call_sub_attr = self.call_sub_attr,
+                dispatch_cls = dispatch_cls,
+                result_cls = self.result_cls
                 )
 
         # raise informative error message if missing translation
@@ -279,7 +301,7 @@ class LazyTbl:
 
         return sqlalchemy.Table(
                 table_name,
-                sqlalchemy.MetaData(),
+                sqlalchemy.MetaData(bind = source),
                 *columns,
                 schema = schema,
                 autoload_with = source if not columns else None
