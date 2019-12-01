@@ -41,11 +41,6 @@ def sql_func_contains(col, pat, case = True, flags = 0, na = None, regex = True)
 
     return col.op(full_op)(pat)
 
-# handle when others is a list?
-def sql_str_cat(col, others, sep, join = None):
-    if join is not None:
-        raise NotImplementedError("join argument of cat not supported")
-
 scalar = SqlTranslator(
         base_scalar,
         log = sql_log,
