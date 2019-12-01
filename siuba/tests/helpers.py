@@ -113,7 +113,7 @@ def assert_frame_sort_equal(a, b, **kwargs):
     """Tests that DataFrames are equal, even if rows are in different order"""
     df_a = ungroup(a)
     df_b = ungroup(b)
-    sorted_a = robust_multiple_sort(df_a, list(df_b.columns)).reset_index(drop = True)
+    sorted_a = robust_multiple_sort(df_a, list(df_a.columns)).reset_index(drop = True)
     sorted_b = robust_multiple_sort(df_b, list(df_b.columns)).reset_index(drop = True)
 
     assert_frame_equal(sorted_a, sorted_b, **kwargs)
