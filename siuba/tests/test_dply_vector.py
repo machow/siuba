@@ -18,7 +18,7 @@ from .helpers import assert_equal_query, data_frame, backend_sql
 from pandas.testing import assert_frame_equal
 
 DATA_SPEC = data_frames([
-        column('x', elements = floats() | integers(), unique = True),
+        column('x', elements = floats(width = 32) | integers(), unique = True),
         column('g', dtype = str, elements = text(max_size = 1))
         ],
         index = indexes(elements = floats() | integers(), max_size = 10)
