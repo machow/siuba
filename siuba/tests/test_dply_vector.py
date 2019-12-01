@@ -5,24 +5,23 @@ results.
 """
 import pytest
 
-from siuba import _, mutate, group_by, summarize
+from siuba import _, mutate, group_by, summarize, filter
 import siuba.sql.dply
 from siuba.dply import vector as v
 from datetime import timedelta
 
 from hypothesis import given, settings, example
 from hypothesis.strategies import text, floats, integers
-from hypothesis.extra.pandas import data_frames, column, range_indexes 
-from hypothesis.extra.numpy import integer_dtypes, floating_dtypes
+from hypothesis.extra.pandas import data_frames, column, indexes 
 
-from .helpers import assert_equal_query, data_frame
+from .helpers import assert_equal_query, data_frame, backend_sql
 from pandas.testing import assert_frame_equal
 
 DATA_SPEC = data_frames([
         column('x', elements = floats() | integers(), unique = True),
         column('g', dtype = str, elements = text(max_size = 1))
         ],
-        index = range_indexes(min_size = 1, max_size = 10)
+        index = indexes(elements = floats() | integers(), max_size = 10)
     )
 
 OMNIBUS_VECTOR_FUNCS = [
@@ -49,6 +48,18 @@ VECTOR_AGG_FUNCS = [
         v.n(_),
         ]
 
+VECTOR_FILTER_FUNCS = [
+        v.dense_rank(_.x, na_option = "keep") < 2,
+        v.min_rank(_.x, na_option = "keep") < 2,
+        v.cume_dist(_.x, na_option = "keep") < .3,
+        v.row_number(_.x) < 2,
+        v.between(_.x, 2, 3),
+        v.lead(_.x) > _.x,
+        v.lag(_.x) > _.x,
+        v.n(_.x) == 1,
+        v.na_if(_.x, 1).isna()
+        ]
+
 @pytest.fixture(params = [
     data_frame(x = [1,2,3], g = ['a', 'a', 'b']),
     data_frame(x = [1.,2.,3.], g = ['a', 'a', 'b']),
@@ -57,9 +68,6 @@ VECTOR_AGG_FUNCS = [
 def simple_data(request):
     return request.param
 
-@example(data_frame(x = [1,2,3], g = ['a', 'a', 'b']))
-@example(data_frame(x = [1.,2.,3.], g = ['a', 'a', 'b']))
-@example(data_frame(x = [1.,2.,None], g = ['a', 'a', 'b']))
 @pytest.mark.parametrize('func', OMNIBUS_VECTOR_FUNCS)
 def test_mutate_vector(backend, func, simple_data):
     if backend.name == 'sqlite':
@@ -74,13 +82,7 @@ def test_mutate_vector(backend, func, simple_data):
             check_dtype = False
             )
 
-@pytest.mark.parametrize('func', OMNIBUS_VECTOR_FUNCS)
-def test_mutate_vector_grouped(backend, func, simple_data):
-    if backend.name == 'sqlite':
-        pytest.skip()
-
-    df = backend.load_cached_df(simple_data)
-    
+    # grouped
     assert_equal_query(
             df,
             group_by(_.g) >> mutate(y = func),
@@ -91,7 +93,6 @@ def test_mutate_vector_grouped(backend, func, simple_data):
 
 @pytest.mark.parametrize('func', VECTOR_AGG_FUNCS)
 def test_agg_vector(backend, func, simple_data):
-    from siuba.siu import strip_symbolic
     if backend.name == 'sqlite':
         pytest.skip()
 
@@ -105,13 +106,7 @@ def test_agg_vector(backend, func, simple_data):
             res 
             )
 
-@pytest.mark.parametrize('func', VECTOR_AGG_FUNCS)
-def test_agg_vector_grouped(backend, func, simple_data):
-    if backend.name == 'sqlite':
-        pytest.skip()
-
-    df = backend.load_cached_df(simple_data)
-
+    # grouped
     assert_equal_query(
             df,
             group_by(_.g) >> summarize(y = func),
@@ -119,9 +114,36 @@ def test_agg_vector_grouped(backend, func, simple_data):
             )
 
 
+@backend_sql
+@pytest.mark.parametrize('func', VECTOR_FILTER_FUNCS)
+def test_filter_vector(backend, func, simple_data):
+    if backend.name == 'sqlite':
+        pytest.skip()
+
+    df = backend.load_cached_df(simple_data)
+
+    res = data_frame(y = func(simple_data))
+
+    assert_equal_query(
+            df,
+            filter(func),
+            filter(simple_data, func),
+            # ignore dtypes, since sql -> an empty data frame has object columns
+            check_dtype = False
+            )
+
+    # grouped (vs slow_filter)
+    assert_equal_query(
+            df,
+            group_by(_.g) >> filter(func),
+            simple_data >> group_by(_.g) >> filter(func),
+            check_dtype = False
+            )
+
+
 @given(DATA_SPEC)
 @settings(max_examples = 50, deadline = 1000)
-def test_omnibus_vector_funcs(backend, data):
+def test_hypothesis_mutate_vector_funcs(backend, data):
     if backend.name == 'sqlite':
         pytest.skip()
 

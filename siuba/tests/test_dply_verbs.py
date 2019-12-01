@@ -28,12 +28,18 @@ def df1():
     ])
 def test_verb_accepts_non_range_indexing(df1, f, expr):
     tmp_df = df1.copy()
-    tmp_df.index = [4,3,2,1]
+    tmp_df['orig_index'] = df1.index.values
+    tmp_df.index = [3,2,1,0]
 
     res1 = f(tmp_df, expr)
     res2 = f(df1, expr)
 
-    assert_frame_equal(res1, res2)
+    assert list(res1.orig_index) == list(res2.index)
+
+    assert_frame_equal(
+            res1.drop(columns = 'orig_index').reset_index(drop = True),
+            res2.reset_index(drop = True)
+            )
 
 
 # mutate ------
