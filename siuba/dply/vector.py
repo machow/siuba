@@ -184,11 +184,22 @@ def row_number(x):
     """Return the row number (position) for each value in x, beginning with 1.
 
     Example:
-        >>> row_number(pd.Series([7,8,9]))
+        >>> ser = pd.Series([7,8])
+        >>> row_number(ser)
         0    1
         1    2
-        2    3
         dtype: int64
+
+        >>> row_number(pd.DataFrame({'a': ser}))
+        0    1
+        1    2
+        dtype: int64
+
+        >>> row_number(pd.Series([7,8], index = [3, 4]))
+        3    1
+        4    2
+        dtype: int64
+
 
     """
     if isinstance(x, pd.DataFrame):
@@ -202,7 +213,7 @@ def row_number(x):
     if isinstance(x, pd.Series):
         return x._constructor(arr, x.index, fastpath = True)
 
-    return pd.Series(arr)
+    return pd.Series(arr, x.index, fastpath = True)
 
 
 @row_number.register(GroupBy)
