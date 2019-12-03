@@ -20,6 +20,7 @@ siuba is a port of [dplyr](https://github.com/tidyverse/dplyr) and other R libra
 These actions can be preceeded by a `group_by()`, which causes them to be applied individually to grouped rows of data. Moreover, many SQL concepts, such as `distinct()`, `count()`, and joins are implemented.
 Inputs to these functions can be a pandas `DataFrame` or SQL connection (currently postgres, redshift, or sqlite).
 
+For more on the rationale behind tools like dplyr, see this [tidyverse paper](https://tidyverse.tidyverse.org/articles/paper.html). 
 For examples of siuba in action, see the [siuba documentation](https://siuba.readthedocs.io/en/latest/intro.html).
 
 Installation
