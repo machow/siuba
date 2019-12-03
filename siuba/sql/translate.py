@@ -10,16 +10,49 @@ This module holds default translations from pandas syntax to sql for 3 kinds of 
 """
 
 from sqlalchemy import sql
-from sqlalchemy.sql import sqltypes as types
+from sqlalchemy.sql import sqltypes as types, func as fn
 from functools import singledispatch
 from .verbs import case_when, if_else
+
+# warning for when sql defaults differ from pandas ============================
 import warnings
+
+
+class SiubaSqlRuntimeWarning(UserWarning): pass
+
+def warn_arg_default(func_name, arg_name, arg, correct):
+    warnings.warn(
+            "\n{func_name} sql translation defaults "
+            "{arg_name} to {arg}. To return identical result as pandas, use "
+            "{arg_name} = {correct}.\n\n"
+            "This warning only displays once per function".format(
+                func_name = func_name, arg_name = arg_name, arg = repr(arg), correct = repr(correct)
+                ),
+            SiubaSqlRuntimeWarning
+            )
+
+# Custom dispatching in call trees ============================================
+from sqlalchemy.sql.elements import ColumnClause
+from sqlalchemy.sql.base import ImmutableColumnCollection
+
+class SqlColumn(ColumnClause): pass
+
+class SqlColumnAgg(SqlColumn): pass
+
+# Custom over clause handling  ================================================
 
 # TODO: must make these take both tbl, col as args, since hard to find window funcs
 def sa_is_window(clause):
     return isinstance(clause, sql.elements.Over) \
             or isinstance(clause, sql.elements.WithinGroup)
 
+def sa_get_over_clauses(clause):
+    windows = []
+    append_win = lambda col: windows.append(col)
+
+    sql.util.visitors.traverse(clause, {}, {"over": append_win})
+
+    return windows
 
 def sa_modify_window(clause, group_by = None, order_by = None):
     if group_by:
@@ -33,10 +66,6 @@ def sa_modify_window(clause, group_by = None, order_by = None):
     return clause
 
 from sqlalchemy.sql.elements import Over
-# windowed agg (group by)
-# agg
-# windowed scalar
-# ordered set agg
 
 class CustomOverClause: pass
 
@@ -48,7 +77,8 @@ class AggOver(Over, CustomOverClause):
 
 class RankOver(Over, CustomOverClause): 
     def set_over(self, group_by, order_by = None):
-        self.partition_by = group_by
+        crnt_partition = getattr(self.partition_by, 'clauses', tuple())
+        self.partition_by = sql.elements.ClauseList(*crnt_partition, *group_by.clauses)
         return self
 
 
@@ -66,49 +96,145 @@ class CumlOver(Over, CustomOverClause):
         return self
 
 
+# Translator creation funcs ===================================================
+
+# Windows ----
+
 def win_absent(name):
-    def not_implemented(*args, **kwargs):
+    from typing import Any
+    def not_implemented(*args, **kwargs) -> Any:
         raise NotImplementedError("SQL dialect does not support {}.".format(name))
     
     return not_implemented
 
-def win_over(name):
+def win_over(name: str):
     sa_func = getattr(sql.func, name)
-    return lambda col: RankOver(sa_func(), order_by = col)
+    def f(col) -> RankOver:
+        return RankOver(sa_func(), order_by = col)
+
+    return f
 
 def win_cumul(name):
     sa_func = getattr(sql.func, name)
-    return lambda col: CumlOver(sa_func(col), rows = (None,0))
+    def f(col, *args, **kwargs) -> CumlOver:
+        return CumlOver(sa_func(col, *args, **kwargs), rows = (None,0))
+
+    return f
 
 def win_agg(name):
     sa_func = getattr(sql.func, name)
-    return lambda col: AggOver(sa_func(col))
+    def f(col, *args, **kwargs) -> AggOver:
+        return AggOver(sa_func(col, *args, **kwargs))
+
+    return f
+
+def sql_func_diff(col, periods = 1):
+    if periods > 0:
+        return CumlOver(col - sql.func.lag(col, periods))
+    elif periods < 0:
+        return CumlOver(col - sql.func.lead(col, abs(periods)))
+
+    raise ValueError("periods argument to sql diff cannot be 0")
+
+
+# Ordered and theoretical set aggregates ----
+
+def set_agg(name):
+    sa_func = getattr(sql.func, name)
+    return lambda col, *args: sa_func(*args).within_group(col)
+
+# Datetime ----
+
+def sql_extract(name):
+    return lambda col: sql.func.extract(name, col)
+
+def sql_func_extract_dow_monday(col):
+    # make monday = 0 rather than sunday
+    monday0 = sql.cast(sql.func.extract('dow', col) + 6, types.Integer) % 7
+    # cast to numeric, since that's what extract('dow') returns
+    return sql.cast(monday0, types.Numeric)
+
+def sql_is_first_of(name, reference):
+    return lambda col: fn.date_trunc(name, col) == fn.date_trunc(reference, col)
+
+def sql_func_last_day_in_period(col, period):
+    return fn.date_trunc(period, col) + sql.text("interval '1 %s - 1 day'" % period)
+
+def sql_func_days_in_month(col):
+    return fn.extract('day', sql_func_last_day_in_period(col, 'month'))
+
+def sql_is_last_day_of(period):
+    def f(col):
+        last_day = sql_func_last_day_in_period(col, period)
+        return fn.date_trunc('day', col) == last_day
+
+    return f
+
+def sql_func_floor_date(col, unit):
+    # see https://www.postgresql.org/docs/9.1/functions-datetime.html#FUNCTIONS-DATETIME-TRUNC
+    # valid values: 
+    #   microseconds, milliseconds, second, minute, hour,
+    #   day, week, month, quarter, year, decade, century, millennium
+    # TODO: implement in siuba.dply.lubridate
+    return fn.date_trunc(unit, col)
+
+
+# Strings ----
+
+def sql_str_strip(name):
+    
+    strip_func = getattr(fn, name)
+    def f(col, to_strip = " \t\n\v\f\r"):
+        return strip_func(col, to_strip)
+
+    return f
+
+def sql_func_capitalize(col):
+    first_char = fn.upper(fn.left(col, 1)) 
+    rest = fn.right(col, fn.length(col) - 1)
+    return first_char.op('||')(rest)
+
+
+# Others ----
 
 def sql_agg(name):
     sa_func = getattr(sql.func, name)
     return lambda col: sa_func(col)
 
-def sql_scalar(name, *args):
+def sql_scalar(name):
     sa_func = getattr(sql.func, name)
-    return lambda col: sa_func(col, *args)
+    return lambda col, *args: sa_func(col, *args)
 
 def sql_colmeth(meth, *outerargs):
-    def f(col, *args):
+    def f(col, *args) -> SqlColumn:
         return getattr(col, meth)(*outerargs, *args)
     return f
 
-def sql_astype(col, _type):
+def sql_not_impl():
+    return NotImplementedError
+
+
+# Custom implementations ----
+
+def sql_func_astype(col, _type):
     mappings = {
             str: types.Text,
+            'str': types.Text,
             int: types.Integer,
+            'int': types.Integer,
             float: types.Numeric,
-            bool: types.Boolean
+            'float': types.Numeric,
+            bool: types.Boolean,
+            'bool': types.Boolean
             }
     try:
         sa_type = mappings[_type]
     except KeyError:
         raise ValueError("sql astype currently only supports type objects: str, int, float, bool")
     return sql.cast(col, sa_type)
+
+
+# Base translations ===========================================================
 
 base_scalar = dict(
         # infix operators -----
@@ -117,8 +243,6 @@ base_scalar = dict(
 
         # sqlalchemy.ColumnElement methods ----
         cast = sql_colmeth("cast"),
-        startswith = sql_colmeth("startswith"),
-        endswith = sql_colmeth("endswith"),
         between = sql_colmeth("between"),
         isin = sql_colmeth("in_"),
 
@@ -133,30 +257,156 @@ base_scalar = dict(
         atan2 = sql_scalar("atan2"),
         cos = sql_scalar("cos"),
         cot = sql_scalar("cot"),
-        astype = sql_astype,
+        astype = sql_func_astype,
         # I was lazy here and wrote lambdas directly ---
         # TODO: I think these are postgres specific?
-        hour = lambda col: sql.func.date_trunc('hour', col),
-        week = lambda col: sql.func.date_trunc('week', col),
         isna = sql_colmeth("is_", None),
         isnull = sql_colmeth("is_", None),
+        notna = lambda col: ~col.is_(None),
+        fillna = sql.functions.coalesce,
         # dply.vector funcs ----
-        desc = lambda col: col.desc(),
-        
-        # TODO: string methods
-        #str.len,
-        #str.upper,
-        #str.lower,
-        #str.replace_all or something similar,
-        #str_detect or similar,
-        #str_trim func to cut text off sides
+
         # TODO: move to postgres specific
-        n = lambda col: sql.func.count(),
         # TODO: this is to support a DictCall (e.g. used in case_when)
         dict = dict,
         # TODO: don't use singledispatch to add sql support to case_when
         case_when = case_when,
-        if_else = if_else
+        if_else = if_else,
+
+        # POSTGRES compatility ------------------------------------------------
+        # _special_methods
+        __round__ = sql_scalar("round"),
+
+        #
+        copy = sql_not_impl(),
+
+        # binary
+        add = sql_colmeth('__add__'),
+        sub = sql_colmeth('__sub__'),
+        #truediv
+        #floordiv
+        mul = sql_colmeth('__mul__'),
+        mod = sql_colmeth('__mod__'),
+        #pow = sql_colmeth('__pow__'),
+        lt = sql_colmeth('__lt__'),
+        gt = sql_colmeth('__gt__'),
+        le = sql_colmeth('__le__'),
+        ge = sql_colmeth('__ge__'),
+        ne = sql_colmeth('__ne__'),
+        eq = sql_colmeth('__eq__'),
+        #round = sql_scalar("round"),
+        radd = sql_colmeth('__radd__'),
+        rsub = sql_colmeth('__rsub__'),
+        #rtruediv
+        #rfloordiv
+        rmul = sql_colmeth('__rmul__'),
+        rmod = sql_colmeth('__rmod__'),
+
+        # computations ---
+        clip = lambda col, lower, upper: fn.least(fn.greatest(col, lower), upper),
+
+        # datetime_properties ---
+        date = sql_not_impl(),
+        time = sql_not_impl(),
+        timetz = sql_not_impl(),
+        year = sql_extract('year'),# , sql.cast(col, sql.sqltypes.Date)),
+        month = sql_extract('month'),
+        day = sql_extract('day'),
+        hour = sql_extract('hour'),
+        minute = sql_extract('minute'),
+        second = sql_extract('second'),
+        #microsecond = sql_extract('microsecond'), # TODO: postgres includes seconds
+        nanosecond = sql_not_impl(),
+        week = sql_extract('week'),
+        weekofyear = sql_extract('week'),
+        dayofweek = sql_func_extract_dow_monday,
+        weekday = sql_func_extract_dow_monday,
+        dayofyear = sql_extract('doy'),
+        quarter = sql_extract('quarter'),
+        is_month_start = sql_is_first_of('day', 'month'),
+        is_month_end = sql_is_last_day_of('month'),
+        is_quarter_start = sql_is_first_of('day', 'quarter'),
+        #is_quarter_end = sql_is_last_day_of('quarter'),
+        is_year_start = sql_is_first_of('day', 'year'),
+        is_year_end = sql_is_last_day_of('year'),
+        is_leap_year = sql_not_impl(),
+        daysinmonth = sql_func_days_in_month,
+        days_in_month = sql_func_days_in_month,
+        tz = sql_not_impl(),
+        freq = sql_not_impl(),
+
+        # datetime methods ---
+        #to_period = ,
+        ## dt.to_pydatetime
+        #tz_localize = 
+        ## dt.tz_convert
+        #normalize = 
+        #strftime = 
+        #round = 
+        #floor = 
+        #ceil = 
+        #month_name = 
+        #day_name =
+        # TODO: slotting in a floor_date method, since I can't do my job
+        #       or make common SQL queries without it....
+        floor_date = sql_func_floor_date,
+
+
+        # string methdos ---
+        
+        capitalize = sql_func_capitalize,
+        #casefold = ,
+        #cat  = ,
+        center = sql_not_impl(),
+        contains = sql_not_impl(),
+#        count = ,
+#        # str.decode
+#        encode = ,
+        endswith = sql_colmeth("endswith"),
+#        #extract = 
+#        # str.extractall
+#        find = ,
+#        findall = ,
+#        #get
+#        #index
+#        #join
+        len = sql.func.length,
+#        ljust = ,
+        lower = sql.func.lower,
+        # TODO: whitespace options based loosely on builtin string.isspace
+        lstrip = sql_str_strip('ltrim'),
+#        match = ,
+#        # str.normalize
+#        pad = ,
+#        # str.partition
+#        # str.repeat
+#        replace = ,
+#        rfind = ,
+#        # str.rindex
+#        rjust = ,
+#        # str.rpartition
+        rstrip = sql_str_strip('rtrim'),
+#        slice = ,
+#        slice_replace = ,
+#        split = ,
+#        rsplit = ,
+        startswith = sql_colmeth("startswith"),
+        strip = sql_str_strip('trim'),
+#        swapcase = ,
+        title = sql.func.initcap,
+#        # str.translate
+        upper = sql.func.upper,
+#        wrap = ,
+#        # str.zfill
+#        isalnum = ,
+#        isalpha = ,
+#        isdigit = ,
+#        isspace = ,
+#        islower = ,
+#        isupper = ,
+#        istitle = ,
+#        isnumeric = ,
+#        isdecimal = ,
         )
 
 base_agg = dict(
@@ -167,18 +417,14 @@ base_agg = dict(
         count = sql_agg("count"),
         # TODO: generalize case where doesn't use col
         # need better handeling of vector funcs
-        # TODO: delete this, len() is not a method anywhere, or vect func
-        len = lambda col: sql.func.count(),
-        n_distinct = lambda col: sql.func.count(sql.func.distinct(col))
+        nunique = lambda col: sql.func.count(sql.func.distinct(col)),
+
+        # POSTGRES compatibility ----------------------------------------------
+        quantile = set_agg("percentile_cont"),
         )
 
 base_win = dict(
-        row_number = lambda col: CumlOver(sql.func.row_number()),
-        min_rank = win_over("rank"),
         rank = win_over("rank"),
-        dense_rank = win_over("dense_rank"),
-        percent_rank = win_over("percent_rank"),
-        cume_dist = win_over("cume_dist"),
         #first = win_over2("first"),
         #last = win_over2("last"),
         #nth = win_over3
@@ -198,23 +444,27 @@ base_win = dict(
 
         # counts ----
         count = win_agg("count"),
-        len = lambda col: sql.func.count().over(),
         #n
         #n_distinct
 
         # cumulative funcs ---
         #avg("id") OVER (PARTITION BY "email" ORDER BY "id" ROWS UNBOUNDED PRECEDING)
         #cummean = win_agg("
-        cumsum = win_cumul("sum")
+        cumsum = win_cumul("sum"),
         #cummin
         #cummax
+        diff = sql_func_diff,
 
+        # POSTGRES compatibility ----------------------------------------------
+        # computations
+        #prod = lambda col: AggOver(fn.exp(fn.sum(fn.log(col)))),
+        std = win_agg("stddev_samp"),
         )
 
 # based on https://github.com/tidyverse/dbplyr/blob/master/R/backend-.R
 base_nowin = dict(
-        row_number   = win_absent("ROW_NUMBER"),
-        min_rank     = win_absent("RANK"),
+        #row_number   = win_absent("ROW_NUMBER"),
+        #min_rank     = win_absent("RANK"),
         rank         = win_absent("RANK"),
         dense_rank   = win_absent("DENSE_RANK"),
         percent_rank = win_absent("PERCENT_RANK"),

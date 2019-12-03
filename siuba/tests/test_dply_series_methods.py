@@ -4,7 +4,7 @@ from .helpers import data_frame, assert_equal_query, backend_pandas, SqlBackend
 import pytest
 # TODO: dot, corr, cov
 
-from siuba import filter, mutate, summarize
+from siuba import filter, mutate, summarize, group_by
 from pandas.testing import assert_frame_equal, assert_series_equal
 import numpy as np
 import pandas as pd
@@ -57,6 +57,12 @@ data_str = data_frame(
     x = ['abc', 'cde', 'fg', 'h']
     )
 
+data_bool = data_frame(
+    g = ['a', 'a', 'b', 'b'],
+    x = [True, False, True, False],
+    y = [True, True, False, False]
+        )
+
 data_default = data_frame(
     g = ['a', 'a', 'a', 'b', 'b', 'b'],
     x = [10, 11, 11, 13, 13, 13],
@@ -66,7 +72,8 @@ data_default = data_frame(
 data = {
     'dt': data_dt,
     'str': data_str,
-    None: data_default
+    None: data_default,
+    'bool': data_bool
 }
 
 # Tests =======================================================================
@@ -108,13 +115,24 @@ def test_frame_expr(entry):
     assert_src_array_equal(res, dst)
 
 
-@backend_pandas
-#@pytest.mark.skip_backend('sqlite')
-def test_frame_mutate(backend, entry):
-    if isinstance(backend, SqlBackend) and entry['result'].get('op') == 'bool':
-        pytest.xfail()
+#@backend_pandas
+@pytest.mark.skip_backend('sqlite')
+def test_frame_mutate(skip_backend, backend, entry):
+    # CASE 1: Needs to be implmented
+    if backend.name in entry['result'].get('xfail', []):
+        pytest.xfail("TODO: impelement this translation")
+    
+    # CASE 2: Can't be used in a mutate (e.g. a SQL ordered set aggregate function)
+    if backend.name in entry['result'].get('no_mutate', []):
+        pytest.skip("Spec'd failure")
 
-    crnt_data = data[entry['accessor']]
+    # CASE 3: Uses an operation that can only take boolean inputs
+    if isinstance(backend, SqlBackend) and entry['result'].get('op') == 'bool':
+        crnt_data = data['bool']
+
+    else:
+        crnt_data = data[entry['accessor']]
+
     df = backend.load_df(crnt_data)
 
     # TODO: once reading from yaml, no need to repr
@@ -124,6 +142,19 @@ def test_frame_mutate(backend, entry):
     dst_series = eval(str_expr, {'_': crnt_data})
     dst = crnt_data.assign(result = dst_series)
     
+    # CASE 4: marked as NotImplemented (meaning no plan to implement)
+    if backend.name in entry['result'].get('not_impl', []):
+        with pytest.raises(NotImplementedError):
+            mutate(df, result = call_expr)
+
+        # we're done
+        return         
+
+    # CASE 5: 
+    if isinstance(backend, SqlBackend) and entry['result'].get('sql_type') == 'float':
+        dst['result'] = dst['result'].astype('float')
+
+    # otherwise, verify returns same result as mutate
     assert_equal_query(df, mutate(result = call_expr), dst)
 
 
@@ -182,5 +213,19 @@ def test_frame_summarize_trivial(backend, agg_entry):
     dst = pd.DataFrame({'result': dst_series})
     
     assert_frame_equal(res, dst)
+
+# Edge Cases ==================================================================
+
+def test_frame_set_aggregates_postgresql():
+    # TODO: probably shouldn't be creating backend here
+    backend = SqlBackend("postgresql")
+    dfs = backend.load_df(data[None])
+    
+    expr = _.x.quantile(.75)
+    assert_equal_query(
+            dfs,
+            group_by(_.g) >> summarize(result = expr),
+            data_frame(g = ['a', 'b'], result = [11., 13.])
+            )
 
 

@@ -5,7 +5,7 @@ from siuba.siu import symbolic_dispatch
 # fct_reorder -----------------------------------------------------------------
 
 @symbolic_dispatch
-def fct_reorder(fct, x, func = np.median, desc = False):
+def fct_reorder(fct, x, func = np.median, desc = False) -> pd.Categorical:
     """Return copy of fct, with categories reordered according to values in x.
     
     Arguments:
@@ -42,7 +42,7 @@ def fct_reorder(fct, x, func = np.median, desc = False):
 # fct_recode ------------------------------------------------------------------
 
 @symbolic_dispatch
-def fct_recode(fct, recat=None, **kwargs):
+def fct_recode(fct, recat=None, **kwargs) -> pd.Categorical:
     """Return copy of fct with renamed categories.
 
     Arguments:
@@ -78,7 +78,7 @@ def fct_recode(fct, recat=None, **kwargs):
 # fct_collapse ----------------------------------------------------------------
 
 @symbolic_dispatch
-def fct_collapse(fct, recat, group_other = None):
+def fct_collapse(fct, recat, group_other = None) -> pd.Categorical:
     """Return copy of fct with categories renamed. Optionally group all others.
 
     Arguments:
@@ -142,7 +142,7 @@ def fct_collapse(fct, recat, group_other = None):
 # fct_lump --------------------------------------------------------------------
 
 @symbolic_dispatch
-def fct_lump(fct, n = None, prop = None, w = None, other_level = "Other", ties = None):
+def fct_lump(fct, n = None, prop = None, w = None, other_level = "Other", ties = None) -> pd.Categorical:
     """
     Arguments:
         fct: a pandas.Categorical, or array(-like) used to create one.
@@ -198,7 +198,7 @@ def _get_values(x):
 # fct_rev ---------------------------------------------------------------------
 
 @symbolic_dispatch
-def fct_rev(fct):
+def fct_rev(fct) -> pd.Categorical:
     """Return a copy of fct with category level order reversed.next
     
     Arguments:

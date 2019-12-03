@@ -342,7 +342,7 @@ def filter(__data, *args):
     else:
         result = __data.loc[crnt_indx,:]
 
-    return result.reset_index(drop = True)
+    return result
 
 @filter.register(DataFrameGroupBy)
 def _filter(__data, *args):
@@ -353,9 +353,11 @@ def _filter(__data, *args):
 
     # will drop all but original index, then sort by it
     group_by_lvls = list(range(df.index.nlevels - 1))
-    ordered = df.reset_index(group_by_lvls, drop = True).sort_index().reset_index(drop = True)
+    ordered = df.reset_index(group_by_lvls, drop = True).sort_index()
 
-    return ordered.groupby([ping.name for ping in groupings])
+    group_cols = [ping.name for ping in groupings]
+    other_cols = list(set(ordered.columns).difference(group_cols))
+    return ordered[group_cols + other_cols].groupby(group_cols)
 
 
 # Summarize ===================================================================
@@ -682,8 +684,7 @@ def arrange(__data, *args):
 
 
     return df.sort_values(by = sort_cols, kind = "mergesort", ascending = ascending) \
-             .drop(tmp_cols, axis = 1) \
-             .reset_index(drop = True)
+             .drop(tmp_cols, axis = 1)
 
 
 @arrange.register(DataFrameGroupBy)
