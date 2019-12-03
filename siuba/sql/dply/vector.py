@@ -117,6 +117,7 @@ def _between_sql(x, left, right, default = None) -> ClauseElement:
 
         >>> print(between(sql.column('a'), 1, 2, default = False))
         coalesce(a BETWEEN :a_1 AND :a_2, :coalesce_1)
+
     """
     
     if default is not False:
