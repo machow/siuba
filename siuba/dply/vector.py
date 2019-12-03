@@ -262,9 +262,41 @@ def between(x, left, right, default = False):
 # coalesce --------------------------------------------------------------------
 
 @symbolic_dispatch(cls = Series)
-def coalesce(*args):
-    """TODO: Not Implemented"""
-    raise NotImplementedError("coalesce not implemented")
+def coalesce(x, *args):
+    """Returns a copy of x, with NaN values filled in from *args. Ignores indexes.
+
+    Arguments:
+        x: a pandas Series object
+        *args: other Series that are the same length as x, or a scalar
+
+    Examples:
+        >>> x = pd.Series([1., None, None])
+        >>> abc = pd.Series(['a', 'b', None])
+        >>> xyz = pd.Series(['x', 'y', 'z'])
+        >>> coalesce(x, abc)
+        0       1
+        1       b
+        2    None
+        dtype: object
+
+        >>> coalesce(x, abc, xyz)
+        0    1
+        1    b
+        2    z
+        dtype: object
+        
+    """
+
+    crnt = x.reset_index(drop = True)
+
+    for other in args:
+        if isinstance(other, pd.Series):
+            other = other.reset_index(drop = True)
+
+        crnt = crnt.where(crnt.notna(), other)
+
+    crnt.index = x.index
+    return crnt
 
 
 # lead ------------------------------------------------------------------------
@@ -419,22 +451,72 @@ def near(x):
 # nth -------------------------------------------------------------------------
 
 @symbolic_dispatch(cls = Series)
-def nth(x):
-    """TODO: Not Implemented"""
-    raise NotImplementedError("nth not implemented") 
+def nth(x, n, order_by = None, default = None):
+    """Return the nth entry of x. Similar to x[n].
+
+    Note:
+        first(x) and last(x) are nth(x, 0) and nth(x, -1).
+
+    Arguments:
+        x: series to get entry from.
+        n: position of entry to get from x (0 indicates first entry).
+        order_by: optional Series used to reorder x.
+        default: (not implemented) value to return if no entry at n.
+
+    Examples:
+        >>> ser = pd.Series(['a', 'b', 'c'])
+        >>> nth(ser, 1)
+        'b'
+
+        >>> sorter = pd.Series([1, 2, 0])
+        >>> nth(ser, 1, order_by = sorter)
+        'a'
+
+        >>> nth(ser, 0), nth(ser, -1)
+        ('a', 'c')
+
+        >>> first(ser), last(ser)
+        ('a', 'c')
+
+    """
+
+    if default is not None:
+        raise NotImplementedError("default argument not implemented") 
+
+    # check indexing is in range, handles positive and negative cases.
+    # TODO: is returning None the correct behavior for an empty Series?
+    if n >= len(x) or abs(n) > len(x):
+        return default
+
+    if order_by is None:
+        return x.iloc[n]
+
+    # case where order_by is specified and n in range ----
+    # TODO: ensure order_by is arraylike
+    if not isinstance(order_by, pd.Series):
+        raise NotImplementedError(
+                "order_by argument is type %s, but currently only"
+                "implemented for Series" % type(order_by)
+                )
+
+    if len(x) != len(order_by):
+        raise ValueError("x and order_by arguments must be same length")
+
+    order_indx = order_by.reset_index(drop = True).sort_values().index
+    return x.iloc[order_indx[n]]
 
 
-# first -----------------------------------------------------------------------
+# first and last ----
 
-@symbolic_dispatch(cls = Series)
-def first(x):
-    """TODO: Not Implemented"""
-    raise NotImplementedError("first not implemented")
+from functools import wraps
+
+_copy_nth_docs = wraps(nth, assigned = ('__doc__',))
+
+@_copy_nth_docs
+def first(x, order_by = None, default = None):
+    return nth(x, 0, order_by, default)
 
 
-# last ------------------------------------------------------------------------
-
-@symbolic_dispatch(cls = Series)
-def last(x):
-    """TODO: Not Implemented"""
-    raise NotImplementedError("last not implemented")
+@_copy_nth_docs
+def last(x, order_by = None, default = None):
+    return nth(x, -1, order_by, default)

@@ -22,7 +22,7 @@ from siuba.dply.vector import (
         n_distinct,
         na_if,
         #near,
-        #nth, first, last
+        nth, first, last
         )
 
 
@@ -181,7 +181,7 @@ def _n_sql(x) -> ClauseElement:
     return AggOver(sql.func.count())
 
 @n.register(SqlColumnAgg)
-def _n_sql(x) -> ClauseElement:
+def _n_sql_agg(x) -> ClauseElement:
     """
     Example:
         >>> from siuba.sql.translate import SqlColumnAgg
@@ -217,3 +217,28 @@ def _na_if_sql(x, y) -> ClauseElement:
         nullif(x, :nullif_1)
     """
     return sql.func.nullif(x, y)
+
+
+# nth, first, last ------------------------------------------------------------
+# note: first and last wrap around nth, so are not dispatchers.
+#       this may need to change this in the future, since this means they won't
+#       show their own name, when you print, e.g. first(_.x)
+
+@nth.register(ClauseElement)
+def _nth_sql(x, n, order_by = None, default = None) -> ClauseElement:
+    if default is not None:
+        raise NotImplementedError("default argument not implemented")
+
+    if n < 0 and order_by is not None:
+        # e.g. -1 in python is 0, -2 is 1
+        n = abs(n + 1)
+        order_by = order_by.desc()
+
+
+    return RankOver(sql.func.nth_value(x, n + 1), order_by = order_by)
+
+
+@nth.register(SqlColumnAgg)
+def _nth_sql_agg(x, n, order_by = None, default = None) -> ClauseElement:
+    raise NotImplementedError("nth, first, and last not available in summarize")
+

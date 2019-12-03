@@ -34,13 +34,15 @@ OMNIBUS_VECTOR_FUNCS = [
         v.row_number(_.x),
         #ntile,
         v.between(_.x, 2, 5, default = False),
-        #v.coalesce(_.x),
+        v.coalesce(_.x, 2),
         v.lead(_.x),
         v.lag(_.x),
         v.n(_.x),
         v.na_if(_.x, 2),
         #near,
-        #nth, first, last
+        v.nth(_.x, 2),
+        v.first(_.x),
+        v.last(_.x, order_by = _.x),            # TODO: in SQL getting FROM LAST requires order by
         ]
 
 VECTOR_AGG_FUNCS = [
