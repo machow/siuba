@@ -23,7 +23,7 @@ mistune==0.8.4
 mock==2.0.0
 nbconvert==5.4.1
 nbformat==4.4.0
-notebook==5.7.4
+notebook==5.7.8
 numpy==1.16.1
 pandas==0.24.1
 pandocfilters==1.4.2
