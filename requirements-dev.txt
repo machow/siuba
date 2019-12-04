@@ -23,7 +23,7 @@ mistune==0.8.4
 mock==2.0.0
 nbconvert==5.4.1
 nbformat==4.4.0
-notebook==5.7.4
+notebook==5.7.8
 numpy==1.16.1
 pandas==0.24.1
 pandocfilters==1.4.2
@@ -37,7 +37,7 @@ ptyprocess==0.6.0
 Pygments==2.3.1
 python-dateutil==2.8.0
 pytz==2018.9
-PyYAML==3.13
+PyYAML==5.1
 pyzmq==17.1.2
 qtconsole==4.4.3
 Send2Trash==1.5.0
