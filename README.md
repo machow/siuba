@@ -86,15 +86,17 @@ See [siu expression section here](https://siuba.readthedocs.io/en/latest/intro.h
 ### Using with SQL
 
 ```python
-from siuba import _, group_by, summarize, filter
+# Setup example data ----
+from sqlalchemy import create_engine
 from siuba.data import mtcars
 
-from sqlalchemy import create_engine
-from siuba.sql import LazyTbl
-
-# copy in to sqlite
+# copy pandas DataFrame to sqlite
 engine = create_engine("sqlite:///:memory:")
 mtcars.to_sql("mtcars", engine, if_exists = "replace")
+
+# Demo SQL analysis with siuba ----
+from siuba import _, group_by, summarize, filter
+from siuba.sql import LazyTbl
 
 # connect with siuba
 tbl_mtcars = LazyTbl(engine, "mtcars")
