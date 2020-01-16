@@ -139,14 +139,11 @@ For the most up to date explanations, see the [siuba docs](https://siuba.readthe
 Testing
 -------
 
-Currently, integration tests are run using nbval and the example notebooks.
-These tests can be run using the follwing command.
+Tests are done using pytest.
+They can be run using the following.
 
-```
+```bash
 # start postgres db
 docker-compose up
-make test
+pytest siuba
 ```
-
-Note that once things settle down, I'll make sure everything is bolted down
-by adding unit tests with pytest.
