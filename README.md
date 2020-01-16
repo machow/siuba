@@ -1,11 +1,27 @@
 siuba
 =====
 
+*scrappy data analysis, with seamless support for pandas and SQL*
+
 [![Build Status](https://travis-ci.org/machow/siuba.svg?branch=master)](https://travis-ci.org/machow/siuba)
 [![Documentation Status](https://readthedocs.org/projects/siuba/badge/?version=latest)](https://siuba.readthedocs.io/en/latest/?badge=latest)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/machow/siuba/master)
 
-**Note: this library is currently in heavy development! For a nice example of siuba in action, see this [intro doc](https://siuba.readthedocs.io/en/latest/intro.html), or this [example analysis](https://github.com/machow/tidytuesday-py/blob/master/2019-01-08-tv-golden-age.ipynb)**
+<img width="30%" align="right" src="./docs/siuba_small.svg">
+
+siuba is a port of [dplyr](https://github.com/tidyverse/dplyr) and other R libraries. It supports a tabular data analysis workflow centered on 5 common actions:
+
+* `select()` - keep certain columns of data.
+* `filter()` - keep certain rows of data.
+* `mutate()` - create or modify an existing column of data.
+* `summarize()` - reduce one or more columns down to a single number.
+* `arrange()` - reorder the rows of data.
+
+These actions can be preceeded by a `group_by()`, which causes them to be applied individually to grouped rows of data. Moreover, many SQL concepts, such as `distinct()`, `count()`, and joins are implemented.
+Inputs to these functions can be a pandas `DataFrame` or SQL connection (currently postgres, redshift, or sqlite).
+
+For more on the rationale behind tools like dplyr, see this [tidyverse paper](https://tidyverse.tidyverse.org/articles/paper.html). 
+For examples of siuba in action, see the [siuba documentation](https://siuba.readthedocs.io/en/latest/intro.html).
 
 Installation
 ------------
@@ -17,7 +33,7 @@ pip install siuba
 Examples
 --------
 
-See the [siuba docs](https://siuba.readthedocs.io) for a full introduction.
+See the [siuba docs](https://siuba.readthedocs.io) or this [live analysis](https://www.youtube.com/watch?v=eKuboGOoP08) for a full introduction.
 
 ### Basic use
 
@@ -123,14 +139,11 @@ For the most up to date explanations, see the [siuba docs](https://siuba.readthe
 Testing
 -------
 
-Currently, integration tests are run using nbval and the example notebooks.
-These tests can be run using the follwing command.
+Tests are done using pytest.
+They can be run using the following.
 
-```
+```bash
 # start postgres db
 docker-compose up
-make test
+pytest siuba
 ```
-
-Note that once things settle down, I'll make sure everything is bolted down
-by adding unit tests with pytest.
