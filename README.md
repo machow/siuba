@@ -9,7 +9,7 @@ siuba
 
 <img width="30%" align="right" src="./docs/siuba_small.svg">
 
-siuba is a port of [dplyr](https://github.com/tidyverse/dplyr) and other R libraries, which supports a tabular data analysis workflow centered on 5 common actions:
+siuba is a port of [dplyr](https://github.com/tidyverse/dplyr) and other R libraries. It supports a tabular data analysis workflow centered on 5 common actions:
 
 * `select()` - keep certain columns of data.
 * `filter()` - keep certain rows of data.
