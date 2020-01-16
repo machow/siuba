@@ -33,7 +33,7 @@ pip install siuba
 Examples
 --------
 
-See the [siuba docs](https://siuba.readthedocs.io) for a full introduction.
+See the [siuba docs](https://siuba.readthedocs.io) or this [live analysis](https://www.youtube.com/watch?v=eKuboGOoP08) for a full introduction.
 
 ### Basic use
 
