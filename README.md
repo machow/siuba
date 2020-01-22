@@ -37,8 +37,7 @@ See the [siuba docs](https://siuba.readthedocs.io) or this [live analysis](https
 
 ### Basic use
 
-The code below uses the example DataFrame `mtcars`.
-It calculates the average horsepower (hp) for each grouping of cylinder.
+The code below uses the example DataFrame `mtcars`, to get the average horsepower (hp) per cylinder.
 
 ```python
 from siuba import group_by, summarize, _
