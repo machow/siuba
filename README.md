@@ -37,8 +37,11 @@ See the [siuba docs](https://siuba.readthedocs.io) or this [live analysis](https
 
 ### Basic use
 
+The code below uses the example DataFrame `mtcars`.
+It calculates the average horsepower (hp) for each grouping of cylinder.
+
 ```python
-from siuba import *
+from siuba import group_by, summarize, _
 from siuba.data import mtcars
 
 (mtcars
@@ -55,22 +58,51 @@ Out[1]:
 2    8  209.214286
 ```
 
+There are three key concepts in this example:
+
+| concept | example | meaning |
+| ------- | ------- | ------- |
+| verb    | `group_by(...)` | a function that operates on a table, like a DataFrame or SQL table |
+| siu expression | `_.hp.mean()` | an expression created with `siuba._`, that represents actions you want to perform |
+| pipe | `mtcars >> group_by(...)` | a syntax that allows you to chain verbs with the `>>` operator |
+
+
 See [introduction to siuba](https://siuba.readthedocs.io/en/latest/intro.html#Introduction-to-siuba).
 
 ### What is a siu expression (e.g. `_.cyl == 4`)?
 
+A siu expression is a way of specifying **what** action you want to perform.
+This allows siuba verbs to decide **how** to execute the action, depending on whether your data is a local DataFrame or remote table.
+
 ```python
 from siuba import _
 
-# old approach
+_.cyl == 4
+```
+
+```
+Out[2]:
+█─==
+├─█─.
+│ ├─_
+│ └─'cyl'
+└─4
+```
+
+You can also think siu expressions as a shorthand for a lambda function.
+
+```python
+from siuba import _
+
+# lambda approach
 mtcars[lambda _: _.cyl == 4]
 
-# siu approach
+# siu expression approach
 mtcars[_.cyl == 4]
 ```
 
 ```
-Out[2]: 
+Out[3]: 
      mpg  cyl   disp   hp  drat     wt   qsec  vs  am  gear  carb
 2   22.8    4  108.0   93  3.85  2.320  18.61   1   1     4     1
 7   24.4    4  146.7   62  3.69  3.190  20.00   1   0     4     2
@@ -85,6 +117,10 @@ See [siu expression section here](https://siuba.readthedocs.io/en/latest/intro.h
 
 ### Using with SQL
 
+A killer feature of siuba is that the same analysis code can be run on a local DataFrame, or a SQL source.
+
+In the code below, we set up an example database.
+
 ```python
 # Setup example data ----
 from sqlalchemy import create_engine
@@ -93,7 +129,11 @@ from siuba.data import mtcars
 # copy pandas DataFrame to sqlite
 engine = create_engine("sqlite:///:memory:")
 mtcars.to_sql("mtcars", engine, if_exists = "replace")
+```
 
+Next, we use the code from the first example, except now executed a SQL table.
+
+```python
 # Demo SQL analysis with siuba ----
 from siuba import _, group_by, summarize, filter
 from siuba.sql import LazyTbl
@@ -108,7 +148,7 @@ tbl_mtcars = LazyTbl(engine, "mtcars")
 ```
 
 ```
-Out[3]: 
+Out[4]: 
 # Source: lazy query
 # DB Conn: Engine(sqlite:///:memory:)
 # Preview:
