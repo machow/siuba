@@ -2,7 +2,7 @@
 from ..translate import (
         SqlColumn, SqlColumnAgg,
         base_scalar, base_agg, base_win, SqlTranslator, 
-        win_agg, sql_scalar,
+        win_agg, sql_scalar, sql_agg
         )
 import sqlalchemy.sql.sqltypes as sa_types
 from sqlalchemy import sql
@@ -53,14 +53,19 @@ scalar = SqlTranslator(
         )
 
 aggregate = SqlTranslator(
-        base_agg
+        base_agg,
+        all = sql_agg("bool_and"),
+        any = sql_agg("bool_or"),
+        std = sql_agg("stddev_samp"),
+        var = sql_agg("var_samp"),
         )
 
 window = SqlTranslator(
         base_win,
         any = win_agg("bool_or"),
         all = win_agg("bool_and"),
-        lag = win_agg("lag")
+        lag = win_agg("lag"),
+        var = win_agg("var_samp"),
         )
 
 funcs = dict(scalar = scalar, aggregate = aggregate, window = window)
