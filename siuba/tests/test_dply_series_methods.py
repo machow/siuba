@@ -1,6 +1,6 @@
 from siuba.siu import Symbolic, strip_symbolic
 from siuba.spec.series import spec
-from .helpers import data_frame, assert_equal_query, backend_pandas, SqlBackend
+from .helpers import data_frame, assert_equal_query, backend_pandas, SqlBackend, PandasBackend
 import pytest
 # TODO: dot, corr, cov
 
@@ -69,12 +69,45 @@ data_default = data_frame(
     y = [1,2,3,4,5,6]
     )
 
-data = {
+DATA = data = {
     'dt': data_dt,
     'str': data_str,
     None: data_default,
     'bool': data_bool
 }
+
+def get_data(entry, data, backend = None):
+
+    req_bool = entry['result'].get('op') == 'bool'
+
+    # pandas is forgiving to bool inputs
+    if isinstance(backend, PandasBackend):
+        req_bool = False
+
+    return data['bool'] if req_bool else data[entry['accessor']]
+
+
+def test_missing_implementation(entry, backend):
+    # Check whether test should xfail, skip, or -------------------------------
+    backend_status = entry['result'].get(backend.name)
+
+    # case: Needs to be implmented
+    # TODO(table): uses xfail
+    if backend_status == "xfail":
+        pytest.xfail("TODO: impelement this translation")
+    
+    # case: Can't be used in a mutate (e.g. a SQL ordered set aggregate function)
+    # TODO(table): no_mutate
+    if backend.name in entry['result'].get('no_mutate', []):
+        pytest.skip("Spec'd failure")
+
+def get_df_expr(entry):
+    str_expr = str(entry['expr_frame'])
+    call_expr = strip_symbolic(eval(str_expr, {'_': _}))
+
+    return str_expr, call_expr
+
+
 
 # Tests =======================================================================
 
@@ -102,6 +135,7 @@ def test_series_against_call(entry):
 
 
 def test_frame_expr(entry):
+    # TODO: remove this test, not checking anything new
     df = data[entry['accessor']]
     # TODO: once reading from yaml, no need to repr
     str_expr = str(entry['expr_frame'])
@@ -118,42 +152,49 @@ def test_frame_expr(entry):
 #@backend_pandas
 @pytest.mark.skip_backend('sqlite')
 def test_frame_mutate(skip_backend, backend, entry):
-    # CASE 1: Needs to be implmented
-    if backend.name in entry['result'].get('xfail', []):
+    # Check whether test should xfail, skip, or -------------------------------
+    backend_status = entry['result'].get(backend.name)
+
+    # case: Needs to be implmented
+    # TODO(table): uses xfail
+    if backend_status == "xfail":
         pytest.xfail("TODO: impelement this translation")
     
-    # CASE 2: Can't be used in a mutate (e.g. a SQL ordered set aggregate function)
+    # case: Can't be used in a mutate (e.g. a SQL ordered set aggregate function)
+    # TODO(table): no_mutate
     if backend.name in entry['result'].get('no_mutate', []):
         pytest.skip("Spec'd failure")
 
-    # CASE 3: Uses an operation that can only take boolean inputs
-    if isinstance(backend, SqlBackend) and entry['result'].get('op') == 'bool':
-        crnt_data = data['bool']
-
-    else:
-        crnt_data = data[entry['accessor']]
+    # Prepare input data ------------------------------------------------------
+    # case: inputs must be boolean
+    crnt_data = get_data(entry, DATA, backend)
 
     df = backend.load_df(crnt_data)
 
+    # Execute mutate ----------------------------------------------------------
     # TODO: once reading from yaml, no need to repr
     str_expr = str(entry['expr_frame'])
     call_expr = strip_symbolic(eval(str_expr, {'_': _}))
 
-    dst_series = eval(str_expr, {'_': crnt_data})
-    dst = crnt_data.assign(result = dst_series)
-    
-    # CASE 4: marked as NotImplemented (meaning no plan to implement)
-    if backend.name in entry['result'].get('not_impl', []):
+    # End with alternative test when explicitly not implemented
+    # TODO(table): not_impl
+    if backend_status == "not_impl":
         with pytest.raises(NotImplementedError):
             mutate(df, result = call_expr)
 
         # we're done
         return         
 
-    # CASE 5: 
-    if isinstance(backend, SqlBackend) and entry['result'].get('sql_type') == 'float':
+    dst_series = eval(str_expr, {'_': crnt_data})
+    dst = crnt_data.assign(result = dst_series)
+    
+    # Process output ----------------------------------------------------------
+    # case: output is of a different type than w/ pandas
+    sql_type = entry['result'].get('sql_type')
+    if isinstance(backend, SqlBackend) and sql_type == 'float':
         dst['result'] = dst['result'].astype('float')
 
+    # Run test for equality w/ pandas ----
     # otherwise, verify returns same result as mutate
     assert_equal_query(df, mutate(result = call_expr), dst)
 
