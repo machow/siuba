@@ -26,7 +26,7 @@ def mock_sqlalchemy_engine(dialect):
         from siuba.sql import LazyTbl
         from siuba import _, mutate, show_query
 
-        engine = create_mock_sqlalchemy_engine('postgresql')
+        engine = mock_sqlalchemy_engine('postgresql')
         tbl = LazyTbl(engine, 'some_table', ['x'])
 
         query = mutate(tbl, y = _.x + _.x)
