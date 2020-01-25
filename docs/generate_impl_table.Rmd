@@ -1,0 +1,236 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.3.0
+  kernelspec:
+    display_name: Python 3
+    language: python
+    name: python3
+---
+
+```{python}
+from siuba.spec.series import spec, nested_spec
+from tabulate import tabulate
+```
+
+```{python}
+from siuba.siu import ALL_OPS
+```
+
+```{python}
+from black import format_str, FileMode
+from IPython.core.interactiveshell import InteractiveShell
+from IPython.display import HTML
+
+from pygments import highlight
+from pygments.lexers import PythonLexer
+from pygments.formatters import HtmlFormatter
+
+from IPython.utils.capture import capture_output
+
+EXAMPLE_TEMPLATE = """
+import pandas as pd
+from siuba import _, {verb}
+
+data = pd.DataFrame({data})
+
+{verb}(data, result = {call_expr})
+"""
+
+EXAMPLE_TEMPLATE2 = """
+from siuba import _, show_query, {verb}
+from siuba.sql import LazyTbl
+from siuba.sql.utils import mock_sqlalchemy_engine
+
+engine = mock_sqlalchemy_engine("postgresql")
+tbl = LazyTbl(engine, 'some_table', ['g', 'x', 'y'])
+
+query = tbl >> {verb}(result = {call_expr}) >> show_query()
+"""
+
+EXAMPLE_TEMPLATE3 = """
+from siuba import group_by
+query = tbl >> group_by(_.g) >> {verb}(result = {call_expr}) >> show_query()
+"""
+
+def load_template(template, data, verb, call_expr):
+    loaded_str = template.format(
+            data = data,
+            verb = verb,
+            call_expr = str(entry['expr_frame'])    
+            )
+
+    mode = FileMode()
+    pretty_code = format_str(loaded_str, mode = mode)
+    
+    return pretty_code
+
+def run_to_html_payload(name, code, shell):
+    with capture_output() as c:
+        res = shell.run_cell(code).result
+
+    if isinstance(res, pd.DataFrame):
+        output = res.to_html()
+    else:
+        output = "<pre>" + str(c) + "</pre>"
+    
+    code_html = highlight(code, PythonLexer(), HtmlFormatter(prestyles = "text-align: left;"))
+    return {'name': name, 'input': code_html, 'output': output, "printed": str(c)}
+
+def create_code(entry, data, shell):
+    df = get_data(entry, data)
+
+    
+    if entry['accessor'] == "dt": 
+        df_repr = """
+{'g': ['a', 'a', 'b', 'b'],
+ 'x': pd.to_datetime(["2019-01-01 01:01:01", "2020-04-08 02:02:02","2021-07-15 03:03:03", "2022-10-22 04:04:04"])
+ }
+"""
+    else:
+        df_repr = repr(df.to_dict(orient = "list"))
+
+    verb = "summarize" if entry['result']['type'] == "Agg" else "mutate"
+    
+    call_expr = str(entry['expr_frame'])
+    examples = []
+
+    pretty_code = load_template(EXAMPLE_TEMPLATE, df_repr, verb, call_expr)
+    examples.append(
+            run_to_html_payload('Pandas DataFrame', pretty_code, shell)
+            )
+
+    if entry['result'].get('postgresql') not in {"xfail", "not_impl"}:
+        pretty_code2 = load_template(EXAMPLE_TEMPLATE2, df_repr, verb, call_expr)
+        examples.append(
+                run_to_html_payload('SQL Table', pretty_code2, shell)
+                )
+
+        pretty_code3 = load_template(EXAMPLE_TEMPLATE3, df_repr, verb, call_expr)
+        examples.append(
+                run_to_html_payload('Grouped SQL Table', pretty_code3, shell)
+                )
+    
+    
+    return examples
+    
+
+
+
+```
+
+```{python}
+from siuba.tests.test_dply_series_methods import get_data, DATA
+
+STATUS = {'done':'✅', 'xfail': '🚧', 'not_impl': '❌'}
+
+shell = InteractiveShell()
+table = []
+for name, entry in spec.items():
+
+    # notes
+    notes = []
+    sql_type = entry['result'].get('sql_type')
+    if sql_type:
+        notes.append("SQL returns a %s."%sql_type)
+    
+    # postgres stuff
+    no_mutate = entry['result'].get('no_mutate')
+    if no_mutate:
+        notes.append("Cannot be used in a mutate with %s"%",".join(no_mutate))
+    postgresql = entry['result'].get('postgresql', 'done')
+    
+    # example
+    example_data = get_data(entry, DATA)
+    entry_type = entry.get('type')
+
+    examples = create_code(entry, DATA, shell)
+    shell.reset()
+    
+    
+    table.append({
+        'name': name,
+        'category': entry['category'],
+        'data_arity': entry['data_arity'],
+        'type': entry['result'].get('type'),
+        'pandas': STATUS['done'],
+        'postgresql': STATUS[postgresql],
+        'expr_frame': str(entry['expr_frame']),
+        'note': "\n".join(notes),
+        'examples': examples
+    })
+    
+```
+
+```{python}
+from airtable import Airtable
+import pandas as pd
+
+from siuba import filter, _, pipe
+
+airtable = Airtable('appErTNqCFXn6stSH', 'methods')
+
+res = airtable.get_all()
+
+air_methods = pd.io.json.json_normalize(res)
+air_methods.columns = air_methods.columns.map(lambda s: s.split('.')[-1])
+air_methods.rename(columns = {'method_name': 'name'}, inplace = True)
+
+```
+
+```{python}
+AIR_STATUS =  {
+    'done':'✅',
+    'priority-zero': '',
+    'priority-low': '',
+    'priority-medium': '🚧',
+    'priority-high': '🚧',
+    'no support': '❌'
+}
+
+hidden_cats = {}#{'_special_methods', 'binary'}
+
+final_table = pd.DataFrame([x for x in table if x['category'] not in hidden_cats])
+
+small_air = air_methods.loc[:, ['category', 'support_category', 'name']]
+small_air['fast grouped'] = small_air.support_category.map(AIR_STATUS).fillna('❌')
+
+merged = small_air.merge(final_table.drop(columns = ['category']), how = "left", on = "name")
+```
+
+```{python}
+from IPython.display import HTML
+from qgrid import show_grid
+
+# TODO:
+#  * missing pandas methods (crnt only includes those impl for group by)
+#  * filterable on backend and status
+#  * include method doc?
+#  * replace "type" with "result" category
+#HTML(tabulate(final_table, headers = "keys", tablefmt = "html"))
+cols_to_keep = [
+    "category", "name",
+    "fast grouped", "postgresql",
+    "note", "expr_frame", "support_category",
+    "examples"
+]
+final = (merged[cols_to_keep]
+        .fillna("")
+        .sort_values(["category", "name"])
+        [lambda d: d["fast grouped"] != ""]
+        )
+HTML(tabulate(final, headers = "keys", tablefmt = "html"))
+
+final.to_json('../docs/_static/support-table/data.json', orient = 'records')
+
+```
+
+## Create example method docs
+
+```{python}
+print(HtmlFormatter().get_style_defs('.highlight'))
+```

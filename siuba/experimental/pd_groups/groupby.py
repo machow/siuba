@@ -87,6 +87,12 @@ def grouper_match(grp1, grp2):
     
 
 def broadcast_group_elements(x, y):
+    """Returns 3-tuple of same-length x and y data, plus a reference group by object.
+
+    Note:
+        * Raises error if x and y are not compatible group by objects.
+        * Will broadcast a GroupByAgg, to ensure same length as other data.
+    """
     if all_isinstance(GroupByAgg, x, y) and x._orig_grouper is y._orig_grouper:
         return x.obj, y.obj, x
     

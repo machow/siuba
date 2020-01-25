@@ -1,6 +1,6 @@
 from siuba.siu import Symbolic, strip_symbolic
 from siuba.spec.series import spec
-from .helpers import data_frame, assert_equal_query, backend_pandas, SqlBackend
+from .helpers import data_frame, assert_equal_query, backend_pandas, SqlBackend, PandasBackend
 import pytest
 # TODO: dot, corr, cov
 
@@ -69,20 +69,58 @@ data_default = data_frame(
     y = [1,2,3,4,5,6]
     )
 
-data = {
+DATA = data = {
     'dt': data_dt,
     'str': data_str,
     None: data_default,
     'bool': data_bool
 }
 
+def get_data(entry, data, backend = None):
+
+    req_bool = entry['result'].get('op') == 'bool'
+
+    # pandas is forgiving to bool inputs
+    if isinstance(backend, PandasBackend):
+        req_bool = False
+
+    return data['bool'] if req_bool else data[entry['accessor']]
+
+
+def test_missing_implementation(entry, backend):
+    # Check whether test should xfail, skip, or -------------------------------
+    backend_status = entry['result'].get(backend.name)
+
+    # case: Needs to be implmented
+    # TODO(table): uses xfail
+    if backend_status == "xfail":
+        pytest.xfail("TODO: impelement this translation")
+    
+    # case: Can't be used in a mutate (e.g. a SQL ordered set aggregate function)
+    # TODO(table): no_mutate
+    if backend.name in entry['result'].get('no_mutate', []):
+        pytest.skip("Spec'd failure")
+
+    # case: won't be implemented
+    if entry['result'].get(backend.name) == "not_impl":
+        pytest.skip()
+
+
+def get_df_expr(entry):
+    str_expr = str(entry['expr_frame'])
+    call_expr = strip_symbolic(eval(str_expr, {'_': _}))
+
+    return str_expr, call_expr
+
+def cast_result_type(entry, backend, ser):
+    sql_type = entry['result'].get('sql_type')
+    if isinstance(backend, SqlBackend) and sql_type == 'float':
+        return ser.astype('float')
+    
+    return ser
+
 # Tests =======================================================================
 
-# Series expr and call return same result
-
-# Series expr and Postgres return same result
-
-# Series agg and trivial group agg return same result (when cast dimless)
 
 def test_series_against_call(entry):
     if entry['result']['type'] == "Window":
@@ -102,6 +140,7 @@ def test_series_against_call(entry):
 
 
 def test_frame_expr(entry):
+    # TODO: remove this test, not checking anything new
     df = data[entry['accessor']]
     # TODO: once reading from yaml, no need to repr
     str_expr = str(entry['expr_frame'])
@@ -113,49 +152,6 @@ def test_frame_expr(entry):
     
     assert res.__class__ is dst.__class__
     assert_src_array_equal(res, dst)
-
-
-#@backend_pandas
-@pytest.mark.skip_backend('sqlite')
-def test_frame_mutate(skip_backend, backend, entry):
-    # CASE 1: Needs to be implmented
-    if backend.name in entry['result'].get('xfail', []):
-        pytest.xfail("TODO: impelement this translation")
-    
-    # CASE 2: Can't be used in a mutate (e.g. a SQL ordered set aggregate function)
-    if backend.name in entry['result'].get('no_mutate', []):
-        pytest.skip("Spec'd failure")
-
-    # CASE 3: Uses an operation that can only take boolean inputs
-    if isinstance(backend, SqlBackend) and entry['result'].get('op') == 'bool':
-        crnt_data = data['bool']
-
-    else:
-        crnt_data = data[entry['accessor']]
-
-    df = backend.load_df(crnt_data)
-
-    # TODO: once reading from yaml, no need to repr
-    str_expr = str(entry['expr_frame'])
-    call_expr = strip_symbolic(eval(str_expr, {'_': _}))
-
-    dst_series = eval(str_expr, {'_': crnt_data})
-    dst = crnt_data.assign(result = dst_series)
-    
-    # CASE 4: marked as NotImplemented (meaning no plan to implement)
-    if backend.name in entry['result'].get('not_impl', []):
-        with pytest.raises(NotImplementedError):
-            mutate(df, result = call_expr)
-
-        # we're done
-        return         
-
-    # CASE 5: 
-    if isinstance(backend, SqlBackend) and entry['result'].get('sql_type') == 'float':
-        dst['result'] = dst['result'].astype('float')
-
-    # otherwise, verify returns same result as mutate
-    assert_equal_query(df, mutate(result = call_expr), dst)
 
 
 def test_pandas_grouped_frame_fast_not_implemented(notimpl_entry):
@@ -170,49 +166,94 @@ def test_pandas_grouped_frame_fast_not_implemented(notimpl_entry):
         res = fast_mutate(gdf, result = call_expr)
     
 
+
+#@backend_pandas
+@pytest.mark.skip_backend('sqlite')
+def test_frame_mutate(skip_backend, backend, entry):
+    test_missing_implementation(entry, backend)
+
+    # Prepare input data ------------------------------------------------------
+    # case: inputs must be boolean
+    crnt_data = get_data(entry, DATA, backend)
+    df = backend.load_df(crnt_data)
+
+    # Execute mutate ----------------------------------------------------------
+    str_expr, call_expr = get_df_expr(entry)
+
+    # Run test for equality w/ ungrouped pandas ----
+    dst = crnt_data.assign(result = call_expr(crnt_data))
+    dst['result'] = cast_result_type(entry, backend, dst['result'])
+
+    assert_equal_query(
+            df,
+            mutate(result = call_expr),
+            dst
+            )
+
+    # Run test for equality w/ grouped pandas ----
+    g_dst = crnt_data.groupby('g').apply(lambda d: d.assign(result = call_expr)).reset_index(drop = True)
+    g_dst['result'] = cast_result_type(entry, backend, g_dst['result'])
+    assert_equal_query(
+            df,
+            group_by(_.g) >> mutate(result = call_expr),
+            g_dst
+            )
+
+
 def test_pandas_grouped_frame_fast_mutate(entry):
     from siuba.experimental.pd_groups.dialect import fast_mutate, DataFrameGroupBy
-    gdf = data[entry['accessor']].groupby('g')
+    gdf = get_data(entry, DATA).groupby('g')
 
-    # TODO: once reading from yaml, no need to repr
-    str_expr = str(entry['expr_frame'])
-    call_expr = strip_symbolic(eval(str_expr, {'_': _}))
+    # Execute mutate ----------------------------------------------------------
+    str_expr, call_expr = get_df_expr(entry)
 
     res = fast_mutate(gdf, result = call_expr)
     dst = mutate(gdf, result = call_expr)
 
-    # fix mutate's current bad behavior of reordering rows ---
-    # (fixed in issue #139)
-    dst_obj_fixed = dst.obj
-
     # TODO: apply mark to skip failing tests, rather than downcast
     # pandas grouped aggs, when not using cython, _try_cast back to original type
     # but since mutate uses apply, it doesn't :/. Currently only affects median func.
+    dst_obj = dst.obj
     if str_expr == '_.x.median()':
-        dst_obj_fixed['result'] = gdf._try_cast(dst_obj_fixed['result'], gdf.x.obj)
+        dst_obj['result'] = gdf._try_cast(dst_obj['result'], gdf.x.obj)
 
     assert isinstance(dst, DataFrameGroupBy)
-    assert_frame_equal(res.obj, dst_obj_fixed)
+    assert_frame_equal(res.obj, dst_obj)
 
 
-#@pytest.mark.skip_backend('sqlite')
-@backend_pandas
-def test_frame_summarize_trivial(backend, agg_entry):
-    crnt_data = data[agg_entry['accessor']]
+@pytest.mark.skip_backend('sqlite')
+def test_frame_summarize(skip_backend, backend, agg_entry):
+    entry = agg_entry
+    test_missing_implementation(entry, backend)
+
+    # Prepare input data ------------------------------------------------------
+    # case: inputs must be boolean
+    crnt_data = get_data(entry, DATA, backend)
     df = backend.load_df(crnt_data)
 
-    # TODO: once reading from yaml, no need to repr
-    str_expr = str(agg_entry['expr_frame'])
+    # Execute mutate ----------------------------------------------------------
+    str_expr, call_expr = get_df_expr(entry)
 
-    call_expr = strip_symbolic(eval(str_expr, {'_': _}))
-    res = summarize(df, result = call_expr)
+    dst = data_frame(result = call_expr(crnt_data))
 
-    # Perform a trivial group agg, where the entire frame is 1 group
-    dst_out = eval(str_expr, {'_': df})
-    dst_series = dst_out if isinstance(dst_out, pd.Series) else pd.Series(dst_out)
-    dst = pd.DataFrame({'result': dst_series})
-    
-    assert_frame_equal(res, dst)
+    # Process output ----------------------------------------------------------
+    # case: output is of a different type than w/ pandas
+    dst['result'] = cast_result_type(entry, backend, dst['result'])
+
+    # Run test for equality w/ pandas ----
+    # otherwise, verify returns same result as mutate
+    assert_equal_query(
+            df,
+            summarize(result = call_expr),
+            dst
+            )
+
+    dst_g = crnt_data.groupby('g').apply(call_expr).reset_index().rename(columns = {0: 'result'})
+    assert_equal_query(
+            df,
+            group_by(_.g) >> summarize(result = call_expr),
+            dst_g
+            )
 
 # Edge Cases ==================================================================
 

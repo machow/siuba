@@ -1,5 +1,12 @@
 from siuba.siu import Symbolic, strip_symbolic
 # TODO: dot, corr, cov
+# ordered set aggregate. e.g. mode()
+# hypothetical-set aggregate (e.g. rank(a) as if it were in partition(order_by b))
+
+# kinds of windows:
+#   * result len n_elements: rank()
+#   * result len 1: is_monotonic (lag, diff, and any). ordered set aggregate.
+#   * result len input len: percentile_cont([.1, .2]). hypo set aggregate.
 
 _ = Symbolic()
 
@@ -16,7 +23,6 @@ class Window(Result): pass
 class Singleton(Result): pass
 class WontImplement(Result): pass
 
-
 CATEGORIES_TIME = {
         'time_series', 'datetime_properties', 'datetime_methods', 'period_properties',
         'timedelta_properties', 'timedelta_methods'
@@ -31,8 +37,8 @@ CATEGORIES_STRING = {
 #   * doesn't work in mutate (no_mutate = ['postgresql'])
 #   * returns float rather than int (sql_type = 'float')
 #   * requires boolean or float input (op = 'bool')
-#   * won't be implemented (in some backend) (not_impl = ['postgresql'])
-#   * isn't implemented now, but will be (xfail = ['postgresql'])
+#   * won't be implemented (in some backend) (postgresql = 'not_impl')
+#   * isn't implemented now, but will be (postgresql = 'xfail')
 funcs = {
     ## ------------------------------------------------------------------------
     # Attributes 
@@ -41,36 +47,36 @@ funcs = {
         '__invert__': _.__invert__()         >> Elwise(op = 'bool'),
         '__and__': _.__and__(_)              >> Elwise(op = 'bool'),
         '__or__': _.__or__(_)                >> Elwise(op = 'bool'),
-        '__xor__': _.__xor__(_)              >> Elwise(op = 'bool', xfail = ['postgresql']),
+        '__xor__': _.__xor__(_)              >> Elwise(op = 'bool', postgresql = 'xfail'),
         '__neg__': _.__neg__()               >> Elwise(),
-        '__pos__': _.__pos__()               >> Elwise(xfail = ['postgresql']),
+        '__pos__': _.__pos__()               >> Elwise(postgresql = 'xfail'),
         '__rand__': _.__rand__(_)            >> Elwise(op = 'bool'),
         '__ror__': _.__ror__(_)              >> Elwise(op = 'bool'),
-        '__rxor__': _.__rxor__(_)            >> Elwise(op = 'bool', xfail = ['postgresql']),
+        '__rxor__': _.__rxor__(_)            >> Elwise(op = 'bool', postgresql = 'xfail'),
         # copied from binary section below
         '__add__': _.__add__(_)               >> Elwise(),
         '__sub__': _.__sub__(_)               >> Elwise(),
-        '__truediv__': _.__truediv__(_)       >> Elwise(xfail = ['postgresql']),  # TODO: pg needs cast int to float?
-        '__floordiv__': _.__floordiv__(_)     >> Elwise(xfail = ['postgresql']),
+        '__truediv__': _.__truediv__(_)       >> Elwise(postgresql = 'xfail'),  # TODO: pg needs cast int to float?
+        '__floordiv__': _.__floordiv__(_)     >> Elwise(postgresql = 'xfail'),
         '__mul__': _.__mul__(_)               >> Elwise(),
         '__mod__': _.__mod__(_)               >> Elwise(),
-        '__pow__': _.__pow__(_)               >> Elwise(xfail = ['postgresql']),
+        '__pow__': _.__pow__(_)               >> Elwise(postgresql = 'xfail'),
         '__lt__': _.__lt__(_)                 >> Elwise(),
         '__gt__': _.__gt__(_)                 >> Elwise(),
         '__le__': _.__le__(_)                 >> Elwise(),
         '__ge__': _.__ge__(_)                 >> Elwise(), 
         '__ne__': _.__ne__(_)                 >> Elwise(), 
         '__eq__': _.__eq__(_)                 >> Elwise(), 
-        '__div__': _.__div__(_)               >> Elwise(xfail = ['postgresql']),  # TODO: deprecated in python3, not in siu
-        '__round__': _.__round__(2)           >> Elwise(xfail = ['postgresql']),  # TODO: pg returns float
+        '__div__': _.__div__(_)               >> Elwise(postgresql = 'xfail'),  # TODO: deprecated in python3, not in siu
+        '__round__': _.__round__(2)           >> Elwise(postgresql = 'xfail'),  # TODO: pg returns float
         '__radd__': _.__radd__(_)             >> Elwise(), 
         '__rsub__': _.__rsub__(_)             >> Elwise(), 
         '__rmul__': _.__rmul__(_)             >> Elwise(), 
-        '__rdiv__': _.__rdiv__(_)             >> Elwise(xfail = ['postgresql']), 
-        '__rtruediv__': _.__rtruediv__(_)     >> Elwise(xfail = ['postgresql']),
-        '__rfloordiv__': _.__rfloordiv__(_)   >> Elwise(xfail = ['postgresql']),
+        '__rdiv__': _.__rdiv__(_)             >> Elwise(postgresql = 'xfail'), 
+        '__rtruediv__': _.__rtruediv__(_)     >> Elwise(postgresql = 'xfail'),
+        '__rfloordiv__': _.__rfloordiv__(_)   >> Elwise(postgresql = 'xfail'),
         '__rmod__': _.__rmod__(_)             >> Elwise(),
-        '__rpow__': _.__rpow__(_)             >> Elwise(xfail = ['postgresql']),
+        '__rpow__': _.__rpow__(_)             >> Elwise(postgresql = 'xfail'),
         },
     'attributes': {
         # method
@@ -104,7 +110,7 @@ funcs = {
     'conversion': {
         'astype': _.astype('str')       >> Elwise(),
         # infer_objects
-        'copy': _.copy()              >> Elwise(not_impl = ['postgresql']),
+        'copy': _.copy()              >> Elwise(postgresql = 'not_impl'),
         # bool
         # to_numpy
         # to_period
@@ -136,27 +142,27 @@ funcs = {
     'binary': {
         'add': _.add(_)               >> Elwise(),
         'sub': _.sub(_)               >> Elwise(),
-        'truediv': _.truediv(_)       >> Elwise(xfail = ['postgresql']),
-        'floordiv': _.floordiv(_)     >> Elwise(xfail = ['postgresql']),
+        'truediv': _.truediv(_)       >> Elwise(postgresql = 'xfail'),
+        'floordiv': _.floordiv(_)     >> Elwise(postgresql = 'xfail'),
         'mul': _.mul(_)               >> Elwise(),
         'mod': _.mod(_)               >> Elwise(),
-        'pow': _.pow(_)               >> Elwise(xfail = ['postgresql']),
+        'pow': _.pow(_)               >> Elwise(postgresql = 'xfail'),
         'lt': _.lt(_)                 >> Elwise(),
         'gt': _.gt(_)                 >> Elwise(),
         'le': _.le(_)                 >> Elwise(),
         'ge': _.ge(_)                 >> Elwise(), 
         'ne': _.ne(_)                 >> Elwise(), 
         'eq': _.eq(_)                 >> Elwise(), 
-        'div': _.div(_)               >> Elwise(xfail = ['postgresql']), 
-        'round': _.round(2)           >> Elwise(xfail = ['postgresql']), 
+        'div': _.div(_)               >> Elwise(postgresql = 'xfail'), 
+        'round': _.round(2)           >> Elwise(postgresql = 'xfail'), 
         'radd': _.radd(_)             >> Elwise(), 
         'rsub': _.rsub(_)             >> Elwise(), 
         'rmul': _.rmul(_)             >> Elwise(), 
-        'rdiv': _.rdiv(_)             >> Elwise(xfail = ['postgresql']), 
-        'rtruediv': _.rtruediv(_)     >> Elwise(xfail = ['postgresql']),
-        'rfloordiv': _.rfloordiv(_)   >> Elwise(xfail = ['postgresql']),
+        'rdiv': _.rdiv(_)             >> Elwise(postgresql = 'xfail'), 
+        'rtruediv': _.rtruediv(_)     >> Elwise(postgresql = 'xfail'),
+        'rfloordiv': _.rfloordiv(_)   >> Elwise(postgresql = 'xfail'),
         'rmod': _.rmod(_)             >> Elwise(),
-        'rpow': _.rpow(_)             >> Elwise(xfail = ['postgresql']),
+        'rpow': _.rpow(_)             >> Elwise(postgresql = 'xfail'),
         # combine
         # combine_first
         #'product': _.product()        >> Agg(),   # TODO: doesn't exist on GroupedDataFrame
@@ -192,30 +198,30 @@ funcs = {
         #'corr': _.corr(_)             >> Agg(),
         'count': _.count()            >> Agg(),
         #'cov': _.cov(_)               >> Agg(),
-        'cummax': _.cummax()          >> Window(xfail = ['postgresql']),
-        'cummin': _.cummin()          >> Window(xfail = ['postgresql']),
-        'cumprod': _.cumprod()        >> Window(xfail = ['postgresql']),
-        'cumsum': _.cumsum()          >> Window(xfail = ['postgresql']),
+        'cummax': _.cummax()          >> Window(postgresql = 'xfail'),
+        'cummin': _.cummin()          >> Window(postgresql = 'xfail'),
+        'cumprod': _.cumprod()        >> Window(postgresql = 'xfail'),
+        'cumsum': _.cumsum()          >> Window(postgresql = 'xfail'),
         # describe
         'diff': _.diff()              >> Window(),
         # factorize
         # 'kurt': _.kurt()              >> Agg(),  # TODO: doesn't exist on GDF
-        'mad': _.mad()                >> Agg(xfail = ['postgresql']),
+        'mad': _.mad()                >> Agg(postgresql = 'xfail'),
         'max': _.max()                >> Agg(),
         'mean': _.mean()              >> Agg(),
-        'median': _.median()          >> Agg(xfail = ['postgresql']),
+        'median': _.median()          >> Agg(postgresql = 'xfail'),
         'min': _.min()                >> Agg(),
         #'mode': _.mode()              >> Agg(),   # TODO: doesn't exist on GDF, can return > 1 result
         #'nlargest': _.nlargest()      >> Window(),
         #'nsmallest': _.nsmallest()    >> Window(),
-        'pct_change': _.pct_change()  >> Window(xfail = ['postgresql']),
-        'prod': _.prod()              >> Agg(xfail = ['postgresql']),
+        'pct_change': _.pct_change()  >> Window(postgresql = 'xfail'),
+        'prod': _.prod()              >> Agg(postgresql = 'xfail'),
         'quantile': _.quantile(.75)      >> Agg(no_mutate = ['postgresql']),
-        'rank': _.rank()              >> Window(xfail = ['postgresql']),
-        'sem': _.sem()                >> Agg(xfail = ['postgresql']),
-        'skew': _.skew()              >> Agg(xfail = ['postgresql']),
+        'rank': _.rank()              >> Window(postgresql = 'xfail'),
+        'sem': _.sem()                >> Agg(postgresql = 'xfail'),
+        'skew': _.skew()              >> Agg(postgresql = 'xfail'),
         'std': _.std()                >> Agg(),
-        'sum': _.sum()                >> Agg(xfail = ['postgresql']), # TODO: pg returns float
+        'sum': _.sum()                >> Agg(postgresql = 'xfail'), # TODO: pg returns float
         'var': _.var()                >> Agg(),
         #'kurtosis': _.kurtosis()      >> Agg(),  # TODO: doesn't exist on GDF
         # unique
@@ -317,17 +323,17 @@ funcs = {
     # Datetime properties 
     ## ------------------------------------------------------------------------
     'datetime_properties': {
-        'dt.date': _.dt.date                         >> Elwise(not_impl = ['postgresql']), # TODO: all 3, not pandas objects
-        'dt.time': _.dt.time                             >> Elwise(not_impl = ['postgresql']),
-        'dt.timetz': _.dt.timetz                         >> Elwise(not_impl = ['postgresql']),
+        'dt.date': _.dt.date                         >> Elwise(postgresql = 'not_impl'), # TODO: all 3, not pandas objects
+        'dt.time': _.dt.time                             >> Elwise(postgresql = 'not_impl'),
+        'dt.timetz': _.dt.timetz                         >> Elwise(postgresql = 'not_impl'),
         'dt.year': _.dt.year                             >> Elwise(sql_type = 'float'),
         'dt.month': _.dt.month                           >> Elwise(sql_type = 'float'),
         'dt.day': _.dt.day                               >> Elwise(sql_type = 'float'),
         'dt.hour': _.dt.hour                             >> Elwise(sql_type = 'float'),
         'dt.minute': _.dt.minute                         >> Elwise(sql_type = 'float'),
         'dt.second': _.dt.second                         >> Elwise(sql_type = 'float'),
-        'dt.microsecond': _.dt.microsecond               >> Elwise(sql_type = 'float', xfail = ['postgresql']),
-        'dt.nanosecond': _.dt.nanosecond                 >> Elwise(not_impl = ['postgresql']),
+        'dt.microsecond': _.dt.microsecond               >> Elwise(sql_type = 'float', postgresql = 'xfail'),
+        'dt.nanosecond': _.dt.nanosecond                 >> Elwise(postgresql = 'not_impl'),
         'dt.week': _.dt.week                             >> Elwise(sql_type = 'float'),
         'dt.weekofyear': _.dt.weekofyear                 >> Elwise(sql_type = 'float'),
         'dt.dayofweek': _.dt.dayofweek                   >> Elwise(sql_type = 'float'),
@@ -337,10 +343,10 @@ funcs = {
         'dt.is_month_start': _.dt.is_month_start         >> Elwise(),
         'dt.is_month_end': _.dt.is_month_end             >> Elwise(),
         'dt.is_quarter_start': _.dt.is_quarter_start     >> Elwise(),
-        'dt.is_quarter_end': _.dt.is_quarter_end         >> Elwise(xfail = ['postgresql']),
+        'dt.is_quarter_end': _.dt.is_quarter_end         >> Elwise(postgresql = 'xfail'),
         'dt.is_year_start': _.dt.is_year_start           >> Elwise(),
         'dt.is_year_end': _.dt.is_year_end               >> Elwise(),
-        'dt.is_leap_year': _.dt.is_leap_year             >> Elwise(not_impl = ['postgresql']),
+        'dt.is_leap_year': _.dt.is_leap_year             >> Elwise(postgresql = 'not_impl'),
         'dt.daysinmonth': _.dt.daysinmonth               >> Elwise(sql_type = 'float'),
         'dt.days_in_month': _.dt.days_in_month           >> Elwise(sql_type = 'float'),
         'dt.tz': _.dt.tz                                 >> Singleton(),
@@ -350,17 +356,17 @@ funcs = {
     # Datetime methods 
     ## ------------------------------------------------------------------------
     'datetime_methods': {
-        'dt.to_period': _.dt.to_period('D')             >> Elwise(xfail = ["postgresql"]),
+        'dt.to_period': _.dt.to_period('D')             >> Elwise(postgresql = 'xfail'),
         # dt.to_pydatetime                                              # TODO: datetime objects converted back to numpy?
-        'dt.tz_localize': _.dt.tz_localize('UTC')       >> Elwise(xfail = ["postgresql"]),
+        'dt.tz_localize': _.dt.tz_localize('UTC')       >> Elwise(postgresql = 'xfail'),
         # dt.tz_convert                                                 # TODO: need custom test
-        'dt.normalize': _.dt.normalize()                >> Elwise(xfail = ["postgresql"]),
-        'dt.strftime': _.dt.strftime('%d')              >> Elwise(xfail = ["postgresql"]),
-        'dt.round': _.dt.round('D')                     >> Elwise(xfail = ["postgresql"]),
-        'dt.floor': _.dt.floor('D')                     >> Elwise(xfail = ["postgresql"]),
-        'dt.ceil': _.dt.ceil('D')                       >> Elwise(xfail = ["postgresql"]),
-        'dt.month_name': _.dt.month_name()              >> Elwise(xfail = ["postgresql"]),
-        'dt.day_name': _.dt.day_name()                  >> Elwise(xfail = ["postgresql"]),
+        'dt.normalize': _.dt.normalize()                >> Elwise(postgresql = 'xfail'),
+        'dt.strftime': _.dt.strftime('%d')              >> Elwise(postgresql = 'xfail'),
+        'dt.round': _.dt.round('D')                     >> Elwise(postgresql = 'xfail'),
+        'dt.floor': _.dt.floor('D')                     >> Elwise(postgresql = 'xfail'),
+        'dt.ceil': _.dt.ceil('D')                       >> Elwise(postgresql = 'xfail'),
+        'dt.month_name': _.dt.month_name()              >> Elwise(postgresql = 'xfail'),
+        'dt.day_name': _.dt.day_name()                  >> Elwise(postgresql = 'xfail'),
         },
     ## ------------------------------------------------------------------------
     # Period properties 
@@ -394,55 +400,55 @@ funcs = {
         'str.capitalize': _.str.capitalize()              >> Elwise(),
         #'str.casefold': _.str.casefold()                  >> Elwise(),   #TODO: introduced in v0.25.1
         # str.cat                                                         #TODO: can be Agg OR Elwise, others arg
-        'str.center': _.str.center(3)                     >> Elwise(not_impl = ['postgresql']),
+        'str.center': _.str.center(3)                     >> Elwise(postgresql = 'not_impl'),
         'str.contains': _.str.contains('a')               >> Elwise(),
-        'str.count': _.str.count('a')                     >> Elwise(xfail = ['postgresql']),
+        'str.count': _.str.count('a')                     >> Elwise(postgresql = 'xfail'),
         # str.decode                                                      # TODO custom testing
-        'str.encode': _.str.encode('utf-8')               >> Elwise(xfail = ['postgresql']),
-        'str.endswith': _.str.endswith('a|b')             >> Elwise(xfail = ['postgresql']),
+        'str.encode': _.str.encode('utf-8')               >> Elwise(postgresql = 'xfail'),
+        'str.endswith': _.str.endswith('a|b')             >> Elwise(postgresql = 'xfail'),
         #'str.extract': _.str.extract('(a)(b)')                           # TODO: returns DataFrame
         # str.extractall
-        'str.find': _.str.find('a|c')                     >> Elwise(xfail = ['postgresql']),
-        'str.findall': _.str.findall('a|c')               >> Elwise(xfail = ['postgresql']),
+        'str.find': _.str.find('a|c')                     >> Elwise(postgresql = 'xfail'),
+        'str.findall': _.str.findall('a|c')               >> Elwise(postgresql = 'xfail'),
         # str.get                                                         # TODO: custom test
         # str.index                                                       # TODO: custom test
         # str.join                                                        # TODO: custom test
         'str.len': _.str.len()                            >> Elwise(),
-        'str.ljust': _.str.ljust(5)                       >> Elwise(xfail = ['postgresql']), # pg formatstr function
+        'str.ljust': _.str.ljust(5)                       >> Elwise(postgresql = 'xfail'), # pg formatstr function
         'str.lower': _.str.lower()                        >> Elwise(),
         'str.lstrip': _.str.lstrip()                      >> Elwise(),
-        'str.match': _.str.match('a|c')                   >> Elwise(xfail = ['postgresql']),
+        'str.match': _.str.match('a|c')                   >> Elwise(postgresql = 'xfail'),
         # str.normalize
-        'str.pad': _.str.pad(5)                           >> Elwise(xfail = ['postgresql']),
+        'str.pad': _.str.pad(5)                           >> Elwise(postgresql = 'xfail'),
         # str.partition
         # str.repeat
-        'str.replace': _.str.replace('a|b', 'c')          >> Elwise(xfail = ['postgresql']),
-        'str.rfind': _.str.rfind('a')                     >> Elwise(xfail = ['postgresql']),
+        'str.replace': _.str.replace('a|b', 'c')          >> Elwise(postgresql = 'xfail'),
+        'str.rfind': _.str.rfind('a')                     >> Elwise(postgresql = 'xfail'),
         # str.rindex
-        'str.rjust': _.str.rjust(5)                       >> Elwise(xfail = ['postgresql']),
+        'str.rjust': _.str.rjust(5)                       >> Elwise(postgresql = 'xfail'),
         # str.rpartition
         'str.rstrip': _.str.rstrip()                      >> Elwise(),
-        'str.slice': _.str.slice(step = 2)                >> Elwise(xfail = ['postgresql']),
-        'str.slice_replace': _.str.slice_replace(2, repl = 'x')   >> Elwise(xfail = ['postgresql']),
-        'str.split': _.str.split('a|b')                   >> Elwise(xfail = ['postgresql']),
-        'str.rsplit': _.str.rsplit('a|b', n = 1)          >> Elwise(xfail = ['postgresql']),
+        'str.slice': _.str.slice(step = 2)                >> Elwise(postgresql = 'xfail'),
+        'str.slice_replace': _.str.slice_replace(2, repl = 'x')   >> Elwise(postgresql = 'xfail'),
+        'str.split': _.str.split('a|b')                   >> Elwise(postgresql = 'xfail'),
+        'str.rsplit': _.str.rsplit('a|b', n = 1)          >> Elwise(postgresql = 'xfail'),
         'str.startswith': _.str.startswith('a|b')         >> Elwise(),
         'str.strip': _.str.strip()                        >> Elwise(),
-        'str.swapcase': _.str.swapcase()                  >> Elwise(xfail = ['postgresql']),
+        'str.swapcase': _.str.swapcase()                  >> Elwise(postgresql = 'xfail'),
         'str.title': _.str.title()                        >> Elwise(),
         # str.translate
         'str.upper': _.str.upper()                        >> Elwise(),
-        'str.wrap': _.str.wrap(2)                         >> Elwise(xfail = ['postgresql']),
+        'str.wrap': _.str.wrap(2)                         >> Elwise(postgresql = 'xfail'),
         # str.zfill
-        'str.isalnum': _.str.isalnum()                    >> Elwise(xfail = ['postgresql']),
-        'str.isalpha': _.str.isalpha()                    >> Elwise(xfail = ['postgresql']),
-        'str.isdigit': _.str.isdigit()                    >> Elwise(xfail = ['postgresql']),
-        'str.isspace': _.str.isspace()                    >> Elwise(xfail = ['postgresql']),
-        'str.islower': _.str.islower()                    >> Elwise(xfail = ['postgresql']),
-        'str.isupper': _.str.isupper()                    >> Elwise(xfail = ['postgresql']),
-        'str.istitle': _.str.istitle()                    >> Elwise(xfail = ['postgresql']),
-        'str.isnumeric': _.str.isnumeric()                >> Elwise(xfail = ['postgresql']),
-        'str.isdecimal': _.str.isdecimal()                >> Elwise(xfail = ['postgresql']),
+        'str.isalnum': _.str.isalnum()                    >> Elwise(postgresql = 'xfail'),
+        'str.isalpha': _.str.isalpha()                    >> Elwise(postgresql = 'xfail'),
+        'str.isdigit': _.str.isdigit()                    >> Elwise(postgresql = 'xfail'),
+        'str.isspace': _.str.isspace()                    >> Elwise(postgresql = 'xfail'),
+        'str.islower': _.str.islower()                    >> Elwise(postgresql = 'xfail'),
+        'str.isupper': _.str.isupper()                    >> Elwise(postgresql = 'xfail'),
+        'str.istitle': _.str.istitle()                    >> Elwise(postgresql = 'xfail'),
+        'str.isnumeric': _.str.isnumeric()                >> Elwise(postgresql = 'xfail'),
+        'str.isdecimal': _.str.isdecimal()                >> Elwise(postgresql = 'xfail'),
         # str.get_dummies
         },
     'categories': {
@@ -518,6 +524,7 @@ for category, call_dict in funcs_stripped.items():
     nested_spec[category] = d = {}
     for name, call in call_dict.items():
         d[name] = get_type_info(call)
+        d[name]['category'] = category
 
 
 spec = dict(itertools.chain(*iter(d.items() for d in nested_spec.values())))
