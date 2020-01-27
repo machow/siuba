@@ -727,6 +727,23 @@ def _distinct(__data, *args, _keep_all = False, **kwargs):
 # TODO: move to vector.py
 @singledispatch
 def if_else(__data, *args, **kwargs):
+    """
+    Example:
+        >>> ser1 = pd.Series([1,2,3,4])
+        >>> if_else(ser1 > 2, np.nan, ser1)
+        array([1, 2, nan, nan], dtype=object)
+
+        >>> from siuba import _
+        >>> f = if_else(_ < 3, _, 3)
+        >>> f(ser1)
+        array([1, 2, 3, 3], dtype=object)
+
+        >>> import numpy as np
+        >>> ser2 = pd.Series(['NA', 'a', 'b'])
+        >>> if_else(ser2 == 'NA', np.nan, ser2)
+        array([nan, 'a', 'b'], dtype=object)
+
+    """
     raise_type_error(__data)
 
 @if_else.register(Call)
@@ -744,8 +761,9 @@ def _if_else(cond, true_vals, false_vals):
     result[true_indx] =  true_vals[true_indx] if np.ndim(true_vals) else true_vals
     result[false_indx] = false_vals[false_indx] if np.ndim(false_vals) else false_vals
 
-    # TODO: inefficient way to downcast?
-    return np.array(list(result))
+    # TODO: should functions that take a Series, return a Series?
+    #       for now, just return "O" type. Sort out once better research.
+    return result
 
 
 # case_when ----------------
