@@ -32,7 +32,7 @@ Unfortunately, `%>%` is not valid python syntax. The [operator precedence](https
 ## How do I use something like n_distinct in siuba?
 
 Many of the "missing" dplyr functions can be found in the `siuba.dply.vector` module.
-Oftentimes, you can find an analogous function in pandas, though. In this case, `ndistinct`.
+Oftentimes, you can find an analogous function in pandas, though. In this case, `nunique`.
 
 ```{python}
 import pandas as pd
