@@ -731,12 +731,12 @@ def if_else(__data, *args, **kwargs):
     Example:
         >>> ser1 = pd.Series([1,2,3,4])
         >>> if_else(ser1 > 2, np.nan, ser1)
-        array([1, 2, nan, nan], dtype=object)
+        array([ 1.,  2., nan, nan])
 
         >>> from siuba import _
         >>> f = if_else(_ < 3, _, 3)
         >>> f(ser1)
-        array([1, 2, 3, 3], dtype=object)
+        array([1, 2, 3, 3])
 
         >>> import numpy as np
         >>> ser2 = pd.Series(['NA', 'a', 'b'])
@@ -753,13 +753,7 @@ def _if_else(__data, *args, **kwargs):
 
 @if_else.register(pd.Series)
 def _if_else(cond, true_vals, false_vals):
-    true_indx = np.where(cond)[0]
-    false_indx = np.where(~cond)[0]
-
-    result = np.repeat(None, len(cond))
-
-    result[true_indx] =  true_vals[true_indx] if np.ndim(true_vals) else true_vals
-    result[false_indx] = false_vals[false_indx] if np.ndim(false_vals) else false_vals
+    result = np.where(cond.fillna(False), true_vals, false_vals)
 
     # TODO: should functions that take a Series, return a Series?
     #       for now, just return "O" type. Sort out once better research.
