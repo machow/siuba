@@ -874,6 +874,37 @@ def add_count(__data, *args, wt = None, sort = False, **kwargs):
 
 # Nest ========================================================================
 
+def _fast_split_df(g_df):
+    """
+    Note
+    ----
+
+    splitting does not scale well to many groups (e.g. 50000+). This is due
+    to pandas' (1) use of indexes, (2) some hard coded actions when subsetting.
+    We are currently working on a fix, so that when people aren't using indexes,
+    nesting will be much faster.
+
+    see https://github.com/machow/siuba/issues/184
+    """
+
+    # TODO (#184): speed up when user doesn't need an index
+    # right now, this is essentially a copy of
+    # pandas.core.groupby.ops.DataSplitter.__iter__
+    from pandas._libs import lib
+    splitter = g_df.grouper._get_splitter(g_df.obj)
+
+    starts, ends = lib.generate_slices(splitter.slabels, splitter.ngroups)
+
+    # TODO: reset index
+    sdata = splitter._get_sorted_data()
+
+    # TODO: avoid costly make_block call, and hard-coded BlockManager init actions.
+    #       neither of these things is necessary when subsetting rows.
+    for start, end in zip(starts, ends):
+        yield splitter._chop(sdata, slice(start, end))
+
+
+
 @singledispatch2(pd.DataFrame)
 def nest(__data, *args, key = "data"):
     """Nest columns within a DataFrame.
@@ -901,13 +932,14 @@ def nest(__data, *args, key = "data"):
     grp_keys = list(k for k in __data.columns if k not in set(od))
     nest_keys = list(od)
 
-    # AFAICT you can't name the col created in the apply here
-    # but it might be more efficient to act on the groupby obj directly
-    out = __data.groupby(grp_keys).apply(lambda d: [d[nest_keys]]).reset_index()
-    out.rename(columns = {out.columns[-1]: key}, inplace = True)
-    # hack, can assign list of dataframes, but not in a groupby?
-    # it ended up making a series of lists each with a single dataframe
-    out[key] = [x[0] for x in out[key]]
+    # split into sub DataFrames, with only nest_keys as columns
+    g_df = __data.groupby(grp_keys)
+    splitter = g_df.grouper._get_splitter(g_df.obj[nest_keys])
+
+    result_index = g_df.grouper.result_index
+    nested_dfs = [x for ii, x in splitter]
+
+    out = pd.DataFrame({key: nested_dfs}, index = result_index).reset_index()
 
     return out
 
