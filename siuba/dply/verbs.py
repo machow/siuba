@@ -730,7 +730,7 @@ def if_else(__data, *args, **kwargs):
     """
     Example:
         >>> ser1 = pd.Series([1,2,3,4])
-        >>> if_else(ser1 > 2, np.nan, ser1)
+        >>> if_else(ser1 > 2, np.nan, ser1)        # doctest: +SKIP
         array([ 1.,  2., nan, nan])
 
         >>> from siuba import _
