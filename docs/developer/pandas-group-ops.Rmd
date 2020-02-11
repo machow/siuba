@@ -114,6 +114,12 @@ print(res_agg.obj.head())
 
 ## Defining custom grouped operations
 
+I'm in the progress of writing out documentation on custom operations.
+For more context on strategic decisions made during their implementation, see
+[this architecture doc](https://github.com/machow/siuba/blob/master/examples/architecture/004-user-defined-functions.ipynb).
+
+An example of implementing a custom cumulative mean function is below.
+
 ```{python}
 from siuba.siu import symbolic_dispatch
 from pandas.core.groupby import SeriesGroupBy, GroupBy
@@ -143,3 +149,6 @@ g_cyl = mtcars.groupby("cyl")
 mutate(g_students, cumul_mean = cummean(_.score))
 
 ```
+
+Note that this approach requires that the custom grouped function (`_cummean_grouped`) specify
+a type annotation for its return value.
