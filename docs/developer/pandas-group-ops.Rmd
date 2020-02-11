@@ -4,8 +4,8 @@ jupyter:
     text_representation:
       extension: .Rmd
       format_name: rmarkdown
-      format_version: '1.1'
-      jupytext_version: 1.2.4
+      format_version: '1.2'
+      jupytext_version: 1.3.0
   kernelspec:
     display_name: Python 3
     language: python
@@ -114,4 +114,41 @@ print(res_agg.obj.head())
 
 ## Defining custom grouped operations
 
-TODO: coming soon
+I'm in the progress of writing out documentation on custom operations.
+For more context on strategic decisions made during their implementation, see
+[this architecture doc](https://github.com/machow/siuba/blob/master/examples/architecture/004-user-defined-functions.ipynb).
+
+An example of implementing a custom cumulative mean function is below.
+
+```{python}
+from siuba.siu import symbolic_dispatch
+from pandas.core.groupby import SeriesGroupBy, GroupBy
+from pandas import Series
+
+@symbolic_dispatch(cls = Series)
+def cummean(x):
+    """Return a same-length array, containing the cumulative mean."""
+    return x.expanding().mean()
+
+
+@cummean.register(SeriesGroupBy)
+def _cummean_grouped(x) -> SeriesGroupBy:
+    grouper = x.grouper
+    n_entries = x.obj.notna().groupby(grouper).cumsum()
+
+    res = x.cumsum() / n_entries
+
+    return res.groupby(grouper)
+
+from siuba import _, mutate
+from siuba.data import mtcars
+
+# a pandas DataFrameGroupBy object
+g_cyl = mtcars.groupby("cyl")
+
+mutate(g_students, cumul_mean = cummean(_.score))
+
+```
+
+Note that this approach requires that the custom grouped function (`_cummean_grouped`) specify
+a type annotation for its return value.
