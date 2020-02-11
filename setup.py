@@ -26,7 +26,6 @@ setup(
         "pandas>=0.24.0",
         "numpy>=1.12.0",
         "SQLAlchemy>=1.1.18",
-        "psycopg2>=2.7.0",
     ],
     python_requires=">=3.6",
     include_package_data=True,
