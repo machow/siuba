@@ -3,28 +3,29 @@ python:
 #  - "3.5"
 #  - "3.5-dev"  # 3.5 development branch
 #  - "3.6"
-  - "3.6-dev"  # 3.6 development branch
-  - "3.7-dev"  # 3.7 development branch
-  - "3.8-dev"
+  - "3.6"  # 3.6 development branch
+  - "3.7"  # 3.7 development branch
+  - "3.8"
 # command to install dependencies
 jobs:
   include:
   - name: "Minimum install_requires versions"
     install:
       - pip install numpy~=1.12.0 pandas~=0.24.0 SQLAlchemy~=1.1.18 psycopg2~=2.7.0
-      - pip install pytest==4.4.2 hypothesis==4.50.2
+      - pip install pytest==4.4.2 hypothesis==4.50.2 attrs==19.3.0
   - name: "Late 2019 dependencies"
     install:
       - pip install numpy==1.17.4 pandas==0.24.2 SQLAlchemy==1.2.19 psycopg2==2.8.4
-      - pip install pytest==4.4.2 hypothesis==4.50.2
+      - pip install pytest==4.4.2 hypothesis==4.50.2 attrs==19.3.0
   - name: "Newest studied dependency versions"
     install:
       - pip install numpy==1.17.4 pandas~=0.25.3 SQLAlchemy~=1.3.11 psycopg2~=2.8.4
-      - pip install pytest==4.4.2 hypothesis==4.50.2
+      - pip install pytest==4.4.2 hypothesis==4.50.2 attrs==19.3.0
   - name: "Pure setup.py install"
     install:
       - pip install ./
-      - pip install pytest==4.4.2 hypothesis==4.50.2
+      - pip install psycopg2~=2.8.4
+      - pip install pytest==4.4.2 hypothesis==4.50.2 attrs==19.3.0
       
 # command to run tests
 services:
