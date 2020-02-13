@@ -161,9 +161,9 @@ def fct_lump(fct, n = None, prop = None, w = None, other_level = "Other", ties =
         Categories (2, object): [a, Other]
 
         # TODO: implement prop arg
-        #>>> fct_lump(['a', 'a', 'b', 'b', 'c', 'd'], prop = .2)
-        #[a, a, b, b, Other, Other]
-        #Categories (3, object): [b, a, Other]
+        >>> fct_lump(['a', 'a', 'b', 'b', 'c', 'd'], prop = .2)
+        [a, a, b, b, Other, Other]
+        Categories (3, object): [a, b, Other]
         
 
     """
@@ -174,19 +174,30 @@ def fct_lump(fct, n = None, prop = None, w = None, other_level = "Other", ties =
     if n is None and prop is None:
         raise NotImplementedError("Either n or prop must be specified")
 
-    if prop is not None:
-        raise NotImplementedError("prop arg is not implemented")
-
-    keep_cats = _fct_lump_n_cats(fct, n, w, other_level, ties)
+    keep_cats = _fct_lump_n_cats(fct, w, other_level, ties, n = n, prop = prop)
     return fct_collapse(fct, {k:k for k in keep_cats}, group_other = other_level)
 
-def _fct_lump_n_cats(fct, n, w, other_level, ties):
+def _fct_lump_n_cats(fct, w, other_level, ties, n = None, prop = None):
     # TODO: currently always selects n, even if ties
-    ascending = n < 0
+
+    # weights might be a Series, or array, etc..
     arr = _get_values(w) if w is not None else 1
     ser = pd.Series(arr, index = fct)
-    sorted_arr = ser.groupby(level = 0).sum().sort_values(ascending = ascending)
-    return sorted_arr.iloc[:abs(n)].index.values
+    counts = ser.groupby(level = 0).sum()
+
+    if n is not None:
+        ascending = n < 0
+        sorted_arr = counts.sort_values(ascending = ascending)
+        res = sorted_arr.iloc[:abs(n)]
+    elif prop is not None:
+        sorted_arr = counts.sort_values() / counts.sum()
+
+        if prop < 0:
+            res = sorted_arr.loc[sorted_arr <= abs(prop)]
+        else:
+            res = sorted_arr.loc[sorted_arr > prop]
+
+    return res.index.values
 
 def _get_values(x):
     # TODO: move into utility, note pandas now encouraging .array method
