@@ -32,7 +32,7 @@ call_listener = CallTreeLocal(
 from siuba.siu import Call
 from siuba.dply.verbs import mutate, filter, summarize, singledispatch2, DataFrameGroupBy, _regroup
 
-def grouped_eval(__data, expr):
+def grouped_eval(__data, expr, require_agg = False):
     if isinstance(expr, Call):
         call = call_listener.enter(expr)
 
@@ -40,13 +40,17 @@ def grouped_eval(__data, expr):
         grouped_res = call(__data)
         if isinstance(grouped_res, GroupByAgg):
             res = grouped_res._broadcast_agg_result()
-        elif isinstance(grouped_res, SeriesGroupBy):
+        elif isinstance(grouped_res, SeriesGroupBy) and not require_agg:
             res = grouped_res.obj
         else:
             # can happen right now if user selects, e.g., a property of the
             # groupby object, like .dtype, which returns a single value
             # in the future, could restrict set of operations user could perform
             raise ValueError("Result must be subclass of SeriesGroupBy")
+    elif not isinstance(expr, (int, str, float)):
+        raise ValueError("Grouped expressions must be a siu expression, or literal (for now).")
+    else:
+        res = expr
 
     # TODO: for non-call arguments, need to validate they're "literals"
     return res
@@ -118,11 +122,23 @@ def fast_summarize(__data, **kwargs):
     out = __data.grouper.result_index.to_frame()
     
     for name, expr in kwargs.items():
-        res = grouped_eval(__data, expr)
-        out[name] = res
+        if isinstance(expr, Call):
+            call = call_listener.enter(expr)
+            res = call(__data)
+        elif callable(expr):
+            res = expr(__data)
+        else:
+            raise ValueError("fast_summarize can't use arg name, type: %s, %s"%(name, type(expr)))
 
-    out.reset_index(drop = True)
-    return out
+        if not isinstance(res, GroupByAgg):
+            raise ValueError("expression for arg name %s must return a GroupByAgg object")
+
+        # TODO: would be faster to check that res has matching grouper, since
+        #       here it goes through the work of matching up indexes (which if
+        #       the groupers match are identical)
+        out[name] = res.obj
+
+    return out.reset_index(drop = True)
 
 
 @fast_summarize.register(object)
@@ -130,6 +146,6 @@ def _fast_summarize_default(__data, **kwargs):
     # TODO: had to register object second, since singledispatch2 sets object dispatch
     #       to be a pipe (e.g. unknown types become a pipe by default)
     # by default dispatch to regular mutate
-    f = mutate.registry[type(__data)]
+    f = summarize.registry[type(__data)]
     return f(__data, **kwargs)
 

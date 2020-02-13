@@ -255,6 +255,27 @@ def test_frame_summarize(skip_backend, backend, agg_entry):
             dst_g
             )
 
+
+def test_pandas_grouped_frame_fast_summarize(agg_entry):
+    from siuba.experimental.pd_groups.dialect import fast_summarize, DataFrameGroupBy
+    gdf = get_data(agg_entry, DATA).groupby('g')
+
+    # Execute summarize ----------------------------------------------------------
+    str_expr, call_expr = get_df_expr(agg_entry)
+
+    res = fast_summarize(gdf, result = call_expr)
+    dst = summarize(gdf, result = call_expr)
+
+    # TODO: apply mark to skip failing tests, rather than downcast
+    # pandas grouped aggs, when not using cython, _try_cast back to original type
+    # but since summarize uses apply, it doesn't :/. Currently only affects median func.
+    if str_expr == '_.x.median()':
+        dst['result'] = gdf._try_cast(dst['result'], gdf.x.obj)
+
+    assert_frame_equal(res, dst)
+
+
+
 # Edge Cases ==================================================================
 
 def test_frame_set_aggregates_postgresql():
