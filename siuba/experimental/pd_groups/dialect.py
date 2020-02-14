@@ -47,6 +47,8 @@ def grouped_eval(__data, expr, require_agg = False):
             # TODO: may want to validate its grouper
             if require_agg:
                 # need an agg, got an agg. we are done.
+                if not grouped_res._orig_grouper is __data.grouper:
+                    raise ValueError("Incompatible groupers")
                 return grouped_res
             else:
                 # broadcast from aggregate to original length (like transform)
