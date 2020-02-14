@@ -31,29 +31,37 @@ call_listener = CallTreeLocal(
 
 from siuba.siu import Call
 from siuba.dply.verbs import mutate, filter, summarize, singledispatch2, DataFrameGroupBy, _regroup
+from pandas.core.dtypes.inference import is_scalar
 
 def grouped_eval(__data, expr, require_agg = False):
+    if is_scalar(expr):
+        return expr
+    
     if isinstance(expr, Call):
         call = call_listener.enter(expr)
 
         #
         grouped_res = call(__data)
+
         if isinstance(grouped_res, GroupByAgg):
-            res = grouped_res._broadcast_agg_result()
+            # TODO: may want to validate its grouper
+            if require_agg:
+                # need an agg, got an agg. we are done.
+                return grouped_res
+            else:
+                # broadcast from aggregate to original length (like transform)
+                return grouped_res._broadcast_agg_result()
         elif isinstance(grouped_res, SeriesGroupBy) and not require_agg:
-            res = grouped_res.obj
+            # TODO: may want to validate its grouper
+            return grouped_res.obj
         else:
             # can happen right now if user selects, e.g., a property of the
             # groupby object, like .dtype, which returns a single value
             # in the future, could restrict set of operations user could perform
             raise ValueError("Result must be subclass of SeriesGroupBy")
-    elif not isinstance(expr, (int, str, float)):
-        raise ValueError("Grouped expressions must be a siu expression, or literal (for now).")
-    else:
-        res = expr
 
-    # TODO: for non-call arguments, need to validate they're "literals"
-    return res
+    raise ValueError("Grouped expressions must be a siu expression or scalar")
+
 
 
 # Fast mutate ----
@@ -122,21 +130,18 @@ def fast_summarize(__data, **kwargs):
     out = __data.grouper.result_index.to_frame()
     
     for name, expr in kwargs.items():
-        if isinstance(expr, Call):
-            call = call_listener.enter(expr)
-            res = call(__data)
-        elif callable(expr):
-            res = expr(__data)
+        # special case: set scalars directly
+        res = grouped_eval(__data, expr, require_agg = True)
+
+        if isinstance(res, GroupByAgg):
+            # TODO: would be faster to check that res has matching grouper, since
+            #       here it goes through the work of matching up indexes (which if
+            #       the groupers match are identical)
+            out[name] = res.obj
+
+        # otherwise, assign like a scalar
         else:
-            raise ValueError("fast_summarize can't use arg name, type: %s, %s"%(name, type(expr)))
-
-        if not isinstance(res, GroupByAgg):
-            raise ValueError("expression for arg name %s must return a GroupByAgg object")
-
-        # TODO: would be faster to check that res has matching grouper, since
-        #       here it goes through the work of matching up indexes (which if
-        #       the groupers match are identical)
-        out[name] = res.obj
+            out[name] = res
 
     return out.reset_index(drop = True)
 
