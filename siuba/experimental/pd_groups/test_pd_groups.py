@@ -92,7 +92,7 @@ def test_agg_groupby_broadcasted_equal_to_transform(f_op, f_dst):
 
 # Test user-defined functions =================================================
 
-from .dialect import fast_mutate
+from .dialect import fast_mutate, fast_summarize, fast_filter
 from siuba.siu import symbolic_dispatch, _, FunctionLookupError
 from typing import Any
 
@@ -131,3 +131,29 @@ def test_fast_grouped_custom_user_func_fail():
         g_out = fast_mutate(gdf, result1 = f(_.x), result2 = _.x.mean() + 10)
 
 
+def test_fast_methods_constant():
+    gdf = data_default.groupby('g')
+
+    # mutate ----
+    out = fast_mutate(gdf, y = 1)
+    assert_frame_equal(data_default.assign(y = 1), out.obj)
+
+    # summarize ----
+    out = fast_summarize(gdf, y = 1)
+    agg_frame = gdf.grouper.result_index.to_frame().reset_index(drop = True)
+    assert_frame_equal(agg_frame.assign(y = 1), out)
+
+    # filter ----
+    out = fast_filter(gdf, True)
+    assert_frame_equal(gdf.obj, out.obj)
+
+    # note: two empty DataFrames can differ if their (empty) indices are different types
+    #       e.g. Index vs RangeIndex
+    out = fast_filter(gdf, False)
+    assert_frame_equal(
+            gdf.obj.iloc[0:0,:],
+            out.obj,
+            check_index_type = False
+            )
+
+    
