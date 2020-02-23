@@ -797,9 +797,6 @@ def _relabeled_cols(columns, keys, suffix):
 def _join(left, right, on = None, *args, how = "inner", sql_on = None):
     _raise_if_args(args)
 
-    if len(args):
-        raise NotImplemented("*args is reserved for future arguments (e.g. suffix)")
-
     # Needs to be on the table, not the select
     left_sel = left.last_op.alias()
     right_sel = right.last_op.alias()
