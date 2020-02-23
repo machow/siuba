@@ -794,14 +794,22 @@ def _relabeled_cols(columns, keys, suffix):
 
 
 @join.register(LazyTbl)
-def _join(left, right, on = None, how = "inner"):
+def _join(left, right, on = None, *args, how = "inner", sql_on = None):
+    _raise_if_args(args)
+
+    if len(args):
+        raise NotImplemented("*args is reserved for future arguments (e.g. suffix)")
+
     # Needs to be on the table, not the select
     left_sel = left.last_op.alias()
     right_sel = right.last_op.alias()
 
     # handle arguments ----
-    on  = _validate_join_arg_on(on)
+    on  = _validate_join_arg_on(on, sql_on)
     how = _validate_join_arg_how(how)
+    
+    # for equality join used to combine keys into single column
+    consolidate_keys = on if sql_on is None else {}
     
     if how == "right":
         # switch joins, since sqlalchemy doesn't have right join arg
@@ -820,11 +828,12 @@ def _join(left, right, on = None, how = "inner"):
             )
     
     # note, shared_keys assumes on is a mapping...
-    shared_keys = [k for k,v in on.items() if k == v]
+    # TODO: shared_keys appears to be for when on is not specified, but was unused
+    #shared_keys = [k for k,v in on.items() if k == v]
     labeled_cols = _joined_cols(
             left_sel.columns,
             right_sel.columns,
-            on_keys = on,
+            on_keys = consolidate_keys,
             full = how == "full"
             )
 
@@ -833,13 +842,14 @@ def _join(left, right, on = None, how = "inner"):
 
 
 @semi_join.register(LazyTbl)
-def _semi_join(left, right = None, on = None):
+def _semi_join(left, right = None, on = None, *args, sql_on = None):
+    _raise_if_args(args)
 
     left_sel = left.last_op.alias()
     right_sel = right.last_op.alias()
 
     # handle arguments ----
-    on  = _validate_join_arg_on(on)
+    on  = _validate_join_arg_on(on, sql_on)
     
     # create join conditions ----
     bool_clause = _create_join_conds(left_sel, right_sel, on)
@@ -862,12 +872,14 @@ def _semi_join(left, right = None, on = None):
 
 
 @anti_join.register(LazyTbl)
-def _anti_join(left, right = None, on = None):
+def _anti_join(left, right = None, on = None, *args, sql_on = None):
+    _raise_if_args(args)
+
     left_sel = left.last_op.alias()
     right_sel = right.last_op.alias()
 
     # handle arguments ----
-    on  = _validate_join_arg_on(on)
+    on  = _validate_join_arg_on(on, sql_on)
     
     # create join conditions ----
     bool_clause = _create_join_conds(left_sel, right_sel, on)
@@ -877,10 +889,21 @@ def _anti_join(left, right = None, on = None):
     sel = sql.select(left_sel.columns, from_obj = left_sel).where(not_exists)
     return left.append_op(sel)
        
+def _raise_if_args(args):
+    if len(args):
+        raise NotImplemented("*args is reserved for future arguments (e.g. suffix)")
 
-def _validate_join_arg_on(on):
+def _validate_join_arg_on(on, sql_on = None):
+    # handle sql on case
+    if sql_on is not None:
+        if on is not None:
+            raise ValueError("Cannot specify both on and sql_on")
+
+        return sql_on
+
+    # handle general cases
     if on is None:
-        raise NotImplementedError("on arg must currently be dict")
+        raise NotImplementedError("on arg currently cannot be None (default) for SQL")
     elif isinstance(on, str):
         on = {on: on}
     elif isinstance(on, (list, tuple)):
@@ -902,11 +925,16 @@ def _create_join_conds(left_sel, right_sel, on):
     left_cols  = left_sel.columns  #lift_inner_cols(left_sel)
     right_cols = right_sel.columns #lift_inner_cols(right_sel)
 
-    conds = []
-    for l, r in on.items():
-        col_expr = left_cols[l] == right_cols[r]
-        conds.append(col_expr)
-        
+    if callable(on):
+        # callable, like with sql_on arg
+        conds = [on(left_cols, right_cols)]
+    else:
+        # dict-like of form {left: right}
+        conds = []
+        for l, r in on.items():
+            col_expr = left_cols[l] == right_cols[r]
+            conds.append(col_expr)
+            
     return sql.and_(*conds)
     
 

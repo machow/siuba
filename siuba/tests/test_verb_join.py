@@ -94,6 +94,39 @@ def test_join_suffixes_dupe_names(df1):
     assert all((non_index_cols + "_y").isin(out))
 
 
+# Test arbitrary conditions with sql_on ---------------------------------------
+
+@backend_sql
+def test_left_join_arg_sql_on(backend, df1, df2):
+    cond = lambda lhs, rhs: lhs.ii > rhs.ii
+
+    # collect sql result
+    out = left_join(df1, df2, sql_on = cond) >> collect()
+
+    # for target, do full cartesian product, then filter based on cond
+    target = data_frame(
+            ii_x = [1, 2, 3, 3, 4, 4],
+            ii_y = [None, 1, 1, 2, 1, 2],
+            x = ["a", "b", "c", "c", "d", "d"],
+            y = [None, "a", "a", "b", "a", "b"]
+            )
+
+    # TODO: SQL columns seem to be returned in random order, so sort
+    #       not sure why it's happening, look into in SqlAlchemy?
+    assert_frame_sort_equal(out.sort_index(axis = 1), target)
+
+@backend_sql
+def test_anti_join_arg_sql_on(backend, df1, df2):
+    cond = lambda lhs, rhs: lhs.ii > rhs.ii
+
+    # collect sql result
+    out = anti_join(df1, df2, sql_on = cond) >> collect()
+
+    # for target, do full cartesian product, then filter based on cond
+    target = data_frame(ii = [1], x = ["a"])
+
+    assert_frame_sort_equal(out, target)
+
 
 # Test basic join types -------------------------------------------------------
 
@@ -150,3 +183,4 @@ def test_basic_anti_join(backend, df1, df2):
             anti_join(df1, df2, on = {"ii": "ii", "x": "y"}) >> collect(),
             DF1.iloc[2:,]
             )
+
