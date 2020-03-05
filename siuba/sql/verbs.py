@@ -269,6 +269,7 @@ class LazyTbl:
         return track_call_windows(call, columns, self.group_by, self.order_by, window_cte)
 
     def get_ordered_col_names(self):
+        """Return columns from current select, with grouping columns first."""
         ungrouped = [k for k in self.last_op.columns.keys() if k not in self.group_by]
         return list(self.group_by) + ungrouped
 
@@ -437,8 +438,8 @@ def _filter(__data, *args, **kwargs):
     # TODO: aggregate funcs
     # Note: currently always produces 2 additional select statements,
     #       1 for window/aggs, and 1 for the where clause
-    sel = __data.last_op.alias()
-    win_sel = sql.select([sel], from_obj = sel)
+    sel = __data.last_op.alias()                   # original select
+    win_sel = sql.select([sel], from_obj = sel)    # first cte
 
     conds = []
     windows = []
@@ -459,12 +460,13 @@ def _filter(__data, *args, **kwargs):
 
     bool_clause = sql.and_(*conds)
 
-    # move non-window functions to refer to win_sel clause (not the innermost)
+    # move non-window functions to refer to win_sel clause (not the innermost) ---
     win_alias = win_sel.alias()
     bool_clause = sql.util.ClauseAdapter(win_alias).traverse(bool_clause)
 
     
-    orig_cols = [win_alias.columns[k] for k in __data.get_ordered_col_names()]
+    # create second cte ----
+    orig_cols = [win_alias.columns[k] for k in sel.columns.keys()]
     filt_sel = sql.select(orig_cols, from_obj = win_alias, whereclause = bool_clause)
     return __data.append_op(filt_sel)
 
