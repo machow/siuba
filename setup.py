@@ -7,15 +7,18 @@ import ast
 _version_re = re.compile(r'__version__\s+=\s+(.*)')
 
 with open('siuba/__init__.py', 'rb') as f:
-    version = str(ast.literal_eval(_version_re.search(
+    VERSION = str(ast.literal_eval(_version_re.search(
         f.read().decode('utf-8')).group(1)))
+
+with open('README.md') as f:
+    README = f.read()
 
 # setup -----------------------------------------------------------------------
 
 setup(
     name='siuba',
     packages=find_packages(),
-    version=version,
+    version=VERSION,
     description='A package for quick, scrappy analyses with pandas and SQL',
     author='Michael Chow',
     license='MIT',
@@ -29,6 +32,8 @@ setup(
     ],
     python_requires=">=3.6",
     include_package_data=True,
+    long_description=README,
+    long_description_content_type="text/markdown",
     classifiers=[
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.6',
