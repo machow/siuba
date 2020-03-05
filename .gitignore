@@ -1,3 +1,6 @@
+# That pesky Mac file
+.DS_Store
+
 # Vim Swapfiles
 .*.swp
 .*.swo
