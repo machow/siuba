@@ -1,4 +1,7 @@
-NOTEBOOK_TESTS=$(addprefix examples/, examples-dplyr-funcs.ipynb case-iris-select.ipynb examples-postgres.ipynb examples-varspec.ipynb)
+NOTEBOOK_TESTS=$(addprefix examples/, \
+		examples-dplyr-funcs.ipynb case-iris-select.ipynb examples-postgres.ipynb examples-varspec.ipynb \
+		examples-siu.ipynb \
+		)
 
 AUTODOC_SCRIPT=docs/generate_autodoc.py
 
@@ -11,7 +14,7 @@ test:
 	pytest --dbs="sqlite,postgresql" siuba/
 
 test-travis:
-	#py.test --nbval $(filter-out %postgres.ipynb, $(NOTEBOOK_TESTS))
+	py.test --nbval-lax $(filter-out %postgres.ipynb, $(NOTEBOOK_TESTS))
 	pytest --dbs="sqlite,postgresql" siuba/
 
 examples/%.ipynb:
