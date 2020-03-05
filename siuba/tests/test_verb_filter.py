@@ -39,7 +39,7 @@ def test_filter_via_group_by(backend):
     assert_equal_query(
             dfs,
             group_by(_.g) >> filter(row_number(_) < 3),
-            data_frame(g = [1,1,2,2], x = [1,2,6,7])
+            data_frame(x = [1,2,6,7], g = [1,1,2,2])
             )
 
 
@@ -51,7 +51,7 @@ def test_filter_via_group_by_agg(backend):
     assert_equal_query(
             dfs,
             group_by(_.g) >> filter(_.x > _.x.mean()),
-            data_frame(g = [1, 1, 2, 2], x = [4, 5, 9, 10])
+            data_frame(x = [4, 5, 9, 10], g = [1, 1, 2, 2])
             )
 
 @backend_sql("TODO: pandas - implement arrange over group by")
@@ -62,7 +62,7 @@ def test_filter_via_group_by_arrange(backend):
     assert_equal_query(
             dfs,
             group_by(_.g) >> arrange(_.x) >> filter(_.x.cumsum() > 3),
-            data_frame(g = [1, 2, 2], x = [3, 3, 4])
+            data_frame(x = [3, 3, 4], g = [1, 2, 2])
             )
 
 @backend_sql("TODO: pandas - implement arrange over group by")
@@ -73,6 +73,6 @@ def test_filter_via_group_by_desc_arrange(backend):
     assert_equal_query(
             dfs,
             group_by(_.g) >> arrange(desc(_.x)) >> filter(_.x.cumsum() > 3),
-            data_frame(g = [1, 1, 2, 2, 2], x = [2, 1, 4, 3, 2])
+            data_frame(x = [2, 1, 4, 3, 2], g = [1, 1, 2, 2, 2])
             )
 

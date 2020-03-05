@@ -351,13 +351,12 @@ def _filter(__data, *args):
 
     df = __data.apply(df_filter, *args)
 
-    # will drop all but original index, then sort by it
+    # will drop all but original index, then sort to get original order
     group_by_lvls = list(range(df.index.nlevels - 1))
     ordered = df.reset_index(group_by_lvls, drop = True).sort_index()
 
     group_cols = [ping.name for ping in groupings]
-    other_cols = list(set(ordered.columns).difference(group_cols))
-    return ordered[group_cols + other_cols].groupby(group_cols)
+    return ordered.groupby(group_cols)
 
 
 # Summarize ===================================================================
