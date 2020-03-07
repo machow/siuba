@@ -5,7 +5,7 @@ from pandas.core.arrays import DatetimeArray
 
 import pandas.testing as tm
 from pandas import offsets
-from siuba.dply.dt import floor_date, ceil_date
+from siuba.experimental.datetime import floor_date, ceil_date
 
 import pytest
 
