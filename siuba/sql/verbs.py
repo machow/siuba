@@ -22,7 +22,7 @@ from .utils import get_dialect_funcs, get_sql_classes
 
 from sqlalchemy import sql
 import sqlalchemy
-from siuba.siu import Call, CallTreeLocal, str_to_getitem_call, Lazy, FunctionLookupError
+from siuba.siu import Call, CallListener, CallTreeLocal, str_to_getitem_call, Lazy, FunctionLookupError
 # TODO: currently needed for select, but can we remove pandas?
 from pandas import Series
 import pandas as pd
@@ -38,17 +38,6 @@ from sqlalchemy.sql import schema
 # Helpers ---------------------------------------------------------------------
 
 class SqlFunctionLookupError(FunctionLookupError): pass
-
-
-class CallListener:
-    """Generic listener. Each exit is called on a node's copy."""
-    def enter(self, node):
-        args, kwargs = node.map_subcalls(self.enter)
-
-        return self.exit(node.__class__(node.func, *args, **kwargs))
-
-    def exit(self, node):
-        return node
 
 
 class WindowReplacer(CallListener):
@@ -528,7 +517,7 @@ def _mutate_select(sel, colname, func, labs, __data):
 @transmute.register(LazyTbl)
 def _transmute(__data, **kwargs):
     # will use mutate, then select some cols
-    f_mutate = mutate.registry[type(__data)]
+    f_mutate = mutate.dispatch(type(__data))
 
     # transmute keeps grouping cols, and any defined in kwargs
     cols_to_keep = ordered_union(__data.group_by, kwargs)

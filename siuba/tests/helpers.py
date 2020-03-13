@@ -1,5 +1,6 @@
 from sqlalchemy import create_engine, types
 from siuba.sql import LazyTbl, collect
+from siuba.experimental.spark.verbs import SparkTbl
 from siuba.dply.verbs import ungroup
 from pandas.testing import assert_frame_equal
 import pandas as pd
@@ -26,6 +27,14 @@ BACKEND_CONFIG = {
             "user": "",
             "password": "",
             "host": ""
+            },
+        "spark": {
+            "dialect": "spark",
+            "dbname": "na",
+            "port": "0",
+            "user": "",
+            "password": "",
+            "host": "",
             }
         }
 
@@ -91,6 +100,28 @@ class SqlBackend(Backend):
         return res
 
 
+class SparkBackend(Backend):
+    table_name_indx = 0
+
+    def __init__(self, name):
+        from pyspark.sql import SparkSession
+        self.name = name
+        self.engine = SparkSession.builder.appName("SQL test").getOrCreate()
+
+    @classmethod
+    def unique_table_name(cls):
+        cls.table_name_indx += 1
+        return "siuba_{0:03d}".format(cls.table_name_indx)
+
+    def load_df(self, *args, **kwargs):
+
+        df = super().load_df(*args, **kwargs)
+        spark_df = self.engine.createDataFrame(df)
+        name = self.unique_table_name()
+        spark_df.createOrReplaceTempView(name)
+        return SparkTbl(self.engine, name, list(df.columns))
+
+
 def robust_multiple_sort(df, by):
     """Sort a DataFrame on multiple columns, slower but more reliable than df.sort_values
 
@@ -125,6 +156,9 @@ def assert_equal_query(tbl, lazy_query, target, **kwargs):
         df_a = ungroup(out).reset_index(drop = True)
         df_b = ungroup(target).reset_index(drop = True)
         assert_frame_equal(df_a, df_b, **kwargs)
+    elif isinstance(tbl, SparkTbl):
+        # TODO: should also pop check_dtype out of kwargs
+        assert_frame_sort_equal(out, target, check_dtype = False, **kwargs)
     else:
         assert_frame_sort_equal(out, target, **kwargs)
 
