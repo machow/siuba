@@ -638,7 +638,7 @@ def _rename(__data, **kwargs):
 
 def _call_strip_ascending(f):
     if isinstance(f, Symbolic):
-        f = f.source
+        f = strip_symbolic(f)
 
     if isinstance(f, Call) and f.func == "__neg__":
         return f.args[0], False
