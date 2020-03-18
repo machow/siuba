@@ -20,7 +20,7 @@ for name, entry in spec.items():
 
 call_listener = CallTreeLocal(
         out,
-        call_sub_attr = ('str', 'dt', 'cat'),
+        call_sub_attr = ('str', 'dt', 'cat', 'sparse'),
         chain_sub_attr = True,
         dispatch_cls = GroupByAgg,
         result_cls = SeriesGroupBy
