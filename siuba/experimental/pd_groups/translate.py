@@ -99,7 +99,13 @@ GROUP_METHODS = {
         ("Agg", 1): method_agg_op,
         ("Window", 1): method_win_op,
         ("Window", 2): method_win_op,
-        ("Singleton", 1): not_implemented
+        ("Singleton", 1): not_implemented,
+        ("Todo", 1): not_implemented,
+        ("Maydo", 1): not_implemented,
+        ("Wontdo", 1): not_implemented,
+        ("Todo", 2): not_implemented,
+        ("Maydo", 2): not_implemented,
+        ("Wontdo", 2): not_implemented,
         }
 
 

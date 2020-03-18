@@ -14,7 +14,7 @@ def filter_on_result(spec, types):
     return [k for k,v in spec.items() if v['result']['type'] in types]
 
 SPEC_IMPLEMENTED = filter_on_result(spec, {"Agg", "Elwise", "Window"})
-SPEC_NOTIMPLEMENTED = filter_on_result(spec, {"Singleton"})
+SPEC_NOTIMPLEMENTED = filter_on_result(spec, {"Singleton", "Wontdo", "Todo", "Maydo"})
 SPEC_AGG = filter_on_result(spec, {"Agg"})
 
 _ = Symbolic()
@@ -63,6 +63,11 @@ data_bool = data_frame(
     y = [True, True, False, False]
         )
 
+data_cat = data_frame(
+    g = ['a', 'a', 'b', 'b'],
+    x = pd.Categorical(['abc', 'cde', 'fg', 'h'])
+    )
+
 data_default = data_frame(
     g = ['a', 'a', 'a', 'b', 'b', 'b'],
     x = [10, 11, 11, 13, 13, 13],
@@ -73,7 +78,8 @@ DATA = data = {
     'dt': data_dt,
     'str': data_str,
     None: data_default,
-    'bool': data_bool
+    'bool': data_bool,
+    'cat': data_cat
 }
 
 def get_data(entry, data, backend = None):
@@ -161,6 +167,9 @@ def test_pandas_grouped_frame_fast_not_implemented(notimpl_entry):
     # TODO: once reading from yaml, no need to repr
     str_expr = str(notimpl_entry['expr_frame'])
     call_expr = strip_symbolic(eval(str_expr, {'_': _}))
+
+    if notimpl_entry['result']['type'] in ["Todo", "Maydo", "Wontdo"] and notimpl_entry["is_property"]:
+        pytest.xfail()
 
     with pytest.raises(NotImplementedError):
         res = fast_mutate(gdf, result = call_expr)

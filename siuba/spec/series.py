@@ -21,7 +21,10 @@ class Elwise(Result): pass
 class Agg(Result): pass 
 class Window(Result): pass
 class Singleton(Result): pass
-class WontImplement(Result): pass
+
+class Wontdo(Result): pass
+class Maydo(Result): pass
+class Todo(Result): pass
 
 CATEGORIES_TIME = {
         'time_series', 'datetime_properties', 'datetime_methods', 'period_properties',
@@ -79,62 +82,66 @@ funcs = {
         '__rpow__': _.__rpow__(_)             >> Elwise(postgresql = 'xfail'),
         },
     'attributes': {
-        # method
-        # index
-        # array
-        # values
-        # dtype
-        # ftype
-        # shape
-        # nbytes
-        # ndim
-        # size                              # TODO: good to support, is a method on grouped series...
-        # strides
-        # itemsize
-        # base
-        # T
-        # memory_usage
-        # hasnans
-        # flags
-        # empty
-        # dtypes
-        # ftypes
-        # data
-        # is_copy
-        # name
-        # put
+        'index': _.index               >> Wontdo(),
+        'array': _.array               >> Wontdo(),
+        'values': _.value              >> Wontdo(),
+        'dtype': _.dtype               >> Todo(),
+        'ftype': _.ftype               >> Wontdo(),
+        'shape': _.shape               >> Wontdo(),
+        'nbytes': _.nbytes             >> Todo(),
+        'ndim': _.ndim                 >> Todo(),
+        'size': _.size                 >> Maydo(),                              # TODO: good to support, is a method on grouped series...'
+        'strides': _.strides           >> Wontdo(),
+        'itemsize': _.itemsize         >> Wontdo(),
+        'base': _.base                 >> Wontdo(),
+        'T': _.T                       >> Wontdo(),
+        'transpose': _.transpose()     >> Wontdo(),
+        'memory_usage': _.memory_usage >> Todo(),
+        'hasnans': _.hasnans           >> Todo(),
+        'flags': _.flags               >> Wontdo(),
+        'empty': _.empty               >> Todo(),
+        'dtypes': _.dtypes             >> Todo(),
+        'ftypes': _.ftypes             >> Wontdo(),
+        'data': _.data                 >> Wontdo(),
+        'is_copy': _.is_copy           >> Todo(),
+        'name': _.name                 >> Todo(),
+        'put': _.put                   >> Wontdo(),
+        'axes': _.axes >> Wontdo(),
+        'attrs': _.attrs >> Wontdo(),
         },
     ## ------------------------------------------------------------------------
     # Conversion 
     ## ------------------------------------------------------------------------
     'conversion': {
-        'astype': _.astype('str')       >> Elwise(),
-        # infer_objects
-        'copy': _.copy()              >> Elwise(postgresql = 'not_impl'),
-        # bool
-        # to_numpy
-        # to_period
-        # to_timestamp
-        # to_list
-        # get_values
-        # __array__
+        'astype': _.astype('str')          >> Elwise(),
+        'convert_dtypes': _.convert_dtypes() >> Todo(), # >> Elwise(),
+        'infer_objects': _.infer_objects() >> Todo(),
+        'copy': _.copy()                   >> Elwise(postgresql = 'not_impl'),
+        'bool': _.bool                     >> Todo(),
+        'to_numpy': _.to_numpy()           >> Wontdo(),
+        'to_period': _.to_period()         >> Todo(),
+        'to_timestamp': _.to_timestamp()   >> Todo(),
+        'to_list': _.to_list()             >> Wontdo(),
+        'tolist': _.tolist()               >> Wontdo(),
+        'get_values': _.get_values()       >> Wontdo(),
+        '__array__': _.__array__()         >> Wontdo(),
         },
     ## ------------------------------------------------------------------------
     # Indexing, iteration 
     ## ------------------------------------------------------------------------
     'indexing': {
-        # get
-        # at
-        # iat
-        # loc
-        # iloc
-        # __iter__
-        # items
-        # iteritems
-        # keys
-        # pop
-        # item
-        # xs
+        'get': _.get(1)            >> Todo(),
+        'at': _.at[1]              >> Todo(),
+        'iat': _.iat[1]            >> Todo(),
+        'loc': _.loc[1]            >> Todo(),
+        'iloc': _.iloc[1]          >> Todo(),
+        '__iter__': _.__iter__()   >> Maydo(),
+        'items': _.items()         >> Wontdo(),
+        'iteritems': _.iteritems() >> Wontdo(),
+        'keys': _.keys()           >> Wontdo(),
+        'pop': _.pop()             >> Wontdo(),
+        'item': _.item()           >> Wontdo(),
+        'xs': _.xs()               >> Wontdo(),
         },
     ## ------------------------------------------------------------------------
     # Binary operator functions 
@@ -142,9 +149,11 @@ funcs = {
     'binary': {
         'add': _.add(_)               >> Elwise(),
         'sub': _.sub(_)               >> Elwise(),
+        'subtract': _.subtract(_)     >> Elwise(postgresql = 'not_impl'),
         'truediv': _.truediv(_)       >> Elwise(postgresql = 'xfail'),
         'floordiv': _.floordiv(_)     >> Elwise(postgresql = 'xfail'),
         'mul': _.mul(_)               >> Elwise(),
+        'multiply': _.multiply(_)     >> Elwise(postgresql = 'not_impl'),
         'mod': _.mod(_)               >> Elwise(),
         'pow': _.pow(_)               >> Elwise(postgresql = 'xfail'),
         'lt': _.lt(_)                 >> Elwise(),
@@ -154,34 +163,37 @@ funcs = {
         'ne': _.ne(_)                 >> Elwise(), 
         'eq': _.eq(_)                 >> Elwise(), 
         'div': _.div(_)               >> Elwise(postgresql = 'xfail'), 
+        'divide': _.divide(_)         >> Todo(), # >> Elwise(),
+        'divmod': _.divmod(_)         >> Todo(),
         'round': _.round(2)           >> Elwise(postgresql = 'xfail'), 
         'radd': _.radd(_)             >> Elwise(), 
         'rsub': _.rsub(_)             >> Elwise(), 
         'rmul': _.rmul(_)             >> Elwise(), 
         'rdiv': _.rdiv(_)             >> Elwise(postgresql = 'xfail'), 
+        'rdivmod': _.rdivmod(_)       >> Todo(),
         'rtruediv': _.rtruediv(_)     >> Elwise(postgresql = 'xfail'),
         'rfloordiv': _.rfloordiv(_)   >> Elwise(postgresql = 'xfail'),
         'rmod': _.rmod(_)             >> Elwise(),
         'rpow': _.rpow(_)             >> Elwise(postgresql = 'xfail'),
-        # combine
-        # combine_first
-        #'product': _.product()        >> Agg(),   # TODO: doesn't exist on GroupedDataFrame
-        #'dot': _.dot(_)               >> Agg(),
+        'combine': _.combine(_, "max")  >> Todo(),            # NOTE: need to migrate to yml spec first
+        'combine_first': _.combine_first(_, "max")  >> Todo(),
+        'product': _.product()        >> Todo(),# >> Agg(),   # TODO: doesn't exist on GroupedDataFrame
+        'dot': _.dot(_)              >> Todo(), # >> Agg(),
         },
     ## ------------------------------------------------------------------------
     # Function application, groupby & window 
     ## ------------------------------------------------------------------------
     'function_application': {
-        # apply
-        # agg
-        # aggregate
-        # transform
-        # map
-        # groupby
-        # rolling
-        # expanding
-        # ewm
-        # pipe
+        'apply': _.apply         >> Wontdo(),
+        'agg': _.agg             >> Wontdo(),
+        'aggregate': _.aggregate >> Wontdo(),
+        'transform': _.transform >> Wontdo(),
+        'map': _.map             >> Wontdo(),
+        'groupby': _.groupby     >> Wontdo(),
+        'rolling': _.rolling     >> Wontdo(),
+        'expanding': _.expanding >> Wontdo(),
+        'ewm': _.ewm             >> Wontdo(),
+        'pipe': _.pipe           >> Wontdo(),
         },
     ## ------------------------------------------------------------------------
     ## Computations / descriptive stats
@@ -190,30 +202,30 @@ funcs = {
         'abs': _.abs()                >> Elwise(),
         'all': _.all()                >> Agg(op = 'bool'),
         'any': _.any()                >> Agg(op = 'bool'),
-        #'autocorr': _.autocorr()      >> Window(), # TODO: missing on GDF
+        'autocorr': _.autocorr()      >> Todo(), # TODO: missing on GDF
         'between': _.between(2, 5)    >> Elwise(),
         'clip': _.clip(2, 5)          >> Elwise(),
         # clip_lower                                # TODO: deprecated
         # clip_upper                                # TODO: deprecated
-        #'corr': _.corr(_)             >> Agg(),
+        'corr': _.corr(_)             >> Todo(),#>> Agg(),
         'count': _.count()            >> Agg(),
-        #'cov': _.cov(_)               >> Agg(),
+        'cov': _.cov(_)               >> Todo(), #>> Agg(),
         'cummax': _.cummax()          >> Window(postgresql = 'xfail'),
         'cummin': _.cummin()          >> Window(postgresql = 'xfail'),
         'cumprod': _.cumprod()        >> Window(postgresql = 'xfail'),
         'cumsum': _.cumsum()          >> Window(postgresql = 'xfail'),
-        # describe
+        'describe': _.describe()      >> Wontdo(),
         'diff': _.diff()              >> Window(),
-        # factorize
-        # 'kurt': _.kurt()              >> Agg(),  # TODO: doesn't exist on GDF
+        'factorize': _.factorize()    >> Maydo(),
+        'kurt': _.kurt()              >> Todo(), # >> Agg(),  # TODO: doesn't exist on GDF
         'mad': _.mad()                >> Agg(postgresql = 'xfail'),
         'max': _.max()                >> Agg(),
         'mean': _.mean()              >> Agg(),
         'median': _.median()          >> Agg(postgresql = 'xfail'),
         'min': _.min()                >> Agg(),
-        #'mode': _.mode()              >> Agg(),   # TODO: doesn't exist on GDF, can return > 1 result
-        #'nlargest': _.nlargest()      >> Window(),
-        #'nsmallest': _.nsmallest()    >> Window(),
+        'mode': _.mode()              >> Maydo(), #Agg(),   # TODO: doesn't exist on GDF, can return > 1 result
+        'nlargest': _.nlargest()      >> Maydo(), #Window(),
+        'nsmallest': _.nsmallest()    >> Maydo(), #Window(),
         'pct_change': _.pct_change()  >> Window(postgresql = 'xfail'),
         'prod': _.prod()              >> Agg(postgresql = 'xfail'),
         'quantile': _.quantile(.75)      >> Agg(no_mutate = ['postgresql']),
@@ -223,101 +235,106 @@ funcs = {
         'std': _.std()                >> Agg(),
         'sum': _.sum()                >> Agg(postgresql = 'xfail'), # TODO: pg returns float
         'var': _.var()                >> Agg(),
-        #'kurtosis': _.kurtosis()      >> Agg(),  # TODO: doesn't exist on GDF
-        # unique
+        'kurtosis': _.kurtosis()      >> Todo(), #Agg(),  # TODO: doesn't exist on GDF
+        'unique': _.unique()          >> Wontdo(),
         'nunique': _.nunique()        >> Agg(no_mutate = ['postgresql']),
-        #'is_unique': _.is_unique      >> Agg(),  # TODO: all is_... properties not on GDF
-        #'is_monotonic': _.is_monotonic >> Agg(),
-        #'is_monotonic_increasing': _.is_monotonic_increasing >> Agg(),
-        #'is_monotonic_decreasing': _.is_monotonic_decreasing >> Agg(),
-        # value_counts
-        # compound
+        'is_unique': _.is_unique      >> Todo(), #Agg(),  # TODO: all is_... properties not on GDF
+        'is_monotonic': _.is_monotonic >> Todo(), # Agg(),
+        'is_monotonic_increasing': _.is_monotonic_increasing >> Todo(), # Agg(),
+        'is_monotonic_decreasing': _.is_monotonic_decreasing >> Todo(), # Agg(),
+        'value_counts': _.value_counts() >> Wontdo(),
+        'compound': _.compound() >> Maydo(),
         },
     ## ------------------------------------------------------------------------
     # Reindexing / selection / label manipulation 
     ## ------------------------------------------------------------------------
     'reindexing': {
-        # align
-        # drop
-        # droplevel
-        # drop_duplicates
-        # duplicated
-        # equals
-        #'first': _.first()            >> Window(),
-        # head
-        # idxmax
-        # idxmin
-        'isin': _.isin(tuple([1,2]))  >> Elwise(),
-        #'last': _.last()              >> Window(),
-        # reindex
-        # reindex_like
-        # rename
-        # rename_axis
-        # reset_index
-        # sample
-        # set_axis
-        # take
-        # tail
-        # truncate
-        # where
-        # mask
-        # add_prefix
-        # add_suffix
-        # filter
+        'align': _.align                       >> Wontdo(),
+        'drop': _.drop                         >> Wontdo(),
+        'droplevel': _.droplevel               >> Wontdo(),
+        'drop_duplicates': _.drop_duplicates() >> Todo(),
+        'duplicated': _.duplicated()           >> Todo(),
+        'equals': _.equals(_)                  >> Todo(),
+        'first': _.first()                     >> Maydo(), #Window
+        'head': _.head()                       >> Todo(),
+        'idxmax': _.idxmax()                   >> Todo(),
+        'idxmin': _.idxmin()                   >> Todo(),
+        'isin': _.isin(tuple([1,2]))           >> Elwise(),
+        'last': _.last()                       >> Wontdo(),
+        'reindex': _.reindex                   >> Wontdo(),
+        'reindex_like': _.reindex_like         >> Wontdo(),
+        'rename': _.rename('new_name')         >> Todo(),
+        'rename_axis': _.rename_axis           >> Wontdo(),
+        'reset_index': _.reset_index()         >> Wontdo(),
+        'sample': _.sample()                   >> Todo(),
+        'set_axis': _.set_axis                 >> Wontdo(),
+        'take': _.take                         >> Wontdo(),
+        'tail': _.tail()                       >> Todo(),
+        'truncate': _.truncate                 >> Wontdo(),
+        'where': _.where(_)                    >> Todo(),
+        'mask': _.mask()                       >> Todo(),
+        'add_prefix': _.add_prefix()           >> Wontdo(),
+        'add_suffix': _.add_suffix()           >> Wontdo(),
+        'filter': _.filter()                   >> Wontdo(),
         },
     ## ------------------------------------------------------------------------
     # Missing data handling 
     ## ------------------------------------------------------------------------
     'missing_data': {
-        'isna':  _.isna()             >> Elwise(),
-        'notna': _.notna()            >> Elwise(),
-        # dropna
-        'fillna': _.fillna(1)         >> Elwise(),
-        # interpolate
+        'isna':  _.isna()              >> Elwise(),
+        'isnull':  _.isnull()          >> Elwise(postgresql = "not_impl"),
+        'notna': _.notna()             >> Elwise(),
+        'notnull': _.notnull()         >> Elwise(postgresql = "not_impl"),
+        'dropna': _.dropna()           >> Maydo(),
+        'fillna': _.fillna(1)          >> Elwise(),
+        'ffill': _.ffill(1)            >> Todo(),
+        'bfill': _.bfill(1)            >> Todo(),
+        'interpolate': _.interpolate() >> Maydo(),
         },
     ## ------------------------------------------------------------------------
     # Reshaping, sorting 
     ## ------------------------------------------------------------------------
     'reshaping': {
-        # argsort
-        # argmin
-        # argmax
-        # reorder_levels
-        # sort_values
-        # sort_index
-        # swaplevel
-        # unstack
-        # explode
-        # searchsorted
-        # ravel
-        # repeat
-        # squeeze
-        # view
+        'argsort': _.argsort               >> Wontdo(),
+        'argmin': _.argmin                 >> Wontdo(),
+        'argmax': _.argmax                 >> Wontdo(),
+        'reorder_levels': _.reorder_levels >> Wontdo(),
+        'sort_values': _.sort_values()     >> Todo(),
+        'sort_index': _.sort_index()       >> Wontdo(),
+        'swaplevel': _.swaplevel           >> Wontdo(),
+        'swapaxes': _.swapaxes            >> Wontdo(),
+        'unstack': _.unstack               >> Wontdo(),
+        'explode': _.explode()             >> Maydo(),
+        'searchsorted': _.searchsorted()   >> Todo(),
+        'ravel': _.ravel()                 >> Wontdo(),
+        'repeat': _.repeat()               >> Maydo(),
+        'squeeze': _.squeeze()             >> Wontdo(),
+        'view': _.view                     >> Wontdo(),
         },
     ## ------------------------------------------------------------------------
     # Combining / joining / merging 
     ## ------------------------------------------------------------------------
     'combining': {
-        # append
-        # replace
-        # update
+        'append': _.append()   >> Todo(),
+        'replace': _.replace() >> Todo(),
+        'update': _.update()   >> Wontdo(),
         },
     ## ------------------------------------------------------------------------
     # Time series-related 
     ## ------------------------------------------------------------------------
     'time_series': {
-        # asfreq
-        # asof
-        # shift
-        # first_valid_index
-        # last_valid_index
-        # resample
-        # tz_convert
-        # tz_localize
-        # at_time
-        # between_time
-        # tshift
-        # slice_shift
+            'asfreq': _.asfreq("D")                    >> Todo(),
+            'asof': _.asof()                           >> Todo(),
+            'shift': _.shift()                         >> Todo(),
+            'first_valid_index': _.first_valid_index() >> Todo(),
+            'last_valid_index': _.last_valid_index()   >> Todo(),
+            'resample': _.resample()                   >> Todo(),
+            'tz_convert': _.tz_convert()               >> Todo(),
+            'tz_localize': _.tz_localize()             >> Todo(),
+            'at_time': _.at_time()                     >> Todo(),
+            'between_time': _.between_time()           >> Maydo(),
+            'tshift': _.tshift()                       >> Todo(),
+            'slice_shift': _.slice_shift()             >> Maydo(),
         },
     ## ------------------------------------------------------------------------
     # Datetime properties 
@@ -356,77 +373,79 @@ funcs = {
     # Datetime methods 
     ## ------------------------------------------------------------------------
     'datetime_methods': {
-        'dt.to_period': _.dt.to_period('D')             >> Elwise(postgresql = 'xfail'),
-        # dt.to_pydatetime                                              # TODO: datetime objects converted back to numpy?
-        'dt.tz_localize': _.dt.tz_localize('UTC')       >> Elwise(postgresql = 'xfail'),
-        # dt.tz_convert                                                 # TODO: need custom test
-        'dt.normalize': _.dt.normalize()                >> Elwise(postgresql = 'xfail'),
-        'dt.strftime': _.dt.strftime('%d')              >> Elwise(postgresql = 'xfail'),
-        'dt.round': _.dt.round('D')                     >> Elwise(postgresql = 'xfail'),
-        'dt.floor': _.dt.floor('D')                     >> Elwise(postgresql = 'xfail'),
-        'dt.ceil': _.dt.ceil('D')                       >> Elwise(postgresql = 'xfail'),
-        'dt.month_name': _.dt.month_name()              >> Elwise(postgresql = 'xfail'),
-        'dt.day_name': _.dt.day_name()                  >> Elwise(postgresql = 'xfail'),
+        'dt.to_period': _.dt.to_period('D')       >> Elwise(postgresql = 'xfail'),
+        'dt.to_pydatetime': _.dt.to_pydatetime()     >> Todo(),            # TODO: datetime objects converted back to numpy?
+        'dt.tz_localize': _.dt.tz_localize('UTC') >> Elwise(postgresql = 'xfail'),
+        'dt.tz_convert': _.dt.tz_convert("MST")   >> Todo(),            # TODO: need custom test
+        'dt.normalize': _.dt.normalize()          >> Elwise(postgresql = 'xfail'),
+        'dt.strftime': _.dt.strftime('%d')        >> Elwise(postgresql = 'xfail'),
+        'dt.round': _.dt.round('D')               >> Elwise(postgresql = 'xfail'),
+        'dt.floor': _.dt.floor('D')               >> Elwise(postgresql = 'xfail'),
+        'dt.ceil': _.dt.ceil('D')                 >> Elwise(postgresql = 'xfail'),
+        'dt.month_name': _.dt.month_name()        >> Elwise(postgresql = 'xfail'),
+        'dt.day_name': _.dt.day_name()            >> Elwise(postgresql = 'xfail'),
         },
     ## ------------------------------------------------------------------------
     # Period properties 
     ## ------------------------------------------------------------------------
     'period_properties': {
-        # dt.qyear
-        # dt.start_time
-        # dt.end_time
+        'dt.asfreq': _.dt.asfreq("D")          >> Todo(),
+        'dt.qyear': _.dt.qyear                 >> Todo(),
+        'dt.start_time': _.dt.start_time       >> Todo(),
+        'dt.end_time': _.dt.end_time           >> Todo(),
+        'dt.to_timestamp': _.dt.to_timestamp() >> Todo(),
         },
     ## ------------------------------------------------------------------------
     # Timedelta properties 
     ## ------------------------------------------------------------------------
     'timedelta_properties': {
-        # dt.days
-        # dt.seconds
-        # dt.microseconds
-        # dt.nanoseconds
-        # dt.components
+        'dt.days': _.dt.days                 >> Todo(),
+        'dt.seconds': _.dt.seconds           >> Todo(),
+        'dt.microseconds': _.dt.microseconds >> Todo(),
+        'dt.nanoseconds': _.dt.nanoseconds   >> Todo(),
+        'dt.components': _.dt.components     >> Maydo(),
         },
     ## ------------------------------------------------------------------------
     # Timedelta methods 
     ## ------------------------------------------------------------------------
     'timedelta_methods': {
-        # dt.to_pytimedelta
-        # dt.total_seconds
+        'dt.to_pytimedelta': _.dt.to_pytimedelta >> Todo(),
+        'dt.total_seconds': _.dt.total_seconds >> Todo(),
         },
     ## ------------------------------------------------------------------------
     ## String methods
     ## ------------------------------------------------------------------------
     'string_methods': {
         'str.capitalize': _.str.capitalize()              >> Elwise(),
-        #'str.casefold': _.str.casefold()                  >> Elwise(),   #TODO: introduced in v0.25.1
-        # str.cat                                                         #TODO: can be Agg OR Elwise, others arg
+        'str.casefold': _.str.casefold()                  >> Todo(), #Elwise(),   #TODO: introduced in v0.25.1
+        'str.cat': _.str.cat(_)                           >> Maydo(),                   #TODO: can be Agg OR Elwise, others arg
         'str.center': _.str.center(3)                     >> Elwise(postgresql = 'not_impl'),
         'str.contains': _.str.contains('a')               >> Elwise(),
         'str.count': _.str.count('a')                     >> Elwise(postgresql = 'xfail'),
-        # str.decode                                                      # TODO custom testing
+        'str.decode': _.str.decode()                      >> Todo(),                  # TODO custom testing
         'str.encode': _.str.encode('utf-8')               >> Elwise(postgresql = 'xfail'),
         'str.endswith': _.str.endswith('a|b')             >> Elwise(postgresql = 'xfail'),
-        #'str.extract': _.str.extract('(a)(b)')                           # TODO: returns DataFrame
-        # str.extractall
+        'str.extract': _.str.extract('(a)(b)')            >> Maydo(),    # TODO: returns DataFrame
+        'str.extractall': _.str.extractall('a')           >> Maydo(),
         'str.find': _.str.find('a|c')                     >> Elwise(postgresql = 'xfail'),
         'str.findall': _.str.findall('a|c')               >> Elwise(postgresql = 'xfail'),
-        # str.get                                                         # TODO: custom test
-        # str.index                                                       # TODO: custom test
-        # str.join                                                        # TODO: custom test
+        'str.get': _.str.split('a').get(0)                >> Todo(),       # TODO: custom test
+        'str.index': _.str.index('a')                     >> Todo(),      # TODO: custom test
+        'str.join': _.str.split('a').str.join(',')        >> Todo(),      # TODO: custom test
         'str.len': _.str.len()                            >> Elwise(),
         'str.ljust': _.str.ljust(5)                       >> Elwise(postgresql = 'xfail'), # pg formatstr function
         'str.lower': _.str.lower()                        >> Elwise(),
         'str.lstrip': _.str.lstrip()                      >> Elwise(),
         'str.match': _.str.match('a|c')                   >> Elwise(postgresql = 'xfail'),
-        # str.normalize
+        'str.normalize': _.str.normalize()                >> Todo(),
         'str.pad': _.str.pad(5)                           >> Elwise(postgresql = 'xfail'),
-        # str.partition
-        # str.repeat
+        'str.partition': _.str.partition()                >> Maydo(),
+        'str.repeat': _.str.repeat(3)                     >> Todo(),
         'str.replace': _.str.replace('a|b', 'c')          >> Elwise(postgresql = 'xfail'),
         'str.rfind': _.str.rfind('a')                     >> Elwise(postgresql = 'xfail'),
-        # str.rindex
+        'str.rindex': _.str.rindex('a')                   >> Todo(),
         'str.rjust': _.str.rjust(5)                       >> Elwise(postgresql = 'xfail'),
-        # str.rpartition
+        'str.rpartition': _.str.rpartition()              >> Todo(),
         'str.rstrip': _.str.rstrip()                      >> Elwise(),
         'str.slice': _.str.slice(step = 2)                >> Elwise(postgresql = 'xfail'),
         'str.slice_replace': _.str.slice_replace(2, repl = 'x')   >> Elwise(postgresql = 'xfail'),
@@ -436,10 +455,10 @@ funcs = {
         'str.strip': _.str.strip()                        >> Elwise(),
         'str.swapcase': _.str.swapcase()                  >> Elwise(postgresql = 'xfail'),
         'str.title': _.str.title()                        >> Elwise(),
-        # str.translate
+        'str.translate': _.str.translate()                >> Todo(),
         'str.upper': _.str.upper()                        >> Elwise(),
         'str.wrap': _.str.wrap(2)                         >> Elwise(postgresql = 'xfail'),
-        # str.zfill
+        'str.zfill': _.str.zfill(2)                       >> Todo(),
         'str.isalnum': _.str.isalnum()                    >> Elwise(postgresql = 'xfail'),
         'str.isalpha': _.str.isalpha()                    >> Elwise(postgresql = 'xfail'),
         'str.isdigit': _.str.isdigit()                    >> Elwise(postgresql = 'xfail'),
@@ -449,29 +468,29 @@ funcs = {
         'str.istitle': _.str.istitle()                    >> Elwise(postgresql = 'xfail'),
         'str.isnumeric': _.str.isnumeric()                >> Elwise(postgresql = 'xfail'),
         'str.isdecimal': _.str.isdecimal()                >> Elwise(postgresql = 'xfail'),
-        # str.get_dummies
+        'str.get_dummies': _.str.get_dummies()            >> Todo(),
         },
     'categories': {
-        # cat.categories
-        # cat.ordered
-        # cat.codes
-        # cat.rename_categories
-        # cat.reorder_categories
-        # cat.add_categories
-        # cat.remove_categories
-        # cat.remove_unused_categories
-        # cat.set_categories
-        # cat.as_ordered
-        # cat.as_unordered
+            'cat.categories': _.cat.categories                               >> Wontdo(),
+            'cat.ordered': _.cat.ordered                                     >> Todo(),
+            'cat.codes': _.cat.codes                                         >> Wontdo(),
+            'cat.rename_categories': _.cat.rename_categories()               >> Todo(),
+            'cat.reorder_categories': _.cat.reorder_categories()             >> Todo(),
+            'cat.add_categories': _.cat.add_categories()                     >> Todo(),
+            'cat.remove_categories': _.cat.remove_categories()               >> Todo(),
+            'cat.remove_unused_categories': _.cat.remove_unused_categories() >> Todo(),
+            'cat.set_categories': _.cat.set_categories()                     >> Todo(),
+            'cat.as_ordered': _.cat.as_ordered()                             >> Todo(),
+            'cat.as_unordered': _.cat.as_unordered()                         >> Todo(),
         },
     'sparse': {
-        # sparse
-        # sparse.npoints
-        # sparse.density
-        # sparse.fill_value
-        # sparse.sp_values
-        # sparse.from_coo
-        # sparse.to_coo
+        'sparse.npoints': _.sparse.npoints       >> Maydo(), #Agg()
+        'sparse.density': _.sparse.density       >> Maydo(), #Agg()
+        'sparse.fill_value': _.sparse.fill_value >> Maydo(), #Agg()
+        'sparse.sp_values': _.sparse.sp_values   >> Maydo(),
+        'sparse.from_coo': _.sparse.from_coo()   >> Wontdo(),
+        'sparse.to_coo': _.sparse.to_coo()       >> Wontdo(),
+        'sparse.to_dense': _.sparse.to_dense()   >> Wontdo(),
         },
     ## ------------------------------------------------------------------------
     # Plotting 
@@ -490,20 +509,23 @@ funcs = {
     ## ------------------------------------------------------------------------
     # Serialization / IO / conversion 
     ## ------------------------------------------------------------------------
-    # to_pickle
-    # to_csv
-    # to_dict
-    # to_excel
-    # to_frame
-    # to_xarray
-    # to_hdf
-    # to_sql
-    # to_msgpack
-    # to_json
-    # to_dense
-    # to_string
-    # to_clipboard
-    # to_latex
+    'io': {
+        'to_pickle': _.to_pickle()       >> Wontdo(),
+        'to_csv': _.to_csv()             >> Wontdo(),
+        'to_dict': _.to_dict()           >> Wontdo(),
+        'to_excel': _.to_excel()         >> Wontdo(),
+        'to_frame': _.to_frame()         >> Wontdo(),
+        'to_xarray': _.to_xarray()       >> Maydo(),
+        'to_hdf': _.to_hdf()             >> Wontdo(),
+        'to_sql': _.to_sql()             >> Wontdo(),
+        'to_msgpack': _.to_msgpack()     >> Wontdo(),
+        'to_json': _.to_json()           >> Todo(),
+        'to_dense': _.to_dense()         >> Wontdo(),
+        'to_string': _.to_string()       >> Todo(),
+        'to_markdown': _.to_markdown()   >> Todo(),
+        'to_clipboard': _.to_clipboard() >> Wontdo(),
+        'to_latex': _.to_latex()         >> Wontdo(),
+        }
     }
 
 from siuba.spec.utils import get_type_info
