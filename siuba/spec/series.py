@@ -135,7 +135,6 @@ funcs = {
         'iat': _.iat[1]            >> Todo(),
         'loc': _.loc[1]            >> Todo(),
         'iloc': _.iloc[1]          >> Todo(),
-        '__iter__': _.__iter__()   >> Maydo(),
         'items': _.items()         >> Wontdo(),
         'iteritems': _.iteritems() >> Wontdo(),
         'keys': _.keys()           >> Wontdo(),
