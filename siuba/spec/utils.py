@@ -1,6 +1,26 @@
 from siuba.siu import _, MetaArg, strip_symbolic
 import itertools
 
+def enrich_spec_entry(entry):
+    accessors = ['str', 'dt', 'cat', 'sparse']
+    expr = strip_symbolic(eval(entry["example"], {"_": _}))
+
+    accessor = [ameth for ameth in accessors if ameth in expr.op_vars()] + [None]
+
+    tmp = {
+            **entry,
+            'is_property': expr.func == "__getattr__",
+            'expr_frame': replace_meta_args(expr, _.x, _.y, _.z),
+            'expr_series': expr,
+            'accessor': accessor[0],
+            }
+    tmp['action'] = {
+            **entry['action'],
+            'data_arity': count_call_type(expr, MetaArg),
+            }
+
+    return tmp
+
 def get_type_info(call):
     if call.func != "__rshift__":
         raise ValueError("Expected first expressions was >>")
@@ -8,7 +28,7 @@ def get_type_info(call):
     out = {}
     expr, result = call.args
     
-    accessors = ['str', 'dt', 'cat']
+    accessors = ['str', 'dt', 'cat', 'sparse']
     
     accessor = [ameth for ameth in accessors if ameth in expr.op_vars()] + [None]
             

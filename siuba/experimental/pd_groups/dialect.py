@@ -9,8 +9,8 @@ from siuba.experimental.pd_groups.translate import SeriesGroupBy, GroupByAgg, GR
 out = {}
 for name, entry in spec.items():
     #if entry['result']['type']: continue
-        
-    key = (entry['result']['type'], entry['data_arity'])
+    kind = entry['action'].get('kind') or entry['action'].get('status')
+    key = (kind.title(), entry['action']['data_arity'])
     meth = GROUP_METHODS[key]
     out[name] = meth(
             name = name.split('.')[-1],
