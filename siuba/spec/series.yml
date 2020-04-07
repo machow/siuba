@@ -72,13 +72,6 @@ __invert__:
   backends: {}
   category: _special_methods
   example: ~_
-__iter__:
-  action:
-    status: maydo
-  backends: {}
-  category: indexing
-  example: _.__iter__()
-  priority: 0
 __le__:
   action:
     kind: elwise
