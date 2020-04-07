@@ -79,12 +79,12 @@ Key Features
 |:-------------------------------------------|:--------|:-----------|:---------|
 | pipe syntax (`>>`)                         | ✅      | ✅         | ❌       |
 | concise, **lazy operations** (`_.a + _.b`) | ✅      | ✅         | ❌       |
-| operations are just Pandas Series methods  | ✅      | ✅         | ✅       |
-| operations use an **abstract syntax tree** | ✅      | ❌         | ❌       |
+| operations are Pandas Series methods       | ✅      | ✅         | ✅       |
+| operations use **abstract syntax trees**   | ✅      | ❌         | ❌       |
 | no need to constantly reset index          | ✅      | ✅         | ❌       |
 | **unified API** over (un)grouped data      | ✅      | ✅         | ❌       |
 | optimized, **fast grouped operations**     | ✅      | ❌         | ⚠️        |
-| seamlessly generate **SQL queries**        | ✅      | ❌         | ❌       |
+| generate **SQL queries**                   | ✅      | ❌         | ❌       |
 | supports **user defined functions**        | ✅      | ❌         | ⚠️        |
 | handles nested data                        | ✅      | ❌         | ⚠️        |
 
