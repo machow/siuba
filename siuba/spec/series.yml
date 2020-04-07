@@ -1,0 +1,2691 @@
+T:
+  action:
+    status: wontdo
+  backends: {}
+  category: attributes
+  example: _.T
+__add__:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: _special_methods
+  example: _ + _
+__and__:
+  action:
+    input_type: bool
+    kind: elwise
+    status: supported
+  backends: {}
+  category: _special_methods
+  example: _ & _
+__array__:
+  action:
+    status: wontdo
+  backends: {}
+  category: conversion
+  example: _.__array__()
+__div__:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: _special_methods
+  example: _.__div__(_)
+__eq__:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: _special_methods
+  example: _ == _
+__floordiv__:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: _special_methods
+  example: _ // _
+__ge__:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: _special_methods
+  example: _ >= _
+__gt__:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: _special_methods
+  example: _ > _
+__invert__:
+  action:
+    input_type: bool
+    kind: elwise
+    status: supported
+  backends: {}
+  category: _special_methods
+  example: ~_
+__le__:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: _special_methods
+  example: _ <= _
+__lt__:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: _special_methods
+  example: _ < _
+__mod__:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: _special_methods
+  example: _ % _
+__mul__:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: _special_methods
+  example: _ * _
+__ne__:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: _special_methods
+  example: _ != _
+__neg__:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: _special_methods
+  example: -_
+__or__:
+  action:
+    input_type: bool
+    kind: elwise
+    status: supported
+  backends: {}
+  category: _special_methods
+  example: _ | _
+__pos__:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: _special_methods
+  example: +_
+__pow__:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: _special_methods
+  example: _**_
+__radd__:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: _special_methods
+  example: _ + _
+__rand__:
+  action:
+    input_type: bool
+    kind: elwise
+    status: supported
+  backends: {}
+  category: _special_methods
+  example: _ & _
+__rdiv__:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: _special_methods
+  example: _.__rdiv__(_)
+__rfloordiv__:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: _special_methods
+  example: _ // _
+__rmod__:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: _special_methods
+  example: _ % _
+__rmul__:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: _special_methods
+  example: _ * _
+__ror__:
+  action:
+    input_type: bool
+    kind: elwise
+    status: supported
+  backends: {}
+  category: _special_methods
+  example: _ | _
+__round__:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: _special_methods
+  example: _.__round__(2)
+__rpow__:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: _special_methods
+  example: _**_
+__rsub__:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: _special_methods
+  example: _ - _
+__rtruediv__:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: _special_methods
+  example: _ / _
+__rxor__:
+  action:
+    input_type: bool
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: _special_methods
+  example: _ ^ _
+__sub__:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: _special_methods
+  example: _ - _
+__truediv__:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: _special_methods
+  example: _ / _
+__xor__:
+  action:
+    input_type: bool
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: _special_methods
+  example: _ ^ _
+abs:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: computations
+  example: _.abs()
+add:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: binary
+  example: _.add(_)
+add_prefix:
+  action:
+    status: wontdo
+  backends: {}
+  category: reindexing
+  example: _.add_prefix()
+add_suffix:
+  action:
+    status: wontdo
+  backends: {}
+  category: reindexing
+  example: _.add_suffix()
+agg:
+  action:
+    status: wontdo
+  backends: {}
+  category: function_application
+  example: _.agg
+aggregate:
+  action:
+    status: wontdo
+  backends: {}
+  category: function_application
+  example: _.aggregate
+align:
+  action:
+    status: wontdo
+  backends: {}
+  category: reindexing
+  example: _.align
+all:
+  action:
+    input_type: bool
+    kind: agg
+    status: supported
+  backends: {}
+  category: computations
+  example: _.all()
+any:
+  action:
+    input_type: bool
+    kind: agg
+    status: supported
+  backends: {}
+  category: computations
+  example: _.any()
+append:
+  action:
+    status: todo
+  backends: {}
+  category: combining
+  example: _.append()
+  priority: 1
+apply:
+  action:
+    status: wontdo
+  backends: {}
+  category: function_application
+  example: _.apply
+argmax:
+  action:
+    status: wontdo
+  backends: {}
+  category: reshaping
+  example: _.argmax
+argmin:
+  action:
+    status: wontdo
+  backends: {}
+  category: reshaping
+  example: _.argmin
+argsort:
+  action:
+    status: wontdo
+  backends: {}
+  category: reshaping
+  example: _.argsort
+array:
+  action:
+    status: wontdo
+  backends: {}
+  category: attributes
+  example: _.array
+asfreq:
+  action:
+    status: todo
+  backends: {}
+  category: time_series
+  example: _.asfreq('D')
+asof:
+  action:
+    status: todo
+  backends: {}
+  category: time_series
+  example: _.asof()
+  priority: 0
+astype:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: conversion
+  example: _.astype('str')
+at:
+  action:
+    status: todo
+  backends: {}
+  category: indexing
+  example: _.at(1)
+  priority: 3
+at_time:
+  action:
+    status: todo
+  backends: {}
+  category: time_series
+  example: _.at_time()
+  priority: 0
+attrs:
+  action:
+    status: wontdo
+  backends: {}
+  category: attributes
+  example: _.attrs
+autocorr:
+  action:
+    status: todo
+  backends: {}
+  category: computations
+  example: _.autocorr()
+  priority: 1
+axes:
+  action:
+    status: wontdo
+  backends: {}
+  category: attributes
+  example: _.axes
+base:
+  action:
+    status: wontdo
+  backends: {}
+  category: attributes
+  example: _.base
+between:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: computations
+  example: _.between(2,5)
+between_time:
+  action:
+    status: maydo
+  backends: {}
+  category: time_series
+  example: _.between_time()
+  priority: 0
+bfill:
+  action:
+    status: todo
+  backends: {}
+  category: missing_data
+  example: _.bfill(1)
+bool:
+  action:
+    status: todo
+  backends: {}
+  category: conversion
+  example: _.bool
+  priority: 1
+cat.add_categories:
+  action:
+    status: todo
+  backends: {}
+  category: categories
+  example: _.cat.add_categories()
+  priority: 1
+cat.as_ordered:
+  action:
+    status: todo
+  backends: {}
+  category: categories
+  example: _.cat.as_ordered()
+  priority: 1
+cat.as_unordered:
+  action:
+    status: todo
+  backends: {}
+  category: categories
+  example: _.cat.as_unordered()
+  priority: 1
+cat.categories:
+  action:
+    status: wontdo
+  backends: {}
+  category: categories
+  example: _.cat.categories
+  priority: 1
+cat.codes:
+  action:
+    status: wontdo
+  backends: {}
+  category: categories
+  example: _.cat.codes
+cat.ordered:
+  action:
+    status: todo
+  backends: {}
+  category: categories
+  example: _.cat.ordered
+  priority: 1
+cat.remove_categories:
+  action:
+    status: todo
+  backends: {}
+  category: categories
+  example: _.cat.remove_categories()
+  priority: 1
+cat.remove_unused_categories:
+  action:
+    status: todo
+  backends: {}
+  category: categories
+  example: _.cat.remove_unused_categories()
+  priority: 1
+cat.rename_categories:
+  action:
+    status: todo
+  backends: {}
+  category: categories
+  example: _.cat.rename_categories()
+  priority: 1
+cat.reorder_categories:
+  action:
+    status: todo
+  backends: {}
+  category: categories
+  example: _.cat.reorder_categories()
+  priority: 1
+cat.set_categories:
+  action:
+    status: todo
+  backends: {}
+  category: categories
+  example: _.cat.set_categories()
+  priority: 1
+clip:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: computations
+  example: _.clip(2,5)
+  priority: 1
+combine:
+  action:
+    status: todo
+  backends: {}
+  category: binary
+  example: _.combine(_,'max')
+  priority: 1
+combine_first:
+  action:
+    status: todo
+  backends: {}
+  category: binary
+  example: _.combine_first(_,'max')
+  priority: 1
+compound:
+  action:
+    status: maydo
+  backends: {}
+  category: computations
+  example: _.compound()
+convert_dtypes:
+  action:
+    status: todo
+  backends: {}
+  category: conversion
+  example: _.convert_dtypes()
+copy:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: wontdo
+  category: conversion
+  example: _.copy()
+corr:
+  action:
+    status: todo
+  backends: {}
+  category: computations
+  example: _.corr(_)
+  priority: 3
+count:
+  action:
+    kind: agg
+    status: supported
+  backends: {}
+  category: computations
+  example: _.count()
+cov:
+  action:
+    status: todo
+  backends: {}
+  category: computations
+  example: _.cov(_)
+  priority: 3
+cummax:
+  action:
+    kind: window
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: computations
+  example: _.cummax()
+cummin:
+  action:
+    kind: window
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: computations
+  example: _.cummin()
+cumprod:
+  action:
+    kind: window
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: computations
+  example: _.cumprod()
+cumsum:
+  action:
+    kind: window
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: computations
+  example: _.cumsum()
+data:
+  action:
+    status: wontdo
+  backends: {}
+  category: attributes
+  example: _.data
+describe:
+  action:
+    status: wontdo
+  backends: {}
+  category: computations
+  example: _.describe()
+diff:
+  action:
+    kind: window
+    status: supported
+  backends: {}
+  category: computations
+  example: _.diff()
+div:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: binary
+  example: _.div(_)
+divide:
+  action:
+    status: todo
+  backends: {}
+  category: binary
+  example: _.divide(_)
+divmod:
+  action:
+    status: todo
+  backends: {}
+  category: binary
+  example: _.divmod(_)
+dot:
+  action:
+    status: todo
+  backends: {}
+  category: binary
+  example: _.dot(_)
+  priority: 1
+drop:
+  action:
+    status: wontdo
+  backends: {}
+  category: reindexing
+  example: _.drop
+drop_duplicates:
+  action:
+    status: todo
+  backends: {}
+  category: reindexing
+  example: _.drop_duplicates()
+  priority: 0
+droplevel:
+  action:
+    status: wontdo
+  backends: {}
+  category: reindexing
+  example: _.droplevel
+dropna:
+  action:
+    status: maydo
+  backends: {}
+  category: missing_data
+  example: _.dropna()
+dt.asfreq:
+  action:
+    status: todo
+  backends: {}
+  category: period_properties
+  example: _.dt.asfreq('D')
+dt.ceil:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: datetime_methods
+  example: _.dt.ceil('D')
+dt.components:
+  action:
+    status: maydo
+  backends: {}
+  category: timedelta_properties
+  example: _.dt.components
+dt.date:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: wontdo
+  category: datetime_properties
+  example: _.dt.date
+dt.day:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      result_type: float
+  category: datetime_properties
+  example: _.dt.day
+dt.day_name:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: datetime_methods
+  example: _.dt.day_name()
+dt.dayofweek:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      result_type: float
+  category: datetime_properties
+  example: _.dt.dayofweek
+dt.dayofyear:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      result_type: float
+  category: datetime_properties
+  example: _.dt.dayofyear
+dt.days:
+  action:
+    status: todo
+  backends: {}
+  category: timedelta_properties
+  example: _.dt.days
+dt.days_in_month:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      result_type: float
+  category: datetime_properties
+  example: _.dt.days_in_month
+dt.daysinmonth:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      result_type: float
+  category: datetime_properties
+  example: _.dt.daysinmonth
+dt.end_time:
+  action:
+    status: todo
+  backends: {}
+  category: period_properties
+  example: _.dt.end_time
+  priority: 0
+dt.floor:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: datetime_methods
+  example: _.dt.floor('D')
+dt.freq:
+  action:
+    kind: singleton
+    status: supported
+  backends: {}
+  category: datetime_properties
+  example: _.dt.freq
+dt.hour:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      result_type: float
+  category: datetime_properties
+  example: _.dt.hour
+dt.is_leap_year:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: wontdo
+  category: datetime_properties
+  example: _.dt.is_leap_year
+dt.is_month_end:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: datetime_properties
+  example: _.dt.is_month_end
+dt.is_month_start:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: datetime_properties
+  example: _.dt.is_month_start
+dt.is_quarter_end:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: datetime_properties
+  example: _.dt.is_quarter_end
+dt.is_quarter_start:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: datetime_properties
+  example: _.dt.is_quarter_start
+dt.is_year_end:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: datetime_properties
+  example: _.dt.is_year_end
+dt.is_year_start:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: datetime_properties
+  example: _.dt.is_year_start
+dt.microsecond:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: datetime_properties
+  example: _.dt.microsecond
+dt.microseconds:
+  action:
+    status: todo
+  backends: {}
+  category: timedelta_properties
+  example: _.dt.microseconds
+dt.minute:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      result_type: float
+  category: datetime_properties
+  example: _.dt.minute
+dt.month:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      result_type: float
+  category: datetime_properties
+  example: _.dt.month
+dt.month_name:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: datetime_methods
+  example: _.dt.month_name()
+dt.nanosecond:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: wontdo
+  category: datetime_properties
+  example: _.dt.nanosecond
+dt.nanoseconds:
+  action:
+    status: todo
+  backends: {}
+  category: timedelta_properties
+  example: _.dt.nanoseconds
+dt.normalize:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: datetime_methods
+  example: _.dt.normalize()
+dt.quarter:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      result_type: float
+  category: datetime_properties
+  example: _.dt.quarter
+dt.qyear:
+  action:
+    status: todo
+  backends: {}
+  category: period_properties
+  example: _.dt.qyear
+  priority: 0
+dt.round:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: datetime_methods
+  example: _.dt.round('D')
+dt.second:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      result_type: float
+  category: datetime_properties
+  example: _.dt.second
+dt.seconds:
+  action:
+    status: todo
+  backends: {}
+  category: timedelta_properties
+  example: _.dt.seconds
+dt.start_time:
+  action:
+    status: todo
+  backends: {}
+  category: period_properties
+  example: _.dt.start_time
+  priority: 0
+dt.strftime:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: datetime_methods
+  example: _.dt.strftime('%d')
+dt.time:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: wontdo
+  category: datetime_properties
+  example: _.dt.time
+dt.timetz:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: wontdo
+  category: datetime_properties
+  example: _.dt.timetz
+dt.to_period:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: datetime_methods
+  example: _.dt.to_period('D')
+dt.to_pydatetime:
+  action:
+    status: todo
+  backends: {}
+  category: datetime_methods
+  example: _.dt.to_pydatetime()
+  priority: 1
+dt.to_pytimedelta:
+  action:
+    status: todo
+  backends: {}
+  category: timedelta_methods
+  example: _.dt.to_pytimedelta
+dt.to_timestamp:
+  action:
+    status: todo
+  backends: {}
+  category: period_properties
+  example: _.dt.to_timestamp()
+dt.total_seconds:
+  action:
+    status: todo
+  backends: {}
+  category: timedelta_methods
+  example: _.dt.total_seconds
+  priority: 1
+dt.tz:
+  action:
+    kind: singleton
+    status: supported
+  backends: {}
+  category: datetime_properties
+  example: _.dt.tz
+dt.tz_convert:
+  action:
+    status: todo
+  backends: {}
+  category: datetime_methods
+  example: _.dt.tz_convert('MST')
+  priority: 1
+dt.tz_localize:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: datetime_methods
+  example: _.dt.tz_localize('UTC')
+dt.week:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      result_type: float
+  category: datetime_properties
+  example: _.dt.week
+dt.weekday:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      result_type: float
+  category: datetime_properties
+  example: _.dt.weekday
+dt.weekofyear:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      result_type: float
+  category: datetime_properties
+  example: _.dt.weekofyear
+dt.year:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      result_type: float
+  category: datetime_properties
+  example: _.dt.year
+dtype:
+  action:
+    status: todo
+  backends: {}
+  category: attributes
+  example: _.dtype
+  priority: 1
+dtypes:
+  action:
+    status: todo
+  backends: {}
+  category: attributes
+  example: _.dtypes
+  priority: 1
+duplicated:
+  action:
+    status: todo
+  backends: {}
+  category: reindexing
+  example: _.duplicated()
+  priority: 3
+empty:
+  action:
+    status: todo
+  backends: {}
+  category: attributes
+  example: _.empty
+  priority: 1
+eq:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: binary
+  example: _.eq(_)
+equals:
+  action:
+    status: todo
+  backends: {}
+  category: reindexing
+  example: _.equals(_)
+  priority: 3
+ewm:
+  action:
+    status: wontdo
+  backends: {}
+  category: function_application
+  example: _.ewm
+expanding:
+  action:
+    status: wontdo
+  backends: {}
+  category: function_application
+  example: _.expanding
+explode:
+  action:
+    status: maydo
+  backends: {}
+  category: reshaping
+  example: _.explode()
+factorize:
+  action:
+    status: maydo
+  backends: {}
+  category: computations
+  example: _.factorize()
+ffill:
+  action:
+    status: todo
+  backends: {}
+  category: missing_data
+  example: _.ffill(1)
+fillna:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: missing_data
+  example: _.fillna(1)
+filter:
+  action:
+    status: wontdo
+  backends: {}
+  category: reindexing
+  example: _.filter()
+first:
+  action:
+    status: maydo
+  backends: {}
+  category: reindexing
+  example: _.first()
+  priority: 0
+first_valid_index:
+  action:
+    status: todo
+  backends: {}
+  category: time_series
+  example: _.first_valid_index()
+  priority: 0
+flags:
+  action:
+    status: wontdo
+  backends: {}
+  category: attributes
+  example: _.flags
+floordiv:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: binary
+  example: _.floordiv(_)
+ftype:
+  action:
+    status: wontdo
+  backends: {}
+  category: attributes
+  example: _.ftype
+ftypes:
+  action:
+    status: wontdo
+  backends: {}
+  category: attributes
+  example: _.ftypes
+ge:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: binary
+  example: _.ge(_)
+get:
+  action:
+    status: todo
+  backends: {}
+  category: indexing
+  example: _.get(1)
+  priority: 3
+get_values:
+  action:
+    status: wontdo
+  backends: {}
+  category: conversion
+  example: _.get_values()
+groupby:
+  action:
+    status: wontdo
+  backends: {}
+  category: function_application
+  example: _.groupby
+gt:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: binary
+  example: _.gt(_)
+hasnans:
+  action:
+    status: todo
+  backends: {}
+  category: attributes
+  example: _.hasnans
+  priority: 1
+head:
+  action:
+    status: todo
+  backends: {}
+  category: reindexing
+  example: _.head()
+  priority: 0
+iat:
+  action:
+    status: todo
+  backends: {}
+  category: indexing
+  example: _.iat(1)
+  priority: 3
+idxmax:
+  action:
+    status: todo
+  backends: {}
+  category: reindexing
+  example: _.idxmax()
+  priority: 0
+idxmin:
+  action:
+    status: todo
+  backends: {}
+  category: reindexing
+  example: _.idxmin()
+  priority: 0
+iloc:
+  action:
+    status: todo
+  backends: {}
+  category: indexing
+  example: _.iloc(1)
+index:
+  action:
+    status: wontdo
+  backends: {}
+  category: attributes
+  example: _.index
+infer_objects:
+  action:
+    status: todo
+  backends: {}
+  category: conversion
+  example: _.infer_objects()
+  priority: 1
+interpolate:
+  action:
+    status: maydo
+  backends: {}
+  category: missing_data
+  example: _.interpolate()
+is_copy:
+  action:
+    status: todo
+  backends: {}
+  category: attributes
+  example: _.is_copy
+  priority: 1
+is_monotonic:
+  action:
+    status: todo
+  backends: {}
+  category: computations
+  example: _.is_monotonic
+  priority: 3
+is_monotonic_decreasing:
+  action:
+    status: todo
+  backends: {}
+  category: computations
+  example: _.is_monotonic_decreasing
+  priority: 3
+is_monotonic_increasing:
+  action:
+    status: todo
+  backends: {}
+  category: computations
+  example: _.is_monotonic_increasing
+  priority: 3
+is_unique:
+  action:
+    status: todo
+  backends: {}
+  category: computations
+  example: _.is_unique
+  priority: 3
+isin:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: reindexing
+  example: _.isin((1, 2))
+isna:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: missing_data
+  example: _.isna()
+isnull:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: wontdo
+  category: missing_data
+  example: _.isnull()
+item:
+  action:
+    status: wontdo
+  backends: {}
+  category: indexing
+  example: _.item()
+items:
+  action:
+    status: wontdo
+  backends: {}
+  category: indexing
+  example: _.items()
+itemsize:
+  action:
+    status: wontdo
+  backends: {}
+  category: attributes
+  example: _.itemsize
+iteritems:
+  action:
+    status: wontdo
+  backends: {}
+  category: indexing
+  example: _.iteritems()
+keys:
+  action:
+    status: wontdo
+  backends: {}
+  category: indexing
+  example: _.keys()
+kurt:
+  action:
+    status: todo
+  backends: {}
+  category: computations
+  example: _.kurt()
+  priority: 2
+kurtosis:
+  action:
+    status: todo
+  backends: {}
+  category: computations
+  example: _.kurtosis()
+  priority: 2
+last:
+  action:
+    status: wontdo
+  backends: {}
+  category: reindexing
+  example: _.last()
+  priority: 0
+last_valid_index:
+  action:
+    status: todo
+  backends: {}
+  category: time_series
+  example: _.last_valid_index()
+  priority: 0
+le:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: binary
+  example: _.le(_)
+loc:
+  action:
+    status: todo
+  backends: {}
+  category: indexing
+  example: _.loc(1)
+lt:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: binary
+  example: _.lt(_)
+mad:
+  action:
+    kind: agg
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: computations
+  example: _.mad()
+map:
+  action:
+    status: wontdo
+  backends: {}
+  category: function_application
+  example: _.map
+mask:
+  action:
+    status: todo
+  backends: {}
+  category: reindexing
+  example: _.mask()
+  priority: 2
+max:
+  action:
+    kind: agg
+    status: supported
+  backends: {}
+  category: computations
+  example: _.max()
+mean:
+  action:
+    kind: agg
+    status: supported
+  backends: {}
+  category: computations
+  example: _.mean()
+median:
+  action:
+    kind: agg
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: computations
+  example: _.median()
+memory_usage:
+  action:
+    status: todo
+  backends: {}
+  category: attributes
+  example: _.memory_usage
+  priority: 1
+min:
+  action:
+    kind: agg
+    status: supported
+  backends: {}
+  category: computations
+  example: _.min()
+mod:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: binary
+  example: _.mod(_)
+mode:
+  action:
+    status: maydo
+  backends: {}
+  category: computations
+  example: _.mode()
+  priority: 2
+mul:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: binary
+  example: _.mul(_)
+multiply:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: wontdo
+  category: binary
+  example: _.multiply(_)
+name:
+  action:
+    status: todo
+  backends: {}
+  category: attributes
+  example: _.name
+  priority: 1
+nbytes:
+  action:
+    status: todo
+  backends: {}
+  category: attributes
+  example: _.nbytes
+  priority: 1
+ndim:
+  action:
+    status: todo
+  backends: {}
+  category: attributes
+  example: _.ndim
+  priority: 1
+ne:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: binary
+  example: _.ne(_)
+nlargest:
+  action:
+    status: maydo
+  backends: {}
+  category: computations
+  example: _.nlargest()
+  priority: 1
+notna:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: missing_data
+  example: _.notna()
+notnull:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: wontdo
+  category: missing_data
+  example: _.notnull()
+nsmallest:
+  action:
+    status: maydo
+  backends: {}
+  category: computations
+  example: _.nsmallest()
+  priority: 1
+nunique:
+  action:
+    kind: agg
+    status: supported
+  backends:
+    postgresql:
+      flags:
+      - no_mutate
+  category: computations
+  example: _.nunique()
+pct_change:
+  action:
+    kind: window
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: computations
+  example: _.pct_change()
+pipe:
+  action:
+    status: wontdo
+  backends: {}
+  category: function_application
+  example: _.pipe
+pop:
+  action:
+    status: wontdo
+  backends: {}
+  category: indexing
+  example: _.pop()
+pow:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: binary
+  example: _.pow(_)
+prod:
+  action:
+    kind: agg
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: computations
+  example: _.prod()
+product:
+  action:
+    status: todo
+  backends: {}
+  category: binary
+  example: _.product()
+  priority: 1
+put:
+  action:
+    status: wontdo
+  backends: {}
+  category: attributes
+  example: _.put
+quantile:
+  action:
+    kind: agg
+    status: supported
+  backends:
+    postgresql:
+      flags:
+      - no_mutate
+  category: computations
+  example: _.quantile(0.75)
+radd:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: binary
+  example: _.radd(_)
+rank:
+  action:
+    kind: window
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: computations
+  example: _.rank()
+ravel:
+  action:
+    status: wontdo
+  backends: {}
+  category: reshaping
+  example: _.ravel()
+rdiv:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: binary
+  example: _.rdiv(_)
+rdivmod:
+  action:
+    status: todo
+  backends: {}
+  category: binary
+  example: _.rdivmod(_)
+reindex:
+  action:
+    status: wontdo
+  backends: {}
+  category: reindexing
+  example: _.reindex
+reindex_like:
+  action:
+    status: wontdo
+  backends: {}
+  category: reindexing
+  example: _.reindex_like
+rename:
+  action:
+    status: todo
+  backends: {}
+  category: reindexing
+  example: _.rename('new_name')
+  priority: 1
+rename_axis:
+  action:
+    status: wontdo
+  backends: {}
+  category: reindexing
+  example: _.rename_axis
+reorder_levels:
+  action:
+    status: wontdo
+  backends: {}
+  category: reshaping
+  example: _.reorder_levels
+repeat:
+  action:
+    status: maydo
+  backends: {}
+  category: reshaping
+  example: _.repeat()
+replace:
+  action:
+    status: todo
+  backends: {}
+  category: combining
+  example: _.replace()
+  priority: 1
+resample:
+  action:
+    status: todo
+  backends: {}
+  category: time_series
+  example: _.resample()
+  priority: 0
+reset_index:
+  action:
+    status: wontdo
+  backends: {}
+  category: reindexing
+  example: _.reset_index()
+rfloordiv:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: binary
+  example: _.rfloordiv(_)
+rmod:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: binary
+  example: _.rmod(_)
+rmul:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: binary
+  example: _.rmul(_)
+rolling:
+  action:
+    status: wontdo
+  backends: {}
+  category: function_application
+  example: _.rolling
+round:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: binary
+  example: _.round(2)
+rpow:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: binary
+  example: _.rpow(_)
+rsub:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: binary
+  example: _.rsub(_)
+rtruediv:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: binary
+  example: _.rtruediv(_)
+sample:
+  action:
+    status: todo
+  backends: {}
+  category: reindexing
+  example: _.sample()
+  priority: 0
+searchsorted:
+  action:
+    status: todo
+  backends: {}
+  category: reshaping
+  example: _.searchsorted()
+  priority: 2
+sem:
+  action:
+    kind: agg
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: computations
+  example: _.sem()
+set_axis:
+  action:
+    status: wontdo
+  backends: {}
+  category: reindexing
+  example: _.set_axis
+shape:
+  action:
+    status: wontdo
+  backends: {}
+  category: attributes
+  example: _.shape
+shift:
+  action:
+    status: todo
+  backends: {}
+  category: time_series
+  example: _.shift()
+  priority: 0
+size:
+  action:
+    status: maydo
+  backends: {}
+  category: attributes
+  example: _.size
+skew:
+  action:
+    kind: agg
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: computations
+  example: _.skew()
+slice_shift:
+  action:
+    status: maydo
+  backends: {}
+  category: time_series
+  example: _.slice_shift()
+  priority: 0
+sort_index:
+  action:
+    status: wontdo
+  backends: {}
+  category: reshaping
+  example: _.sort_index()
+sort_values:
+  action:
+    status: todo
+  backends: {}
+  category: reshaping
+  example: _.sort_values()
+  priority: 1
+sparse.density:
+  action:
+    status: maydo
+  backends: {}
+  category: sparse
+  example: _.sparse.density
+  priority: 1
+sparse.fill_value:
+  action:
+    status: maydo
+  backends: {}
+  category: sparse
+  example: _.sparse.fill_value
+  priority: 1
+sparse.from_coo:
+  action:
+    status: wontdo
+  backends: {}
+  category: sparse
+  example: _.sparse.from_coo()
+sparse.npoints:
+  action:
+    status: maydo
+  backends: {}
+  category: sparse
+  example: _.sparse.npoints
+  priority: 1
+sparse.sp_values:
+  action:
+    status: maydo
+  backends: {}
+  category: sparse
+  example: _.sparse.sp_values
+sparse.to_coo:
+  action:
+    status: wontdo
+  backends: {}
+  category: sparse
+  example: _.sparse.to_coo()
+sparse.to_dense:
+  action:
+    status: wontdo
+  backends: {}
+  category: sparse
+  example: _.sparse.to_dense()
+squeeze:
+  action:
+    status: wontdo
+  backends: {}
+  category: reshaping
+  example: _.squeeze()
+std:
+  action:
+    kind: agg
+    status: supported
+  backends: {}
+  category: computations
+  example: _.std()
+str.capitalize:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: string_methods
+  example: _.str.capitalize()
+str.casefold:
+  action:
+    status: todo
+  backends: {}
+  category: string_methods
+  example: _.str.casefold()
+  priority: 2
+str.cat:
+  action:
+    status: maydo
+  backends: {}
+  category: string_methods
+  example: _.str.cat(_)
+  priority: 2
+str.center:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: wontdo
+  category: string_methods
+  example: _.str.center(3)
+str.contains:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: string_methods
+  example: _.str.contains('a')
+str.count:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.count('a')
+str.decode:
+  action:
+    status: todo
+  backends: {}
+  category: string_methods
+  example: _.str.decode()
+  priority: 2
+str.encode:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.encode('utf-8')
+str.endswith:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.endswith('a|b')
+str.extract:
+  action:
+    status: maydo
+  backends: {}
+  category: string_methods
+  example: _.str.extract('(a)(b)')
+  priority: 1
+str.extractall:
+  action:
+    status: maydo
+  backends: {}
+  category: string_methods
+  example: _.str.extractall('a')
+  priority: 0
+str.find:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.find('a|c')
+str.findall:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.findall('a|c')
+str.get:
+  action:
+    status: todo
+  backends: {}
+  category: string_methods
+  example: _.str.split('a').get(0)
+  priority: 2
+str.get_dummies:
+  action:
+    status: todo
+  backends: {}
+  category: string_methods
+  example: _.str.get_dummies()
+str.index:
+  action:
+    status: todo
+  backends: {}
+  category: string_methods
+  example: _.str.index('a')
+  priority: 2
+str.isalnum:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.isalnum()
+str.isalpha:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.isalpha()
+str.isdecimal:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.isdecimal()
+str.isdigit:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.isdigit()
+str.islower:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.islower()
+str.isnumeric:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.isnumeric()
+str.isspace:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.isspace()
+str.istitle:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.istitle()
+str.isupper:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.isupper()
+str.join:
+  action:
+    status: todo
+  backends: {}
+  category: string_methods
+  example: _.str.split('a').str.join(',')
+  priority: 2
+str.len:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: string_methods
+  example: _.str.len()
+str.ljust:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.ljust(5)
+str.lower:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: string_methods
+  example: _.str.lower()
+str.lstrip:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: string_methods
+  example: _.str.lstrip()
+str.match:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.match('a|c')
+str.normalize:
+  action:
+    status: todo
+  backends: {}
+  category: string_methods
+  example: _.str.normalize()
+  priority: 2
+str.pad:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.pad(5)
+str.partition:
+  action:
+    status: maydo
+  backends: {}
+  category: string_methods
+  example: _.str.partition()
+str.repeat:
+  action:
+    status: todo
+  backends: {}
+  category: string_methods
+  example: _.str.repeat(3)
+  priority: 2
+str.replace:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.replace('a|b','c')
+str.rfind:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.rfind('a')
+str.rindex:
+  action:
+    status: todo
+  backends: {}
+  category: string_methods
+  example: _.str.rindex('a')
+  priority: 2
+str.rjust:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.rjust(5)
+str.rpartition:
+  action:
+    status: todo
+  backends: {}
+  category: string_methods
+  example: _.str.rpartition()
+str.rsplit:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.rsplit('a|b',n = 1)
+str.rstrip:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: string_methods
+  example: _.str.rstrip()
+str.slice:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.slice(step = 2)
+str.slice_replace:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.slice_replace(2,repl = 'x')
+str.split:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.split('a|b')
+str.startswith:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: string_methods
+  example: _.str.startswith('a|b')
+str.strip:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: string_methods
+  example: _.str.strip()
+str.swapcase:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.swapcase()
+str.title:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: string_methods
+  example: _.str.title()
+str.translate:
+  action:
+    status: todo
+  backends: {}
+  category: string_methods
+  example: _.str.translate()
+  priority: 0
+str.upper:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: string_methods
+  example: _.str.upper()
+str.wrap:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: string_methods
+  example: _.str.wrap(2)
+str.zfill:
+  action:
+    status: todo
+  backends: {}
+  category: string_methods
+  example: _.str.zfill(2)
+  priority: 2
+strides:
+  action:
+    status: wontdo
+  backends: {}
+  category: attributes
+  example: _.strides
+sub:
+  action:
+    kind: elwise
+    status: supported
+  backends: {}
+  category: binary
+  example: _.sub(_)
+subtract:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: wontdo
+  category: binary
+  example: _.subtract(_)
+sum:
+  action:
+    kind: agg
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: computations
+  example: _.sum()
+swapaxes:
+  action:
+    status: wontdo
+  backends: {}
+  category: reshaping
+  example: _.swapaxes
+swaplevel:
+  action:
+    status: wontdo
+  backends: {}
+  category: reshaping
+  example: _.swaplevel
+tail:
+  action:
+    status: todo
+  backends: {}
+  category: reindexing
+  example: _.tail()
+  priority: 0
+take:
+  action:
+    status: wontdo
+  backends: {}
+  category: reindexing
+  example: _.take
+to_clipboard:
+  action:
+    status: wontdo
+  backends: {}
+  category: io
+  example: _.to_clipboard()
+  priority: 0
+to_csv:
+  action:
+    status: wontdo
+  backends: {}
+  category: io
+  example: _.to_csv()
+  priority: 0
+to_dense:
+  action:
+    status: wontdo
+  backends: {}
+  category: io
+  example: _.to_dense()
+to_dict:
+  action:
+    status: wontdo
+  backends: {}
+  category: io
+  example: _.to_dict()
+  priority: 0
+to_excel:
+  action:
+    status: wontdo
+  backends: {}
+  category: io
+  example: _.to_excel()
+  priority: 0
+to_frame:
+  action:
+    status: wontdo
+  backends: {}
+  category: io
+  example: _.to_frame()
+  priority: 0
+to_hdf:
+  action:
+    status: wontdo
+  backends: {}
+  category: io
+  example: _.to_hdf()
+  priority: 0
+to_json:
+  action:
+    status: todo
+  backends: {}
+  category: io
+  example: _.to_json()
+  priority: 0
+to_latex:
+  action:
+    status: wontdo
+  backends: {}
+  category: io
+  example: _.to_latex()
+  priority: 0
+to_list:
+  action:
+    status: wontdo
+  backends: {}
+  category: conversion
+  example: _.to_list()
+to_markdown:
+  action:
+    status: todo
+  backends: {}
+  category: io
+  example: _.to_markdown()
+to_msgpack:
+  action:
+    status: wontdo
+  backends: {}
+  category: io
+  example: _.to_msgpack()
+to_numpy:
+  action:
+    status: wontdo
+  backends: {}
+  category: conversion
+  example: _.to_numpy()
+to_period:
+  action:
+    status: todo
+  backends: {}
+  category: conversion
+  example: _.to_period()
+  priority: 1
+to_pickle:
+  action:
+    status: wontdo
+  backends: {}
+  category: io
+  example: _.to_pickle()
+  priority: 0
+to_sql:
+  action:
+    status: wontdo
+  backends: {}
+  category: io
+  example: _.to_sql()
+  priority: 0
+to_string:
+  action:
+    status: todo
+  backends: {}
+  category: io
+  example: _.to_string()
+  priority: 0
+to_timestamp:
+  action:
+    status: todo
+  backends: {}
+  category: conversion
+  example: _.to_timestamp()
+  priority: 1
+to_xarray:
+  action:
+    status: maydo
+  backends: {}
+  category: io
+  example: _.to_xarray()
+  priority: 0
+tolist:
+  action:
+    status: wontdo
+  backends: {}
+  category: conversion
+  example: _.tolist()
+transform:
+  action:
+    status: wontdo
+  backends: {}
+  category: function_application
+  example: _.transform
+transpose:
+  action:
+    status: wontdo
+  backends: {}
+  category: attributes
+  example: _.transpose()
+truediv:
+  action:
+    kind: elwise
+    status: supported
+  backends:
+    postgresql:
+      status: todo
+  category: binary
+  example: _.truediv(_)
+truncate:
+  action:
+    status: wontdo
+  backends: {}
+  category: reindexing
+  example: _.truncate
+tshift:
+  action:
+    status: todo
+  backends: {}
+  category: time_series
+  example: _.tshift()
+  priority: 0
+tz_convert:
+  action:
+    status: todo
+  backends: {}
+  category: time_series
+  example: _.tz_convert()
+  priority: 0
+tz_localize:
+  action:
+    status: todo
+  backends: {}
+  category: time_series
+  example: _.tz_localize()
+  priority: 0
+unique:
+  action:
+    status: wontdo
+  backends: {}
+  category: computations
+  example: _.unique()
+  priority: 1
+unstack:
+  action:
+    status: wontdo
+  backends: {}
+  category: reshaping
+  example: _.unstack
+update:
+  action:
+    status: wontdo
+  backends: {}
+  category: combining
+  example: _.update()
+value_counts:
+  action:
+    status: wontdo
+  backends: {}
+  category: computations
+  example: _.value_counts()
+  priority: 1
+values:
+  action:
+    status: wontdo
+  backends: {}
+  category: attributes
+  example: _.value
+var:
+  action:
+    kind: agg
+    status: supported
+  backends: {}
+  category: computations
+  example: _.var()
+view:
+  action:
+    status: wontdo
+  backends: {}
+  category: reshaping
+  example: _.view
+where:
+  action:
+    status: todo
+  backends: {}
+  category: reindexing
+  example: _.where(_)
+  priority: 2
+xs:
+  action:
+    status: wontdo
+  backends: {}
+  category: indexing
+  example: _.xs()

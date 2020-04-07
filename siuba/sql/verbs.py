@@ -434,7 +434,7 @@ def _select(__data, *args, **kwargs):
 
 
 @filter.register(LazyTbl)
-def _filter(__data, *args, **kwargs):
+def _filter(__data, *args):
     # TODO: aggregate funcs
     # Note: currently always produces 2 additional select statements,
     #       1 for window/aggs, and 1 for the where clause
