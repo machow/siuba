@@ -22,7 +22,9 @@ def enrich_spec_entry(entry):
     return tmp
 
 def get_type_info(call):
-    if call.func != "__rshift__":
+    call = strip_symbolic(call)
+    func = call.func
+    if isinstance(func, str) and func != "__rshift__":
         raise ValueError("Expected first expressions was >>")
         
     out = {}
