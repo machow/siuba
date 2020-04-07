@@ -30,7 +30,7 @@ Installation
 pip install siuba
 ```
 
-<br><br>
+<br>
 
 <table>
   <tbody>
