@@ -77,15 +77,15 @@ Key Features
 
 | feature                                    | siuba   | dplython   | pandas   |
 |:-------------------------------------------|:--------|:-----------|:---------|
+| operations are Pandas Series methods       | ✅      | ✅         | ✅       |
+| supports **user defined functions**        | ✅      | ✅         | ✅       |
 | pipe syntax (`>>`)                         | ✅      | ✅         | ❌       |
 | concise, **lazy operations** (`_.a + _.b`) | ✅      | ✅         | ❌       |
-| operations are Pandas Series methods       | ✅      | ✅         | ✅       |
-| operations use **abstract syntax trees**   | ✅      | ❌         | ❌       |
 | no need to constantly reset index          | ✅      | ✅         | ❌       |
 | **unified API** over (un)grouped data      | ✅      | ✅         | ❌       |
-| optimized, **fast grouped operations**     | ✅      | ❌         | ⚠️        |
+| optimized, **fast grouped operations**     | ✅      | ❌         | ✅       |
 | generate **SQL queries**                   | ✅      | ❌         | ❌       |
-| supports **user defined functions**        | ✅      | ❌         | ⚠️        |
+| operations use **abstract syntax trees**   | ✅      | ❌         | ❌       |
 | handles nested data                        | ✅      | ❌         | ⚠️        |
 
 **For more details, see [key features and benchmarks](https://siuba.readthedocs.io/en/latest/).**
