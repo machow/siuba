@@ -7,12 +7,14 @@
 extensions = [
     'nbsphinx',
     'sphinx.ext.autodoc',
-    'sphinx.ext.napoleon'
+    'sphinx.ext.napoleon',
     #'sphinx.ext.mathjax',
+    'sphinx.ext.autosectionlabel',
+    'sphinx_togglebutton',
 ]
 
 # Exclude build directory and Jupyter backup files:
-exclude_patterns = ['_build', '**.ipynb_checkpoints', '**.swp', 'draft-*']
+exclude_patterns = ['_build', '**.ipynb_checkpoints', '**.swp', 'draft*', 'api_*', '.*swp']
 
 # Default language for syntax highlighting in reST and Markdown cells
 highlight_language = 'none'
@@ -65,8 +67,13 @@ html_theme_options = {
     "github_repo": "siuba",
     "fixed_sidebar": False,
     "github_banner": True,
-    "github_button": False
+    "github_button": False,
+    "fixed_sidebar": True,
     }
+
+html_static_path = ['_static']
+
+html_js_files = ['custom.js']
 
 # -- nbsphinx customization ---------------------------------------------------
 

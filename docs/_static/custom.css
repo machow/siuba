@@ -1,0 +1,55 @@
+body {
+  font-size: 16px !important;
+}
+
+div.document {
+  max-width: 1010px;
+  width: auto !important;
+  min-width: 940px;
+}
+
+div.sphinxsidebar {
+  max-height: 100%;
+  overflow-y: auto;
+
+}
+
+div.sphinxsidebar a.active {
+  background-color: #aee691;
+}
+
+li.toctree-l2 a {
+  border: none;
+}
+
+li.toctree-l3 a {
+  border: none;
+}
+
+div.body {
+  padding-left: 45px !important;
+}
+
+table.align-default {
+  margin-left: 0 !important;
+  box-shadow: none !important;
+  border 1px solid #dfe2e5 !important;
+}
+
+table.table-align-left {
+  margin-left: 0 !important;
+  box-shadow: none !important;
+  border 1px solid #dfe2e5 !important;
+  
+}
+
+table th {
+  border: 1px solid #dfe2e5 !important;
+  padding: 6px 13px !important;
+}
+
+table td {
+  padding: 6px 13px !important;
+  border: 1px solid #dfe2e5 !important;
+}
+
