@@ -4,133 +4,145 @@ jupyter:
     text_representation:
       extension: .Rmd
       format_name: rmarkdown
-      format_version: '1.1'
-      jupytext_version: 1.1.1
+      format_version: '1.2'
+      jupytext_version: 1.4.1
   kernelspec:
     display_name: Python 3
     language: python
     name: python3
 ---
 
-```{python nbsphinx=hidden}
+```{python nbsphinx="hidden"}
 import pandas as pd
 pd.set_option("display.max_rows", 5)
+import matplotlib
+
+# %matplotlib inline
 ```
 
-## Introduction to siuba
+<!-- #region -->
+# Quickstart
 
 Siuba is a tool for concise, flexible data-analysis over multiple data sources. It currently supports pandas DataFrames and SQL tables.
 
 
+## Installing
+
+
+```
+pip install siuba
+```
+<!-- #endregion -->
+
+## Basic use
+
+The code below uses the example DataFrame mtcars, to get the average horsepower (hp) per cylinder.
+
 ```{python}
-from siuba import _, group_by, summarize, filter
+from siuba import _, group_by, summarize
 from siuba.data import mtcars
 
 (mtcars
   >> group_by(_.cyl)
   >> summarize(avg_hp = _.hp.mean())
   )
+
 ```
 
-The siuba library has 3 main goals:
+<!-- #region -->
+
+There are three key concepts in this example:
 
 
-* **concise** - simplify using pandas methods on columns of data, with siu expressions (e.g. `_.somecol.mean()`).
-* **flexible** - ensure that any operations can run on either grouped or ungrouped data.
-* **multiple data sources** - allow a chain of operations (called a pipe) to work with pandas and SQL data.
+| concept | example | meaning |
+| ------- | ------- | ------- |
+| verb    | `group_by(...)` | a function that operates on a table, like a DataFrame or SQL table |
+| lazy expression | `_.hp.mean()` | an expression created with `siuba._`, that represents actions you want to perform |
+| pipe | `mtcars >> group_by(...)` | a syntax that allows you to chain verbs with the `>>` operator |
+<!-- #endregion -->
 
+### Lazy expressions (`_`)
 
-### Concise pandas operations with siu expressions (`_`)
+A siu expression is a way of specifying **what** action you want to perform.
+This allows siuba verbs to decide **how** to execute the action, depending on whether your data is a local DataFrame or remote table.
+
 
 ```{python}
-# old approach
+from siuba import _
+
+_.cyl == 4
+
+```
+
+Notice how the output represents each step in our lazy expression, with these pieces:
+
+* black box █ - a method like checking equality (`==`) or getting an attribute (`.`).
+* underscore (`_`) - a placeholder for a table of data.
+
+We can use these expressions like lambda functions.
+For example, to keep specific rows of a pandas DataFrame.
+
+```{python}
+# old approach: repeat name
+mtcars[mtcars.cyl == 4]
+
+# old approach: lambda
 mtcars[lambda _: _.cyl == 4]
 
 # siu approach
 mtcars[_.cyl == 4]
 ```
 
-```{python}
-# old approach
-mtcars.assign(cyl2 = lambda _: _.cyl*2)
+Note that like the lambda function, siuba avoids typing the same (potentially_very_long) name twice, while also being a bit shorter.
 
-# siu approach
-mtcars.assign(cyl2 = _.cyl*2)
+Here is a more complex example, that uses grouping and calculating a mean with the pandas groupby and apply methods.
+
+```{python}
+# group by cylinder, calculate horse power (hp) minus its mean
+(mtcars
+  .groupby("cyl")
+  .apply(_.hp - _.hp.mean())
+)
+```
+
+### Verbs: mutate, filter, summarize
+
+Verbs a functions that operate on a table of data.
+They can be combined using a pipe with the `>>` operator.
+
+The previous example can be re-written in siuba as the following.
+
+```{python}
+from siuba import mutate
+
+(mtcars
+  >> group_by(_.cyl)
+  >> mutate(demeaned = _.hp - _.hp.mean())
+  )
+```
+
+Note that there is a key difference: mutate returned a pandas DataFrame with the new column (demeaned) at the end. This is a core feature of siuba verbs--tables in and tables out.
+
+Below are examples of keeping certain rows with **filter**, and calculating a single number per group with **summarize**.
+
+```{python}
+from siuba import filter, summarize
+
+g_cyl = group_by(mtcars, _.cyl)
+
+# keep lowest hp per group
+g_cyl >> filter(_.hp == _.hp.min())
 ```
 
 ```{python}
-# siu approach
-mtcars \
-  .groupby("cyl") \
-  .apply((_.mpg / _.cyl).mean())
+g_cyl >> summarize(avg_hp = _.hp.mean())
 ```
 
-Note that using siu expressions is not limited to pandas.
-At its core, a siu expression just generates a function that can be called, similar to a `lambda` function.
+### Working with SQL
 
-```{python}
-# using a lambda
-f_lambda = lambda _: _ + _
+Up to this point we've covered lazy expressions (`_`), and using table verbs. A major benefit of these two approaches is that they allow us to change how siuba behaves depending on the data source on which it is operating.
 
-# using siu expression
-f = _ + _
-
-f(1)
-```
-
-The one exception is that if a siu expression needs to access an attribute, then you need to escape it with two tildes.
-
-
-```{python}
-class AThing:
-    x = 1
-    
-    @staticmethod
-    def print_hey():
-        print("hey")
-
-# produces 1
-AThing.x
-
-# calling a method doesn't need to be escaped
-f_hey = _.print_hey()
-f_hey(AThing)
-```
-
-```{python}
-# operations that don't end in attribute access are fine!
-f_add = _.x + _.x
-f_add(AThing)
-```
-
-```{python}
-# ending with attribute access needs to be escaped
-f_x = ~~_.x
-
-f_x(AThing)
-```
-
-### Flexible in handling grouped and ungrouped data
-
-One major challenge when working with pandas is that many methods which exist on an ungrouped DataFrame, do not exist on a grouped DataFrame. To illustrate, below are the methods shown above.
-
-* `mtcars[_.cyl == 4]`
-* `mtcars.assign(cyl2 = _.cyl*2)`
-* `mtcars.groupby('cyl').apply(...)`
-
-The first two methods (indexing with `[` and assign) only work with ungrouped data. In the last method chain, `apply` works different depending whether data is grouped or not.
-
-**(TODO: finish describing apply case)**
-
-
-**TODO: review simple uses of the verbs filter, summarize, mutate. For now, see core one table verbs section of docs**
-
-
-### Works seamlessly with pandas and SQL
-
-Up to this point we've covered how siuba simplifies column operations using siu expressions (`_`), and a pipe of table verbs to flexibly handle both grouped and ungrouped data. A major benefit of these two approaches is that they allow us to change how siuba behaves depending on the data source on which it is operating.
-
-This is shown below, where we perform an operation from earlier in the docs to a sqlite table.
+For this example we first need to set up a SQL database.
 
 ```{python}
 from sqlalchemy import create_engine
@@ -139,7 +151,11 @@ from siuba.sql import LazyTbl
 # # copy in to sqlite
 engine = create_engine("sqlite:///:memory:")
 mtcars.to_sql("mtcars", engine, if_exists = "replace")
+```
 
+Now we can use summarize as above.
+
+```{python}
 # connect with siuba
 tbl_mtcars = LazyTbl(engine, "mtcars")
 
@@ -148,3 +164,26 @@ tbl_mtcars = LazyTbl(engine, "mtcars")
   >> summarize(avg_hp = _.hp.mean())
   )
 ```
+
+Under the hood siuba's summarize function is converting the lazy expression show in the code below to SQL.
+
+
+### Using with plotnine
+
+Fortnuately, plotnine supports siuba's style of piping, so is easy to plug in to!
+
+```{python}
+from siuba import rename
+from plotnine import ggplot, aes, geom_point
+
+(mtcars
+  >> mutate(hp_per_cyl = _.hp / _.cyl)
+  >> ggplot(aes("cyl", "hp_per_cyl"))
+   + geom_point()
+)
+```
+
+## Next steps
+
+* Interested in wrangling data right away? Check out the [data analysis guide](guide_analysis.html).
+* Curious how to program and extend siuba? Check out the [programming guide](guide_programming.html).
