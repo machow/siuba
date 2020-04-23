@@ -14,6 +14,7 @@ DPLY_FUNCTIONS = (
         "arrange", "distinct",
         "count", "add_count",
         "head",
+        "top_n",
         # Tidy ----
         "spread", "gather",
         "nest", "unnest",
@@ -1015,11 +1016,17 @@ from pandas.core.reshape.merge import _MergeOperation
 
 # TODO: will need to use multiple dispatch
 @singledispatch2(pd.DataFrame)
-def join(left, right, on = None, how = None):
+def join(left, right, on = None, how = None, *args, by = None, **kwargs):
     if not isinstance(right, DataFrame):
         raise Exception("right hand table must be a DataFrame")
     if how is None:
         raise Exception("Must specify how argument")
+
+    if len(args) or len(kwargs):
+        raise NotImplementedError("extra arguments to pandas join not currently supported")
+
+    if on is None and by is not None:
+        on = by
 
     # pandas uses outer, but dplyr uses term full
     if how == "full":
@@ -1095,6 +1102,53 @@ inner_join = partial(join, how = "inner")
 @singledispatch2(pd.DataFrame)
 def head(__data, n = 5):
     return __data.head(n)
+
+
+# Top N =======================================================================
+
+# TODO: should dispatch to filter, no need to specify pd.DataFrame?
+@singledispatch2((pd.DataFrame, DataFrameGroupBy))
+def top_n(__data, n, wt = None):
+    """Filter to keep the top or bottom entries in each group.
+
+    Args:
+        ___data: a DataFrame
+        n: the number of rows to keep in each group
+        wt: a column or expression that determines ordering (defaults to the last column in data)
+
+    Examples:
+        df = pd.DataFrame({'x': [3, 1, 2, 4], 'y': [6, 7, 8, 9]})
+        top_n(df, 2, _.x)     # keeps 3 and 4
+
+        top_n(df, -2, _.x)    # keeps 1, 2
+
+        top_n(df, 2, -_.x)    # keeps 1, 2. TODO: better example
+
+    """
+    # NOTE: using min_rank, since it can return a lazy expr for min_rank(ing)
+    #       but I would rather not have it imported in verbs. will be more 
+    #       reasonable if each verb were its own file? need abstract verb / vector module.
+    #       vector imports experimental right now, so we need to invert deps
+    # TODO: 
+    #   * what if wt is a string? should remove all str -> expr in verbs like group_by etc..
+    #   * verbs like filter allow lambdas, but this func breaks with that   
+    from .vector import min_rank
+    if wt is None:
+        sym_wt = getattr(Symbolic(MetaArg("_")), __data.columns[-1])
+    elif isinstance(wt, Call):
+        sym_wt = Symbolic(wt)
+    else:
+        raise TypeError("wt must be a symbolic expression, eg. _.some_col")
+
+    if n > 0:
+        return filter(__data, min_rank(-sym_wt) <= n)
+    else:
+        return filter(__data, min_rank(sym_wt) <= abs(n))
+
+
+def top_frac(__data, n, wt):
+    return __data
+
 
 # Gather ======================================================================
 
