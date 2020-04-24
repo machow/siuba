@@ -74,13 +74,17 @@ DOCSTRING = """
     ...
     ValueError: <MonthBegin> is a non-fixed frequency
 
-    >>> floor_date(dti, "MS")       # round down to month start
+    Month start will always go to the first day of a month.
+
+    >>> floor_date(dti, "MS") 
     DatetimeIndex(['2020-02-01'], dtype='datetime64[ns]', freq=None)
 
     >>> ceil_date(dti, "MS")
     DatetimeIndex(['2020-03-01'], dtype='datetime64[ns]', freq=None)
 
-    >>> floor_date(dti, "M")        # round down to month end
+    On the other hand, here is month end.
+    
+    >>> floor_date(dti, "M") 
     DatetimeIndex(['2020-01-31'], dtype='datetime64[ns]', freq=None)
 
     >>> ceil_date(dti, "M")
@@ -88,7 +92,7 @@ DOCSTRING = """
 
     It also works on things supported by the Series.dt.floor method, like hours.
 
-    >>> floor_date(dti, "H")        # round down to hour
+    >>> floor_date(dti, "H")
     DatetimeIndex(['2020-02-02 02:00:00'], dtype='datetime64[ns]', freq=None)
 
     You can also use it on other types, like a PeriodIndex
