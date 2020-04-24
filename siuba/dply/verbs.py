@@ -1117,12 +1117,22 @@ def top_n(__data, n, wt = None):
         wt: a column or expression that determines ordering (defaults to the last column in data)
 
     Examples:
-        df = pd.DataFrame({'x': [3, 1, 2, 4], 'y': [6, 7, 8, 9]})
-        top_n(df, 2, _.x)     # keeps 3 and 4
+        >>> from siuba import _, top_n
+        >>> df = pd.DataFrame({'x': [3, 1, 2, 4], 'y': [1, 1, 0, 0]})
+        >>> top_n(df, 2, _.x)
+           x  y
+        0  3  1
+        3  4  0
 
-        top_n(df, -2, _.x)    # keeps 1, 2
+        >>> top_n(df, -2, _.x)
+           x  y
+        1  1  1
+        2  2  0
 
-        top_n(df, 2, -_.x)    # keeps 1, 2. TODO: better example
+        >>> top_n(df, 2, _.x*_.y)
+           x  y
+        0  3  1
+        1  1  1
 
     """
     # NOTE: using min_rank, since it can return a lazy expr for min_rank(ing)
@@ -1144,10 +1154,6 @@ def top_n(__data, n, wt = None):
         return filter(__data, min_rank(-sym_wt) <= n)
     else:
         return filter(__data, min_rank(sym_wt) <= abs(n))
-
-
-def top_frac(__data, n, wt):
-    return __data
 
 
 # Gather ======================================================================
