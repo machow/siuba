@@ -92,8 +92,57 @@ def test_explain_binary(_, op):
     assert explain(sym) == right
 
 
+@pytest.mark.parametrize('expr', [
+    "_['a']",
+    "_.a",
+    "_['a':'b']",
+    """_["'a'":'b']""",
+    ])
+def test_explain_other(_, expr):
+    sym = eval(expr, {'_': _})
+    assert explain(sym) == expr
+
+@pytest.mark.parametrize('expr', [
+    '_[slice(1,2)]',           # siu can't know concrete slice syntax
+    '_["a"]',                  # siu can't know concrete quote syntax
+    ])
+def test_explain_failures(_, expr):
+    sym = eval(expr, {'_': _})
+    assert explain(sym) != expr
+
+
+# Node copying ================================================================
+
+from siuba.siu import Call, BinaryOp, SliceOp, MetaArg, FuncArg, DictCall
+# Call
+@pytest.mark.parametrize('node', [
+    Call("__call__", lambda x, y = 2: x + y, 1, y = 2),
+    BinaryOp("__add__", 1, 2),
+    SliceOp("__siu_slice__", 0, 1),
+    MetaArg("_"),
+    FuncArg("__custom_func__", lambda x: x),
+    FuncArg(lambda x: x),
+    DictCall("__call__", dict, {'a': 1, 'b': 2})
+    ])
+def test_node_copy(node):
+    copy = node.copy()
+    assert isinstance(copy, node.__class__)
+    assert copy is not node
+    assert copy.func == node.func
+    assert copy.args == node.args
+    assert copy.kwargs == node.kwargs
+
+def test_dict_call_child_copy():
+    bin_op = BinaryOp('__add__', 1, 2)
+    call = DictCall("__call__", dict, {'a': bin_op, 'b': 2})
+    copy = call.copy()
+
+    assert isinstance(call.args[1]['a'], BinaryOp)
+    assert bin_op is not copy.args[1]['a']
+
 
 # Symbolic dispatch ===========================================================
+
 from siuba.siu import symbolic_dispatch, Call, FuncArg
 
 def test_FuncArg():

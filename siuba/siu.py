@@ -28,7 +28,8 @@ BINARY_LEVELS = {
         "__ge__": 5,
         "__le__": "5",
 
-        "__getattr__": 0
+        "__getattr__": 0,
+        "__getitem__": 0,
         }
 
 BINARY_OPS = {
@@ -52,7 +53,8 @@ BINARY_OPS = {
         "__ne__": "!=",
         "__ge__": ">=",
         "__le__": "<=",
-        "__getattr__": "."
+        "__getattr__": ".",
+        "__getitem__": "[",
         }
 
 UNARY_OPS = {
@@ -63,11 +65,7 @@ UNARY_OPS = {
         }
 
 # TODO: can it just be put in binary ops? Special handling in Symbolic class?
-MISC_OPS = {
-        "__getitem__": "["
-        }
-
-ALL_OPS = {**BINARY_OPS, **UNARY_OPS, **MISC_OPS}
+ALL_OPS = {**BINARY_OPS, **UNARY_OPS}
 
 #for k, v in BINARY_OPS.copy().items():
 #    BINARY_OPS[k.replace("__", "__r", 1)] = v
@@ -78,7 +76,9 @@ for k, v in BINARY_LEVELS.copy().items():
 class Formatter:
     def __init__(self): pass
 
-    def format(self, call):
+    def format(self, call, pad = 0):
+        """Return a Symbolic or Call back as a nice tree, with boxes for nodes."""
+
         fmt_block = "█─"
         fmt_pipe = "├─"
         
@@ -92,34 +92,43 @@ class Formatter:
         if isinstance(call, Call):
             call_str = fmt_block + ALL_OPS.get(call.func, repr(call.func))
 
-            args_str = (self.format(arg) for arg in call.args)
+            args_str = [self.format(arg) for arg in call.args]
 
-            # TODO: kwargs handling looks funny.. (e.g. _.a(b = _.c))
-            kwargs_str = (k + " = " + self.format(v) for k,v in call.kwargs.items())
+            # format keyword args, making sure "└─<key> = █─" aligns box's children
+            kwargs_str = []
+            for k, v in call.kwargs.items():
+                kwargs_str.append(
+                        k + " = " + self.format(v, pad = len(k) + 3)
+                        )
 
             all_args = [*args_str, *kwargs_str]
-            if len(all_args):
-                fmt_args = [*map(self.fmt_pipe, all_args[:-1]), self.fmt_pipe(all_args[-1], final = True)]
-            else:
-                fmt_args = []
-            return "".join([call_str, *fmt_args])
+            padded = []
+            for ii, entry in enumerate(all_args):
+                chunk = self.fmt_pipe(
+                        entry,
+                        final = ii == len(all_args) - 1,
+                        pad = pad
+                        )
+                padded.append(chunk)
 
-        call_str = repr(call)
-        indx = call_str.find("\n")
+            return "".join([call_str, *padded])
 
-        if indx != -1:
-            return call_str
-        else:
-            return call_str
+        return repr(call)
+
 
     @staticmethod
-    def fmt_pipe(x, final = False):
+    def fmt_pipe(x, final = False, pad = 0):
         if not final:
-            connector = "\n│ " if not final else "\n  "
-            prefix = "\n├─"
+            connector = "│ " if not final else "  "
+            prefix = "├─"
         else:
-            connector = "\n  "
-            prefix = "\n└─"
+            connector = "  "
+            prefix = "└─"
+
+        connector = "\n" + " "*pad + connector
+        prefix = "\n" + " "*pad + prefix
+        # NOTE: because visiting is depth first, this is essentially prepending
+        # the text to the left.
         return prefix + connector.join(x.splitlines())
 
 
@@ -192,7 +201,7 @@ class Call:
         return arg
 
     def copy(self):
-        args, kwargs = self.map_subcalls(self.copy)
+        args, kwargs = self.map_subcalls(lambda child: child.copy())
         return self.__class__(self.func, *args, **kwargs)
 
     def map_subcalls(self, f):
@@ -288,17 +297,31 @@ class BinaryOp(Call):
         args = self.args
         arg0 = "({args[0]})" if self.needs_paren(args[0]) else "{args[0]}"
         arg1 = "({args[1]})" if self.needs_paren(args[1]) else "{args[1]}"
-        fmt = arg0 + "{spaces}{func}{spaces}" + arg1
+
+        # handle binary ops that are not infix operators
+        if self.func == "__getitem__":
+            suffix = "]"
+        else:
+            suffix = ""
+
+        # final, formatting
+        fmt = arg0 + "{spaces}{func}{spaces}" + arg1 + suffix
 
 
         func = BINARY_OPS[self.func]
-        return fmt.format(func = func, args = self.args, kwargs = self.kwargs, spaces = spaces)
+        if self.func == "__getattr__":
+            # use bare string. eg _.a
+            fmt_args = [repr(args[0]), args[1]]
+        else:
+            fmt_args = list(map(repr, args))
+
+        return fmt.format(func = func, args = fmt_args, spaces = spaces)
 
     def needs_paren(self, x):
         if isinstance(x, BinaryOp):
             sub_lvl = BINARY_LEVELS[x.func]
             level = BINARY_LEVELS[self.func]
-            if sub_lvl != 0 and sub_lvl != level:
+            if sub_lvl != 0 and sub_lvl > level:
                 return True
 
         return False
@@ -324,6 +347,24 @@ class DictCall(Call):
 
     def __call__(self, x):
         return self.args[1]
+
+class SliceOp(Call):
+    def __init__(self, func, *args, **kwargs):
+        self.func = "__siu_slice__"
+        self.args = args
+
+        if kwargs:
+            raise ValueError("a slice cannot accept keyword arguments")
+
+        self.kwargs = {}
+
+    def __repr__(self):
+        return ":".join(repr(x) for x in self.args if x is not None)
+
+    def __call__(self, x):
+        args = [self.evaluate_calls(arg, x) for arg in self.args]
+        
+        return slice(*args)
 
 # Special kinds of call arguments ----
 # These functions insure that when using siu expressions generated by _,
@@ -627,11 +668,11 @@ class Symbolic(object):
 
         return create_sym_call(self.__source, *args, **kwargs)
 
-    def __getitem__(self, *args):
-        return Symbolic(Call(
+    def __getitem__(self, x):
+        return Symbolic(BinaryOp(
                 "__getitem__",
                 self.__source,
-                *map(slice_to_call, args)
+                slice_to_call(x),
                 ),
                 ready_to_call = True)
 
@@ -676,7 +717,7 @@ def create_sym_call(source, *args, **kwargs):
 def slice_to_call(x):
     if isinstance(x, slice):
         args = map(strip_symbolic, (x.start, x.stop, x.step))
-        return Call("__call__", slice, *args)
+        return SliceOp("__siu_slice__", *args)
     
     return strip_symbolic(x)
 
@@ -759,7 +800,7 @@ def create_unary_op(op_name):
     return _unary_op
 
 for k, v in BINARY_OPS.items():
-    if k in {"__getattr__"}: continue
+    if k in {"__getattr__", "__getitem__"}: continue
     rop = k.replace("__", "__r", 1)
     setattr(Symbolic, k, create_binary_op(k))
     setattr(Symbolic, rop, create_binary_op(k, left_assoc = False))
