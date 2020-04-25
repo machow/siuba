@@ -24,7 +24,20 @@ jobs:
       - pip install -r requirements-test.txt
       - pip install ./
       - pip install psycopg2~=2.8.4
-      
+
+  # deploy on github release
+  - stage: deploy
+    before_deploy:
+      - python3 -c 'import os, siuba; assert(os.environ["TRAVIS_TAG"] == "v" + siuba.__version__)'
+    deploy:
+      provider: pypi
+      user: __token__
+      password:
+        secure: "OGtU1RgAksy0oGmI94bgZ3e7Fkxlxjs94hBm667cAj9MIs5z1qGd32D5Se+HYsWW4Z3OYx170hSgk/AzG8MrXK41rvFoeNEd5NnZ0vY7FaLpsRErWoG/JauBiEt/Q4ize9X+2RSTgWyrKLgTccRKIKwOsO5Qyr6XJorEvJY4fdS19YZGu8sHyphFNCXeDHxZnE5EVJ71/36uv61IGh/KbMm46vZu1Adnh6UJTOkzDAkK2y1aO1Bm2kETM5EmTIVa++m63qPzU3pbcIpBC8ivz/hDIujF4wyCBpEl3M80at/GDuQjPgLkCsNC7lU5q3+f6KucND6tVBQiCVf07lpEAkGFltZrAo86i8fL9OzkFQrQY4MzCuk8ImZT+5fBoG/D7QXdyFeroAmuRSqX7/vKm3ceGFXMsP8dR2fTXWmAAEhpj3zG3/Hsck97/90PvQTd+fvMnpHqdrvRTFC6Dau1FKntRtW0qkjg+mFqGlMdy1PYCRLc7pXE3kAHwzJKEDOZnLYJC2TYniz5KUPfPtKrQhfu/55XOCC1C20v3ouJD9MeaHwla5pbEWVescXJa2nSOX6ANJYRTPiXJgnEgaBTlOFWwDNBqU1io5jgF63ai8nueacz1lXWc91VfbdZx1gLTgtHUF2/nVRA+zq+MDFAYrxG5CK45gB03hZ/3sNCxKc="
+      distributions: sdist bdist_wheel
+      on:
+        tags: true
+
 # command to run tests
 install:
   - pip install -r requirements.txt
@@ -36,17 +49,4 @@ env:
     - SB_TEST_PGPORT=5432
 script:
   - make test-travis
-
-# deploy on github release
-before_deploy:
-  - python3 -c 'import os, siuba; assert(os.environ["TRAVIS_TAG"] == "v" + siuba.__version__)'
-deploy:
-  provider: pypi
-  user: __token__
-  password:
-    secure: "OGtU1RgAksy0oGmI94bgZ3e7Fkxlxjs94hBm667cAj9MIs5z1qGd32D5Se+HYsWW4Z3OYx170hSgk/AzG8MrXK41rvFoeNEd5NnZ0vY7FaLpsRErWoG/JauBiEt/Q4ize9X+2RSTgWyrKLgTccRKIKwOsO5Qyr6XJorEvJY4fdS19YZGu8sHyphFNCXeDHxZnE5EVJ71/36uv61IGh/KbMm46vZu1Adnh6UJTOkzDAkK2y1aO1Bm2kETM5EmTIVa++m63qPzU3pbcIpBC8ivz/hDIujF4wyCBpEl3M80at/GDuQjPgLkCsNC7lU5q3+f6KucND6tVBQiCVf07lpEAkGFltZrAo86i8fL9OzkFQrQY4MzCuk8ImZT+5fBoG/D7QXdyFeroAmuRSqX7/vKm3ceGFXMsP8dR2fTXWmAAEhpj3zG3/Hsck97/90PvQTd+fvMnpHqdrvRTFC6Dau1FKntRtW0qkjg+mFqGlMdy1PYCRLc7pXE3kAHwzJKEDOZnLYJC2TYniz5KUPfPtKrQhfu/55XOCC1C20v3ouJD9MeaHwla5pbEWVescXJa2nSOX6ANJYRTPiXJgnEgaBTlOFWwDNBqU1io5jgF63ai8nueacz1lXWc91VfbdZx1gLTgtHUF2/nVRA+zq+MDFAYrxG5CK45gB03hZ/3sNCxKc="
-  distributions: sdist bdist_wheel
-  on:
-    tags: true
-
 
