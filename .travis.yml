@@ -1,11 +1,9 @@
 language: python
 python:
-#  - "3.5"
-#  - "3.5-dev"  # 3.5 development branch
-#  - "3.6"
   - "3.6"  # 3.6 development branch
   - "3.7"  # 3.7 development branch
   - "3.8"
+
 # command to install dependencies
 jobs:
   include:
@@ -38,3 +36,15 @@ env:
     - SB_TEST_PGPORT=5432
 script:
   - make test-travis
+
+# deploy on github release
+before_deploy:
+  - python3 -c 'import os, siuba; assert(os.environ["TRAVIS_TAG"] == "v" + siuba.__version__)'
+deploy:
+  provider: pypi
+  user: __token__
+  password:
+    secure: jEtm6ClFGtCTraiB++JyY1O11bn1GQvV02YLToEj7gdIZeKwqFPR6WChQaJ6Es47i00Q2vtw1ot4Jq4rF5d652pBqUAbZByvK5Tct9871BP3iwR6iZc0GbYQXtvoC+7q55FQzQXKCsJG7ZWWOJYXpFCuw28URl5LQ6rWlR5p1AzFfCOWV6OsqgQMkmx0ECnoqcKNDLkQphLd2AR/IXutlVXh+5iRJVfNVMmyBiyKHU9BBjWhmxIcSxH1sXblrNjfn5cyaSj2YOute6i8ivx5H3EnREpVWmTUZAS3tfinhbfrrHulBmaLqhYvD6mSb/fsQi21paBTsOvoeVd30mbUDSLCUnd/tPLHRNA2daZ86XnXpcjF8lnaP71kh2LZWVNziPqfHUXA4ir+O/g6l6L/deEsJVsqMXIQXLeW9GYfgR+Ut8wBvtZ/grynt33ut+WJu1Qsa9afTNACHU9q3PZdI0KKz/nhdYMXeIugTXtqWFTcdO5KD2MKcbZF0T58e4MyOJqKEsMTDOhSWoNI67Avb8cdvbbdk61wYkn2+1K1uf8EDLvlSXNhJotILgjdZ/KGUcF/FIVIyZ2JJwdtcmZCmpW4Y+BARrvH7JSbOSHfsVODN/px6686FA0VNxWWinDSC9vvr58JC6zZNTbnSi9T78vuVTDddGF5y8jemUsB15E=
+  distributions: sdist bdist_wheel
+
+
