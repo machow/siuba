@@ -210,6 +210,10 @@ class Call:
 
         return new_args, new_kwargs
 
+    def map_replace(self, f):
+        args, kwargs = self.map_subcalls(f)
+        return self.__class__(self.func, *args, **kwargs)
+
     def iter_subcalls(self, f):
         yield from iter(arg for arg in self.args if instance(arg, Call))
         yield from iter(v for k,v in self.kwargs.items() if isinstance(v, Call))
