@@ -17,10 +17,10 @@ import pandas as pd
 pd.set_option("display.max_rows", 20)
 ```
 
-## Gather
+## Spread
 
 ```{python}
-from siuba import _, gather, spread
+from siuba import _, spread, gather
 from siuba.data import mtcars
 ```
 
@@ -36,22 +36,20 @@ costs
 ```
 
 ```{python}
-# selecting each variable manually
-costs >> gather('measure', 'value', _.price_x, _.price_y, _.price_z)
+long = costs >> gather('measure', 'value', _.price_x, _.price_y, _.price_z)
 
-# selecting variables using a slice
-costs >> gather('measure', 'value', _["price_x":"price_z"])
-
-# selecting by excluding id
-costs >> gather('measure', 'value', -_.id)
+long
 ```
 
-### Spread is the inverse of gather
+```{python}
+spread(long, "measure", "value")
+```
 
 ```{python}
+one_missing = long[:-1]
+spread(one_missing, "measure", "value")
+```
 
-(costs
-    >> gather('measure', 'value', -_.id)
-    >> spread('measure', 'value')
-)
+```{python}
+spread(one_missing, "measure", "value", fill = 99)
 ```
