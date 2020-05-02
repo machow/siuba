@@ -12,9 +12,12 @@ jupyter:
     name: python3
 ---
 
-```{python nbsphinx=hidden}
+```{python nbsphinx="hidden"}
 import pandas as pd
 pd.set_option("display.max_rows", 5)
+import matplotlib
+
+# %matplotlib inline
 ```
 
 <!-- #region -->
@@ -120,7 +123,7 @@ from siuba import mutate
 
 Note that there is a key difference: mutate returned a pandas DataFrame with the new column (demeaned) at the end. This is a core feature of siuba verbs--tables in and tables out.
 
-Below are examples of keeping certain rows with filter, and calculating a single number per group with summarize.
+Below are examples of keeping certain rows with **filter**, and calculating a single number per group with **summarize**.
 
 ```{python}
 from siuba import filter, summarize

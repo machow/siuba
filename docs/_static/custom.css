@@ -18,6 +18,14 @@ div.sphinxsidebar a.active {
   background-color: #aee691;
 }
 
+div.sphinxsidebar ul ul ul {
+  list-style: none !important;
+}
+
+li.toctree-l2 {
+  margin-top: .25em;
+}
+
 li.toctree-l2 a {
   border: none;
 }
@@ -30,7 +38,7 @@ div.body {
   padding-left: 45px !important;
 }
 
-table.align-default {
+table.align-default, .table-container table {
   margin-left: 0 !important;
   box-shadow: none !important;
   border 1px solid #dfe2e5 !important;
