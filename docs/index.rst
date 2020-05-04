@@ -7,7 +7,6 @@
     guide_analysis.ipynb
     guide_programming.ipynb
     examples.ipynb
-    backends.ipynb
     developer/index.rst
 
 .. toctree::

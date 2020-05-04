@@ -51,13 +51,12 @@ table.table-align-left {
   
 }
 
-table th {
+table.align-default th, table.align-eft th {
   border: 1px solid #dfe2e5 !important;
   padding: 6px 13px !important;
 }
 
-table td {
+table.align-default td, table.align-left td {
   padding: 6px 13px !important;
   border: 1px solid #dfe2e5 !important;
 }
-
