@@ -2,12 +2,12 @@
     :maxdepth: 3
     :hidden:
 
-    intro.Rmd
-    key_features.ipynb
-    guide_analysis.ipynb
-    guide_programming.ipynb
-    examples.ipynb
-    developer/index.rst
+    intro
+    key_features
+    guide_analysis
+    guide_programming
+    examples
+    developer/index
 
 .. toctree::
     :hidden:
