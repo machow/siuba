@@ -10,7 +10,7 @@ extensions = [
     'sphinx.ext.napoleon',
     #'sphinx.ext.mathjax',
     'sphinx.ext.autosectionlabel',
-    'sphinx_togglebutton',
+    #'sphinx_togglebutton',
 ]
 
 # Exclude build directory and Jupyter backup files:

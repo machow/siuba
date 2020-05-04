@@ -67,12 +67,10 @@ User API
    ===========================================  =======================================================
     :ref:`Distinct`                              |distinct|
     :ref:`Count`                                 |count|
-    :ref:`Tally`                                 |tally|
    ===========================================  =======================================================
 
-.. |distinct| replace:: TODO
-.. |count| replace:: TODO
-.. |tally| replace:: TODO
+.. |distinct| replace:: Keep only rows with unique values.
+.. |count| replace:: Group by columns and count the number of observations.
 
 .. rubric:: Two-table verbs
 
@@ -83,7 +81,7 @@ User API
     :ref:`Joins`                                 |joins|
    ===========================================  =======================================================
 
-.. |joins| replace:: TODO
+.. |joins| replace:: Merge two tables using specific columns.
 
 
 .. rubric:: Tidy verbs
@@ -93,9 +91,9 @@ User API
 
    ===========================================  =======================================================
     :ref:`Nest`                                  |nest|
-    :ref:`Gather`                                |gather|
+    :ref:`Gather`, :ref:`Spread`                 |gather|
    ===========================================  =======================================================
 
-.. |nest| replace:: TODO
-.. |gather| replace:: TODO
+.. |nest| replace:: Create a column where each row is a DataFrame.
+.. |gather| replace:: Reshape data between long and wide formats.
 
