@@ -23,6 +23,7 @@ pd.set_option("display.max_rows", 5)
 
 # Data Analysis guide
 
+**Note: this document is a work in progress. For sections that aren't completed, I have included links to useful documentation and examples.**
 
 See also these resources:
 
@@ -40,13 +41,16 @@ from siuba.data import cars
 cars
 ```
 
-<!-- #region toc-hr-collapsed=false -->
 ## Split-apply-combine
-<!-- #endregion -->
 
-* Split with group_by()
-* Apply with `_`
-* Combine with verbs
+> 🚧 Coming soon. In the meantime, check out these docs with many examples in the User API.
+
+* [filter](api_table_core/01_filter)
+* [arrange](api_table_core/02_arrange)
+* [select](api_table_core/03_select)
+* [mutate](api_table_core/05_mutate)
+* [summarize](api_table_core/07_summarize)
+* [group_by](api_table_core/08_group_by)
 
 
 ## Dates and times
