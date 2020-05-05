@@ -53,7 +53,7 @@ As with most subsetting in pandas, when a condition evalutes to an `NA` value, t
 
 ```{python}
 df = pd.DataFrame({
-    "x": [True, False, pd.np.nan],
+    "x": [True, False, None],
     })
 
 df
