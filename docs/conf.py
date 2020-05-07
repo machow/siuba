@@ -11,6 +11,7 @@ extensions = [
     #'sphinx.ext.mathjax',
     'sphinx.ext.autosectionlabel',
     #'sphinx_togglebutton',
+    'sphinx_gallery.load_style',
 ]
 
 # Exclude build directory and Jupyter backup files:
