@@ -1,0 +1,92 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.4.1
+  kernelspec:
+    display_name: Python 3
+    language: python
+    name: python3
+---
+
+```{python nbsphinx=hidden}
+import pandas as pd
+pd.set_option("display.max_rows", 5)
+```
+
+# Basic Example
+
+```{python}
+import pandas as pd
+
+from siuba import _, mutate, filter, group_by, count
+from plotnine import *
+
+# NOTE: normally you can use the argument to convert a column to a date,
+#       but it doesn't work here. (dateutils.parser does work, though..?)
+villagers_raw = pd.read_csv(
+    'https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-05-05/villagers.csv'
+)
+```
+
+Note that birthdays is not a datetime
+
+```{python}
+villagers_raw.info()
+```
+
+```{python}
+villagers = (
+    villagers_raw
+    >> mutate(
+        full_birthday= lambda _: ("2019-" + _.birthday).astype("datetime64[D]")
+    )
+)
+```
+
+```{python}
+villagers >> count(_.species, sort = True)
+```
+
+```{python}
+(villagers
+  >> count(_.species, sort = True)
+  >> ggplot(aes("species", "n")) + geom_col()
+)
+```
+
+```{python}
+from siuba.dply.forcats import fct_reorder
+
+(
+    villagers
+    >> count(_.species, sort=True)
+    >> mutate(species=fct_reorder(_.species, _.n))
+    >> ggplot(aes("species", "n"))
+    + geom_col()
+    + theme(axis_text_x=element_text(angle=45, hjust=1))
+)
+```
+
+```{python}
+villagers
+```
+
+```{python tags=c("nbsphinx-thumbnail")}
+import numpy as np
+
+p = (
+    villagers
+    >> count(_.species, _.personality, sort=True)
+    >> mutate(species=fct_reorder(_.species, _.n, np.sum))
+    >> ggplot(aes("species", "n", fill="personality"))
+    + geom_col()
+    + theme(axis_text_x=element_text(angle=45, hjust=1))
+)
+
+# special trick to not print out <ggplot ...>
+p.draw();
+```
