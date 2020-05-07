@@ -1,3 +1,12 @@
+/* nbsphinx specific */
+
+.nbinput .prompt, .nboutput .prompt {
+    display: none;
+}
+
+
+/* general site styles */
+
 body {
   font-size: 16px !important;
 }
@@ -14,7 +23,7 @@ div.sphinxsidebar {
 
 }
 
-div.sphinxsidebar.searchbox {
+div.sphinxsidebar .search {
   width: 200px;
 }
 
