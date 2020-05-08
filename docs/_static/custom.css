@@ -1,3 +1,9 @@
+@media screen and (max-width: 875px) {
+  div.sphinxsidebar {
+    order: 2;
+  }
+}
+
 body {
   font-size: 16px !important;
 }
@@ -6,6 +12,12 @@ div.document {
   max-width: 1010px;
   width: auto !important;
   min-width: 940px;
+  display: flex;
+  flex-direction: column;
+}
+
+div.documentwrapper {
+  padding-bottom: 50px
 }
 
 div.sphinxsidebar {
