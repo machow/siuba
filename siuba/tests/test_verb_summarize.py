@@ -99,10 +99,25 @@ def test_summarize_unnamed_args(df):
             )
 
 
-@pytest.mark.skip("TODO: Summarize should fail when result len > 1 (#138)")
+def test_summarize_validates_length():
+    with pytest.raises(ValueError):
+        summarize(data_frame(x = [1,2]), res = _.x + 1)
+
+
 def test_frame_mode_returns_many():
+    # related to length validation above
     with pytest.raises(ValueError):
         df = data_frame(x = [1, 2, 3])
         res = summarize(df, result = _.x.mode())
 
 
+def test_summarize_removes_series_index():
+    # Note: currently wouldn't work in postgresql, since _.x + _.y not an agg func
+    df = data_frame(g = ['a', 'b', 'c'], x = [1,2,3], y = [4,5,6])
+
+    assert_equal_query(
+            df,
+            group_by(_.g) >> summarize(res = _.x + _.y),
+            df.assign(res = df.x + df.y).drop(columns = ["x", "y"])
+            )
+            

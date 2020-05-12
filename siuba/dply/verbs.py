@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 
 from pandas.core.groupby import DataFrameGroupBy
+from pandas.core.dtypes.inference import is_scalar
 from siuba.siu import Symbolic, Call, strip_symbolic, MetaArg, BinaryOp, create_sym_call, Lazy
 
 DPLY_FUNCTIONS = (
@@ -391,10 +392,15 @@ def summarize(__data, **kwargs):
     for k, v in kwargs.items():
         res = v(__data) if callable(v) else v
 
-        # TODO: validation?
+        # validate operations returned single result
+        if not is_scalar(res) and len(res) > 1:
+            raise ValueError("Summarize argument, %s, must return result of length 1 or a scalar." % k)
 
-        results[k] = res
+        # keep result, but use underlying array to avoid crazy index issues
+        # on DataFrame construction (#138)
+        results[k] = res.array if isinstance(res, pd.Series) else res
         
+    # must pass index, or raises error when using all scalar values
     return DataFrame(results, index = [0])
 
     
