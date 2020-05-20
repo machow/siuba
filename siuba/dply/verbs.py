@@ -37,6 +37,17 @@ __all__ = [*DPLY_FUNCTIONS, "Pipeable", "pipe"]
 # * separate_rows
 # * tally
 
+def install_siu_methods(cls):
+    """This function attaches siuba's table verbs on a class, to use as methods.
+
+    """
+    func_dict = globals()
+    for func_name in DPLY_FUNCTIONS:
+        f = func_dict[func_name]
+
+        method_name = "siu_{}".format(func_name)
+        setattr(cls, method_name, f)
+
 def install_pd_siu():
     # https://github.com/coursera/pandas-ply/blob/master/pandas_ply/methods.py
     func_dict = globals()
