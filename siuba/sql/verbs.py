@@ -589,32 +589,28 @@ def _create_order_by_clause(columns, *args):
 @count.register(LazyTbl)
 def _count(__data, *args, sort = False, wt = None, **kwargs):
     # TODO: if already col named n, use name nn, etc.. get logic from tidy.py
-    if kwargs:
-        raise NotImplementedError("TODO")
-
     if wt is not None:
         raise NotImplementedError("TODO")
 
+    res_name = "n"
     # similar to filter verb, we need two select statements,
     # an inner one for derived cols, and outer to group by them
-    sel = __data.last_op.alias()
-    sel_inner = sql.select([sel], from_obj = sel)
 
     # inner select ----
     # holds any mutation style columns
-    group_cols = []
+    arg_names = []
     for arg in args:
-        col_name = simple_varname(arg)
-        if col_name is None:
-            # evaluate call
-            col_expr = arg(sel.columns) if callable(arg) else arg
+        name = simple_varname(arg)
+        if name is None:
+            raise NotImplementedError(
+                    "Count positional arguments must be single column name. "
+                    "Use a named argument to count using complex expressions."
+                    )
+        arg_names.append(name)
 
-            # compile, so we can use the expr as its name (e.g. "id + 1")
-            col_name = str(compile_el(__data, col_expr))
-            label = col_expr.label(col_name)
-            sel_inner.append_column(label)
-
-        group_cols.append(col_name)
+    tbl_inner = mutate(__data, **kwargs)
+    sel_inner = tbl_inner.last_op
+    group_cols = arg_names + list(kwargs)
 
     # outer select ----
     # holds selected columns and tally (n)
@@ -623,7 +619,7 @@ def _count(__data, *args, sort = False, wt = None, **kwargs):
     sel_outer = sql.select(from_obj = sel_inner_cte)
 
     # apply any group vars from a group_by verb call first
-    prev_group_cols = [inner_cols[k] for k in __data.group_by]
+    prev_group_cols = [inner_cols[k] for k in tbl_inner.group_by]
     if prev_group_cols:
         sel_outer.append_group_by(*prev_group_cols)
         sel_outer.append_column(*prev_group_cols)
@@ -633,10 +629,14 @@ def _count(__data, *args, sort = False, wt = None, **kwargs):
         sel_outer.append_group_by(inner_cols[k])
         sel_outer.append_column(inner_cols[k])
 
-    sel_outer.append_column(sql.functions.count().label("n"))
+    count_col = sql.functions.count().label(res_name)
+    sel_outer.append_column(count_col)
 
-    return __data.append_op(sel_outer)
-    
+    # count is like summarize, so removes order_by
+    return tbl_inner.append_op(
+            sel_outer.order_by(count_col.desc()),
+            order_by = tuple()
+            )
 
 
 @summarize.register(LazyTbl)
