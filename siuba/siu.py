@@ -1,4 +1,5 @@
 import itertools
+import operator
 
 # TODO: symbolic formatting: __add__ -> "+"
 
@@ -190,9 +191,12 @@ class Call:
         # TODO: temporary workaround, for when only __get_attribute__ is defined
         if self.func == "__getattr__":
             return getattr(inst, *rest)
+        elif self.func == "__call__":
+            return getattr(inst, self.func)(*rest, **kwargs)
 
         # in normal case, get method to call, and then call it
-        return getattr(inst, self.func)(*rest, **kwargs)
+        f_op = getattr(operator, self.func)
+        return f_op(inst, *rest, **kwargs)
 
     @staticmethod
     def evaluate_calls(arg, x):

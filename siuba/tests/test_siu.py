@@ -1,6 +1,24 @@
 from siuba.siu import strip_symbolic, FunctionLookupError, Symbolic, MetaArg
 import pytest
 
+BINARY_OPS = [
+    "+",
+    "-",
+    "*",
+    "@",
+    "//",
+    #truediv
+    #divmod
+    "/",
+    "%",
+    #"_ ** _", #TODO: uses different formatting
+    "<<",
+    ">>",
+    "&",
+    "^",
+    "|"
+    ]
+
 @pytest.fixture
 def _():
     return Symbolic()
@@ -63,23 +81,7 @@ def test_explain_unary(_, code):
 
     assert explain(sym) == code
 
-@pytest.mark.parametrize('op', [
-    "+",
-    "-",
-    "*",
-    "@",
-    "//",
-    #truediv
-    #divmod
-    "/",
-    "%",
-    #"_ ** _", #TODO: uses different formatting
-    "<<",
-    ">>",
-    "&",
-    "^",
-    "|"
-    ])
+@pytest.mark.parametrize('op', BINARY_OPS)
 def test_explain_binary(_, op):
     left = "_ {op} 1".format(op = op)
     sym = eval(left, {'_': _})
@@ -91,6 +93,17 @@ def test_explain_binary(_, op):
 
     assert explain(sym) == right
 
+@pytest.mark.parametrize('op', BINARY_OPS)
+def test_symbol_rhs_exec(_, op):
+    if op == "@":
+        pytest.skip("TODO: test with class where @ is implemented?")
+
+    right = "1 {op} _".format(op = op)
+
+    sym = eval(right, {'_': _})
+    dst = eval(right, {'_': 2})
+
+    assert sym(2) == dst
 
 @pytest.mark.parametrize('expr', [
     "_['a']",
