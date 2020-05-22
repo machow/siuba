@@ -1,6 +1,9 @@
 from siuba.dply.verbs import singledispatch2, gather
 import pandas as pd
 
+def pivot_longer_spec(data, spec, names_repair = "check_unique", values_drop_na = False):
+    pass
+
 @singledispatch2(pd.DataFrame)
 def pivot_longer(
         __data,
