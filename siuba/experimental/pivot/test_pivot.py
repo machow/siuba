@@ -145,3 +145,66 @@ def test_can_pivot_duplicate_names_to_value():
     assert pv1["a"] == [1, 2]
     assert_frame_equal(pv2, pv1)
     assert_frame_equal(pv3, pv1)
+
+
+@pytest.mark.xfail
+def test_value_can_be_any_pos_in_names_to():
+    samp = data_frame(
+        i = np.arange(1, 5),
+        y_t1 = np.random.standard_normal(4),
+        y_t2 = np.random.standard_normal(4),
+        z_t1 = [3] * 4,
+        z_t2 = [-2] * 4,
+    )
+
+    value_first = pivot_longer(samp, -_.i,
+                               names_to = ("_value", "time"), sep = "_")
+
+    samp2 = samp.rename(columns={"y_t1": "t1_y", "y_t2": "t2_y",
+                                 "z_t1": "t1_z", "z_t2": "t2_z"})
+    
+    value_second = pivot_longer(samp, -_.i,
+                                names_to = ("time", "_value"), names_sep = "_")
+    
+    assert_frame_equal(value_first, value_second)
+
+
+def test_type_error_message_uses_var_names():
+    # Error handling is by default 'better' in python than R
+    # This test is tricky, as python doesn't care when stacking data of different types.
+    df = data_frame(abc = 1, xyz = "b")
+    try:
+        # This should by default pivot everything, as with tidyr
+        pivot_longer(df, _[:])
+    except:
+        # Ideally we'd print an error message here and compare if the keys are
+        # printed correctly, but `pivot_longer` doesn't brake in python as in R
+        # when stacking different data types. Not sure if we should 'make' it brake?
+        print(err)
+
+
+@pytest.mark.xfail
+def test_grouping_is_preserved():
+    # In siuba this actually tests 3 things:
+    # 1) Can we pipe a grouped DataFrame in to `pivot_longer`? - Not yet
+    # 2) Does it retain grouping? - Not yet
+    # 3) Can we get the names of grouping _columns_ ie variables? - Not yet?
+    df = data_frame(g = [1, 2], x1 = [1, 2], x2 = [3, 4])
+    # Breaks; `pivot_longer` needs singledispatch for grouped DataFrames
+    out = (
+        df
+        >> group_by(_.g)
+        >> pivot_longer(_["x1":"x2"], names_to = "x", values_to = "v")
+    )
+
+    # Breaks, as group_vars does not exist yet.
+    # For now, in pandas it is probably better to check if the DataFrame remains
+    # grouped, and if it matches the expected output
+    # assert group_vars(out) == "g"
+    expected = data_frame(
+        g = [1, 1, 2, 2],
+        x = ["x1", "x2", "x1", "x2"],
+        v = [1, 3, 2, 4],
+    )
+    # assert_frame_equal does not work with DataFrameGroupBy.
+    assert_frame_equal(out, expected.groupby("g"))
