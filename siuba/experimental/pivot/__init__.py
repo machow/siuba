@@ -31,7 +31,11 @@ def pivot_longer(
 
     keep_data = __data.loc[:,id_vars]
     if value_vars is None:
-        stacked = __data.stack(dropna=values_drop_na)
+        # While stack works in this case, it will later on merge in to the
+        # original dataframe. To copy tidyr behaviour, we need to raise a
+        # ValueError
+        # stacked = __data.stack(dropna=values_drop_na)
+        raise ValueError("Please provide at least 1 column or all columns (shorthand: _[:]).")
     else:
         stacked = __data.loc[:,value_vars].stack(dropna=values_drop_na)
     
