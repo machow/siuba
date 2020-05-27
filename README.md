@@ -88,7 +88,7 @@ Out[2]:
 └─4
 ```
 
-You can also think siu expressions as a shorthand for a lambda function.
+You can also think of siu expressions as a shorthand for a lambda function.
 
 ```python
 from siuba import _
@@ -114,7 +114,7 @@ Out[3]:
 
 See [siu expression section here](https://siuba.readthedocs.io/en/latest/intro.html#Concise-pandas-operations-with-siu-expressions-(_)).
 
-### Using with SQL
+### Using with a SQL database
 
 A killer feature of siuba is that the same analysis code can be run on a local DataFrame, or a SQL source.
 
