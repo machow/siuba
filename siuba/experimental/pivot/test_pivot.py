@@ -72,14 +72,17 @@ def test_can_drop_missing_values():
     assert pv["value"].tolist() == [1, 2]
 
 
-@pytest.mark.xfail
 def test_can_handle_missing_combinations():
-    df = data_frame(id = ["A", "B"], x_1 = [1, 3], x_2 = [2, 4], y_1 = ["a", "b"])
+    df = data_frame(id = ["A", "B"], x_1 = [1, 3], x_2 = [2, 4], y_2 = ["a", "b"])
     pv = pivot_longer(df, -_.id, names_to = ("_value", "n"), names_sep = "_")
+
+    pv_expected = pd.Series([np.nan, "a", np.nan, "b"],
+                            index = [0, 0, 1, 1],
+                            name = 'y')
 
     assert pv.columns.tolist() == ["id", "n", "x", "y"]
     assert pv["x"].tolist() == [1, 2, 3, 4]
-    assert pv["y"].tolist() == [np.nan, "a", np.nan, "b"]
+    pd.testing.assert_series_equal(pv["y"], pv_expected)
 
 
 @pytest.mark.xfail
@@ -134,20 +137,18 @@ def test_handles_duplicate_column_names():
     assert pv["value"].tolist() == [1, 2, 3, 4]
 
 
-@pytest.mark.xfail
 def test_can_pivot_duplicate_names_to_value():
     df = data_frame(x = 1, a_1 = 1, a_2 = 2, b_1 = 3, b_2 = 4)
     pv1 = pivot_longer(df, -_.x, names_to = ("_value", np.nan), names_sep = "_")
     pv2 = pivot_longer(df, -_.x, names_to = ("_value", np.nan), names_pattern = "(.)_(.)")
-    pv3 = pivot_longer(df, -_.x, names_to = "_value", names_pattern = "(.)_(.)")
+    pv3 = pivot_longer(df, -_.x, names_to = "_value", names_pattern = "(.)_.")
 
     assert pv1.columns.tolist() == ["x", "a", "b"]
-    assert pv1["a"] == [1, 2]
+    assert pv1["a"].tolist() == [1, 2]
     assert_frame_equal(pv2, pv1)
     assert_frame_equal(pv3, pv1)
 
 
-@pytest.mark.xfail
 def test_value_can_be_any_pos_in_names_to():
     samp = data_frame(
         i = np.arange(1, 5),
@@ -158,12 +159,12 @@ def test_value_can_be_any_pos_in_names_to():
     )
 
     value_first = pivot_longer(samp, -_.i,
-                               names_to = ("_value", "time"), sep = "_")
+                               names_to = ("_value", "time"), names_sep = "_")
 
     samp2 = samp.rename(columns={"y_t1": "t1_y", "y_t2": "t2_y",
                                  "z_t1": "t1_z", "z_t2": "t2_z"})
     
-    value_second = pivot_longer(samp, -_.i,
+    value_second = pivot_longer(samp2, -_.i,
                                 names_to = ("time", "_value"), names_sep = "_")
     
     assert_frame_equal(value_first, value_second)
