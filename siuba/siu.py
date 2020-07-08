@@ -721,7 +721,7 @@ class Symbolic(object):
         dfs = ipython.run_line_magic('who_ls', 'DataFrame')
 
         history = HistoryAccessor()
-        commands = [command for _, _, command in history.get_tail()]
+        commands = [command for _, _, command in history.get_tail(include_latest=True)]
 
         df = match_df_name(dfs, commands)
 
@@ -746,6 +746,8 @@ def match_df_name(dfs, commands):
             return assign_match[0]
 
         import_match = [df for df in dfs if "import " + df in command]
+        if import_match:
+            return import_match[0]
 
         in_expression = [df for df in dfs if df + "," in command or df + ")" in command]
         if in_expression:
