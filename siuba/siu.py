@@ -82,7 +82,7 @@ class Formatter:
 
         fmt_block = "█─"
         fmt_pipe = "├─"
-        
+
         # TODO: why are some nodes still symbolic?
         if isinstance(call, Symbolic):
             return self.format(strip_symbolic(call))
@@ -187,7 +187,7 @@ class Call:
     def __call__(self, x):
         inst, *rest = (self.evaluate_calls(arg, x) for arg in self.args)
         kwargs = {k: self.evaluate_calls(v, x) for k, v in self.kwargs.items()}
-        
+
         # TODO: temporary workaround, for when only __get_attribute__ is defined
         if self.func == "__getattr__":
             return getattr(inst, *rest)
@@ -224,7 +224,7 @@ class Call:
 
     def op_vars(self, attr_calls = True):
         """Return set of all variable names used in Call
-        
+
         Args:
             attr_calls: whether to include called attributes (e.g. 'a' from _.a())
         """
@@ -251,7 +251,7 @@ class Call:
                 varnames.update(arg.op_vars(attr_calls = attr_calls))
 
         return varnames
-    
+
     def _get_op_var(self):
         if self.func in ("__getattr__", "__getitem__") and isinstance(self.args[1], str):
             return self.args[1]
@@ -371,7 +371,7 @@ class SliceOp(Call):
 
     def __call__(self, x):
         args = [self.evaluate_calls(arg, x) for arg in self.args]
-        
+
         return slice(*args)
 
 # Special kinds of call arguments ----
@@ -436,7 +436,7 @@ class CallVisitor:
 
     def generic_visit(self, node):
         """Called if no explicit visitor function exists for a node."""
-        
+
         node.map_subcalls(self.visit)
 
     @classmethod
@@ -526,7 +526,7 @@ class CallTreeLocal(CallListener):
         self.result_cls = result_cls
 
     def create_local_call(self, name, prev_obj, cls, func_args = None, func_kwargs = None):
-        # need call attr name (arg[0].args[1]) 
+        # need call attr name (arg[0].args[1])
         # need call arg and kwargs
         func_args = tuple() if func_args is None else func_args
         func_kwargs = {} if func_kwargs is None else func_kwargs
@@ -573,7 +573,7 @@ class CallTreeLocal(CallListener):
 
     def enter___custom_func__(self, node):
         func = node(None)
-        
+
         # TODO: not robust at all, need class for singledispatch? unique attr flag?
         if (hasattr(func, 'registry')
             and hasattr(func, 'dispatch')
@@ -586,7 +586,7 @@ class CallTreeLocal(CallListener):
                 ):
                 # matches return annotation type (or not required)
                 return node.__class__(f_for_cls)
-            
+
             raise FunctionLookupError(
                     "External function {name} can dispatch on the class {dispatch_cls}, but "
                     "must also have result annotation of (sub)type {result_cls}"
@@ -606,13 +606,13 @@ class CallTreeLocal(CallListener):
         Overview:
              variables      _.x.method(1)         row_number(_.x, 1)
              ---------      -------------        --------------------
-            
-                            █─'__call__'         █─'__call__'                           
+
+                            █─'__call__'         █─'__call__'
              obj            ├─█─.                ├─<function row_number
-                            │ ├─█─.              ├─█─.                                  
-                            │ │ ├─_              │ ├─_                                  
-                            │ │ └─'x'            │ └─'x'                                
-                            │ └─'method'         │                                   
+                            │ ├─█─.              ├─█─.
+                            │ │ ├─_              │ ├─_
+                            │ │ └─'x'            │ └─'x'
+                            │ └─'method'         │
                             └─1                  └─1
         """
         obj, *rest = node.args
@@ -651,6 +651,8 @@ class CallTreeLocal(CallListener):
 # Symbolic
 # =============================================================================
 
+from pandas import DataFrame
+
 class Symbolic(object):
     def __init__(self, source = None, ready_to_call = False):
         self.__source = MetaArg("_") if source is None else source
@@ -668,7 +670,7 @@ class Symbolic(object):
                 self.__source,
                 strip_symbolic(x)
                 ))
-                
+
 
     def __call__(self, *args, **kwargs):
         if self.__ready_to_call:
@@ -684,11 +686,11 @@ class Symbolic(object):
                 ),
                 ready_to_call = True)
 
-    
+
     def __invert__(self):
         if isinstance(self.__source, Call) and self.__source.func == "__invert__":
             return self.__source.args[0]
-        else: 
+        else:
             return self.__op_invert()
 
 
@@ -707,9 +709,49 @@ class Symbolic(object):
 
 
     # representation ----
-        
+
     def __repr__(self):
         return Formatter().format(self.__source)
+
+    def __dir__(self):
+        from IPython import get_ipython
+        from IPython.core.history import HistoryAccessor
+
+        ipython = get_ipython()
+        dfs = ipython.run_line_magic('who_ls', 'DataFrame')
+
+        history = HistoryAccessor()
+        commands = [command for _, _, command in history.get_tail()]
+
+        df = match_df_name(dfs, commands)
+
+        return list(ipython.ev(df).columns)
+
+
+def match_df_name(dfs, commands):
+    if not dfs:
+        return []
+
+    for command in reversed(commands):
+        exact_match = [df for df in dfs if df in command]
+        if exact_match:
+            return exact_match[0]
+
+        method_match = [df for df in dfs if df + "." in command]
+        if method_match:
+            return method_match[0]
+
+        assign_match = [df for df in dfs if command.startswith(df + " = ")]
+        if assign_match:
+            return assign_match[0]
+
+        import_match = [df for df in dfs if "import " + df in command]
+
+        in_expression = [df for df in dfs if df + "," in command or df + ")" in command]
+        if in_expression:
+            return in_expression[0]
+
+    return dfs[0]
 
 
 def create_sym_call(source, *args, **kwargs):
@@ -726,14 +768,14 @@ def slice_to_call(x):
     if isinstance(x, slice):
         args = map(strip_symbolic, (x.start, x.stop, x.step))
         return SliceOp("__siu_slice__", *args)
-    
+
     return strip_symbolic(x)
 
 
 def str_to_getitem_call(x):
     return Call("__getitem__", MetaArg("_"), x)
 
-    
+
 def strip_symbolic(x):
     if isinstance(x, Symbolic):
         return x.__dict__["_Symbolic__source"]
@@ -786,7 +828,7 @@ def symbolic_dispatch(f = None, cls = object):
 
     return dispatch_func
 
-    
+
 # Do some gnarly method setting -----------------------------------------------
 
 def create_binary_op(op_name, left_assoc = True):
@@ -820,4 +862,3 @@ for k, v in UNARY_OPS.items():
 Lam = Lazy
 
 _ = Symbolic()
-
