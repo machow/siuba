@@ -651,7 +651,7 @@ class CallTreeLocal(CallListener):
 # Symbolic
 # =============================================================================
 
-from pandas import DataFrame
+from pandas import DataFrame, Series
 
 class Symbolic(object):
     def __init__(self, source = None, ready_to_call = False):
@@ -665,7 +665,7 @@ class Symbolic(object):
         # temporary hack working around ipython pretty.py printing
         #if x == "__class__": return Symbolic
 
-        return Symbolic(BinaryOp(
+        return SymbolicAttr(BinaryOp(
                 "__getattr__",
                 self.__source,
                 strip_symbolic(x)
@@ -727,6 +727,10 @@ class Symbolic(object):
 
         return list(ipython.ev(df).columns)
 
+
+class SymbolicAttr(Symbolic):
+    def __dir__(self):
+        return dir(Series)
 
 def match_df_name(dfs, commands):
     if not dfs:
