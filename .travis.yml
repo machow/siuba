@@ -7,22 +7,33 @@ python:
 # command to install dependencies
 jobs:
   include:
+  # historical requirements
   - name: "Minimum install_requires versions"
     install:
       - pip install -r requirements-test.txt
       - pip install . numpy~=1.12.0 pandas~=0.24.0 SQLAlchemy~=1.1.18 psycopg2~=2.7.0
+    env:
+      - PYTEST_FLAGS='--ignore=siuba/dply/forcats.py siuba'
   - name: "2019-late dependencies"
     install:
       - pip install -r requirements-test.txt
       - pip install . numpy==1.17.4 pandas==0.24.2 SQLAlchemy==1.2.19 psycopg2==2.8.4
+    env:
+      - PYTEST_FLAGS='--ignore=siuba/dply/forcats.py siuba'
   - name: "2020-early dependencies"
     install:
       - pip install -r requirements-test.txt
       - pip install . numpy==1.17.4 pandas~=0.25.3 SQLAlchemy~=1.3.11 psycopg2~=2.8.4
+    env:
+      - PYTEST_FLAGS='--ignore=siuba/dply/forcats.py siuba'
+
+  # current
   - name: "2020-mid dependencies"
     install:
       - pip install -r requirements-test.txt
       - pip install . numpy~=1.19.1 pandas~=1.1.0 SQLAlchemy~=1.3.18 psycopg2~=2.8.5
+
+  # bleeding edge
   - name: "Pure setup.py install"
     if: branch = latest
     install:
