@@ -16,16 +16,16 @@ def fct_reorder(fct, x, func = np.median, desc = False) -> pd.Categorical:
 
     Examples:
         >>> fct_reorder(['a', 'a', 'b'], [4, 3, 2])
-        [a, a, b]
-        Categories (2, object): [b, a]
+        ['a', 'a', 'b']
+        Categories (2, object): ['b', 'a']
 
         >>> fct_reorder(['a', 'a', 'b'], [4, 3, 2], desc = True)
-        [a, a, b]
-        Categories (2, object): [a, b]
+        ['a', 'a', 'b']
+        Categories (2, object): ['a', 'b']
 
         >>> fct_reorder(['x', 'x', 'y'], [4, 0, 2], np.max)
-        [x, x, y]
-        Categories (2, object): [y, x]
+        ['x', 'x', 'y']
+        Categories (2, object): ['y', 'x']
 
     """
 
@@ -52,8 +52,8 @@ def fct_recode(fct, recat=None, **kwargs) -> pd.Categorical:
     Examples:
         >>> cat = ['a', 'b', 'c']
         >>> fct_recode(cat, z = 'c')
-        [a, b, z]
-        Categories (3, object): [a, b, z]
+        ['a', 'b', 'z']
+        Categories (3, object): ['a', 'b', 'z']
 
         # >>> fct_recode(cat, x = 'a', x = 'b')
         # >>> fct_recode(cat, x = ['a', 'b'])
@@ -93,16 +93,16 @@ def fct_collapse(fct, recat, group_other = None) -> pd.Categorical:
 
     Examples:
         >>> fct_collapse(['a', 'b', 'c'], {'x': 'a'})
-        [x, b, c]
-        Categories (3, object): [x, b, c]
+        ['x', 'b', 'c']
+        Categories (3, object): ['x', 'b', 'c']
 
         >>> fct_collapse(['a', 'b', 'c'], {'x': 'a'}, group_other = 'others')
-        [x, others, others]
-        Categories (2, object): [x, others]
+        ['x', 'others', 'others']
+        Categories (2, object): ['x', 'others']
 
         >>> fct_collapse(['a', 'b', 'c'], {'ab': ['a', 'b']})
-        [ab, ab, c]
-        Categories (2, object): [ab, c]
+        ['ab', 'ab', 'c']
+        Categories (2, object): ['ab', 'c']
 
     """
     if not isinstance(fct, pd.Categorical):
@@ -157,13 +157,13 @@ def fct_lump(fct, n = None, prop = None, w = None, other_level = "Other", ties =
 
     Examples:
         >>> fct_lump(['a', 'a', 'b', 'c'], n = 1)
-        [a, a, Other, Other]
-        Categories (2, object): [a, Other]
+        ['a', 'a', 'Other', 'Other']
+        Categories (2, object): ['a', 'Other']
 
         # TODO: implement prop arg
         >>> fct_lump(['a', 'a', 'b', 'b', 'c', 'd'], prop = .2)
-        [a, a, b, b, Other, Other]
-        Categories (3, object): [a, b, Other]
+        ['a', 'a', 'b', 'b', 'Other', 'Other']
+        Categories (3, object): ['a', 'b', 'Other']
         
 
     """
