@@ -18,14 +18,13 @@ from siuba.dply.verbs import (
         if_else
         )
 from .translate import sa_get_over_clauses, CustomOverClause, SqlColumn, SqlColumnAgg
-from .utils import get_dialect_funcs, get_sql_classes
+from .utils import get_dialect_funcs, get_sql_classes, _FixedSqlDatabase
 
 from sqlalchemy import sql
 import sqlalchemy
 from siuba.siu import Call, CallTreeLocal, str_to_getitem_call, Lazy, FunctionLookupError
 # TODO: currently needed for select, but can we remove pandas?
 from pandas import Series
-import pandas as pd
 
 from sqlalchemy.sql import schema
 
@@ -396,13 +395,17 @@ def _collect(__data, as_df = True):
     # normally can just pass the sql objects to execute, but for some reason
     # psycopg2 completes about incomplete template.
     # see https://stackoverflow.com/a/47193568/1144523
-    query = __data.last_op
-    compiled = query.compile(
-        dialect = __data.source.dialect,
-        compile_kwargs = {"literal_binds": True}
-    )
+
+    #query = __data.last_op
+    #compiled = query.compile(
+    #    dialect = __data.source.dialect,
+    #    compile_kwargs = {"literal_binds": True}
+    #)
+
     if as_df:
-        return pd.read_sql(compiled, __data.source)
+        sql_db = _FixedSqlDatabase(__data.source)
+
+        return sql_db.read_sql(__data.last_op)
 
     return __data.source.execute(compiled).fetchall()
 
