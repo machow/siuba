@@ -94,6 +94,9 @@ class WindowReplacer(CallListener):
             # optionally put into CTE, and return its resulting column
             self.window_cte.append_column(label)
             win_col = self.window_cte.c.values()[-1]
+
+            # custom key, or parameters like "%(...)s" may nest and break psycopg2
+            win_col.key = 'win'
             return win_col
                 
         return col_expr
