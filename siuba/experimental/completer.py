@@ -1,6 +1,7 @@
 from IPython import get_ipython
 from IPython.core.history import HistoryAccessor
 
+
 def _match_df_name(dfs, commands):
     if not dfs:
         return []
@@ -33,13 +34,15 @@ def _match_df_name(dfs, commands):
     # return one of the dataframes
     return dfs[0]
 
+
 def _find_df_in_history(shell):
-    dfs = shell.run_line_magic('who_ls', 'DataFrame')
+    dfs = shell.run_line_magic("who_ls", "DataFrame")
 
     history = HistoryAccessor()
     commands = [command for _, _, command in history.get_tail(include_latest=True)]
 
     return _match_df_name(dfs, commands)
+
 
 class _ShellCompletion(object):
     def __init__(self, shell, target_df):
@@ -71,10 +74,8 @@ def symbolic_completer(shell, event):
     with _ShellCompletion(shell, df) as shell:
         _, _, _, jedi = shell.Completer.complete(event.symbol)
 
-    return [
-        event.symbol + completions.name_with_symbols for completions in jedi
-    ]
+    return [event.symbol + completions.name_with_symbols for completions in jedi]
 
 
 shell = get_ipython()
-shell.set_hook('complete_command', symbolic_completer, re_key = '.*_.*')
+shell.set_hook("complete_command", symbolic_completer, re_key=".*_.*")
