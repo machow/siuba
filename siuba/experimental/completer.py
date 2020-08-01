@@ -2,6 +2,29 @@ from IPython import get_ipython
 from IPython.core.history import HistoryAccessor
 
 
+class _ShellCompletion(object):
+    def __init__(self, shell, target_df):
+        self.old_ns = shell.user_ns
+
+        old_ns = shell.Completer.namespace
+        target_df = shell.user_ns[target_df]
+        shell.Completer.namespace = {**old_ns, "_": target_df}
+
+        self.old_custom_completers = shell.Completer.custom_completers
+        shell.Completer.custom_completers = None
+
+        self.shell = shell
+
+    def __enter__(self):
+        return self.shell
+
+    def __exit__(self):
+        shell = self.shell
+
+        shell.Completer.namespace = self.old_ns
+        shell.Completer.custom_completers = self.old_custom_completers
+
+
 def _match_df_name(dfs, commands):
     if not dfs:
         return []
@@ -42,29 +65,6 @@ def _find_df_in_history(shell):
     commands = [command for _, _, command in history.get_tail(include_latest=True)]
 
     return _match_df_name(dfs, commands)
-
-
-class _ShellCompletion(object):
-    def __init__(self, shell, target_df):
-        self.old_ns = shell.user_ns
-
-        old_ns = shell.Completer.namespace
-        target_df = shell.user_ns["mtcars"]
-        shell.Completer.namespace = {**old_ns, "_": target_df}
-
-        self.old_custom_completers = shell.Completer.custom_completers
-        shell.Completer.custom_completers = None
-
-        self.shell = shell
-
-    def __enter__(self):
-        return self.shell
-
-    def __exit__(self):
-        shell = self.shell
-
-        shell.Completer.namespace = self.old_ns
-        shell.Completer.custom_completers = self.old_custom_completers
 
 
 def symbolic_completer(shell, event):
