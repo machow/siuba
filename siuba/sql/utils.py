@@ -39,3 +39,11 @@ def mock_sqlalchemy_engine(dialect):
     dialect_cls = registry.load('postgresql')   
     return Engine(None, dialect_cls(), '')  
 
+
+# Temporary fix for pandas bug (https://github.com/pandas-dev/pandas/issues/35484)
+from pandas.io import sql as _pd_sql
+
+class _FixedSqlDatabase(_pd_sql.SQLDatabase):
+    def execute(self, *args, **kwargs):
+        return self.connectable.execute(*args, **kwargs)
+
