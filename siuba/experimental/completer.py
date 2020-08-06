@@ -135,4 +135,6 @@ def siuba_jedi_override(shell):
 
 
 shell = get_ipython()
-siuba_jedi_override(shell)
+
+if shell is not None:
+    siuba_jedi_override(shell)
