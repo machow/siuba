@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
+
 from siuba.siu import symbolic_dispatch
+from collections import defaultdict
 
 # fct_reorder -----------------------------------------------------------------
 
@@ -104,6 +106,10 @@ def fct_collapse(fct, recat, group_other = None) -> pd.Categorical:
         ['ab', 'ab', 'c']
         Categories (2, object): ['ab', 'c']
 
+        >>> fct_collapse(['a', 'b', None], {'a': ['b']})
+        ['a', 'a', NaN]
+        Categories (1, object): ['a']
+
     """
     if not isinstance(fct, pd.Categorical):
         fct = pd.Categorical(fct)
@@ -130,12 +136,18 @@ def fct_collapse(fct, recat, group_other = None) -> pd.Categorical:
     # map from old cat to new code ----
     # calculate new codes
     ordered_cats = {new: True for old, new in cat_to_new.items()}
-    new_cat_set = {k: ii for ii, k in enumerate(ordered_cats)}
-    # map old cats to new codes
-    remap_code = {old: new_cat_set[new] for old, new in cat_to_new.items()}
 
-    new_codes = fct.map(remap_code)
-    new_cats = list(new_cat_set.keys())
+    new_cat_set = {k: ii for ii, k in enumerate(ordered_cats)}
+
+    # make an array, where the index is old code + 1 (so missing val index is 0)
+    old_code_to_new = np.array(
+            [-1] + [new_cat_set[new_cat] for new_cat in cat_to_new.values()]
+    )
+
+    # map old cats to new codes
+    #remap_code = {old: new_cat_set[new] for old, new in cat_to_new.items()}
+    new_codes = old_code_to_new[fct.codes + 1]
+    new_cats = list(new_cat_set)
     return pd.Categorical.from_codes(new_codes, new_cats)
 
 
