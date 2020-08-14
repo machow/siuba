@@ -1099,6 +1099,8 @@ def anti_join(left, right = None, on = None):
     # copied from semi_join
     if isinstance(on, Mapping):
         left_on, right_on = zip(*on.items())
+    else: 
+        left_on = right_on = on
 
     # manually perform merge, up to getting pieces need for indexing
     merger = _MergeOperation(left, right, left_on = left_on, right_on = right_on)
