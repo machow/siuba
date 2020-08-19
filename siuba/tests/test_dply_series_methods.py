@@ -18,8 +18,8 @@ def get_action_kind(spec_entry):
 def filter_on_result(spec, types):
     return [k for k,v in spec.items() if v['action'].get('kind', v['action'].get('status')).title() in types]
 
-SPEC_IMPLEMENTED = filter_on_result(spec, {"Agg", "Elwise", "Window"})
-SPEC_NOTIMPLEMENTED = filter_on_result(spec, {"Singleton", "Wontdo", "Todo", "Maydo"})
+SPEC_IMPLEMENTED = filter_on_result(spec, {"Agg", "Elwise", "Window", "Singleton"})
+SPEC_NOTIMPLEMENTED = filter_on_result(spec, {"Wontdo", "Todo", "Maydo"})
 SPEC_AGG = filter_on_result(spec, {"Agg"})
 
 _ = Symbolic()

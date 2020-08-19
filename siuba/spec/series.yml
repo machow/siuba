@@ -806,7 +806,9 @@ dt.freq:
   action:
     kind: singleton
     status: supported
-  backends: {}
+  backends:
+    postgresql:
+      status: wontdo
   category: datetime_properties
   example: _.dt.freq
 dt.hour:
@@ -1050,7 +1052,9 @@ dt.tz:
   action:
     kind: singleton
     status: supported
-  backends: {}
+  backends:
+    postgresql:
+      status: wontdo
   category: datetime_properties
   example: _.dt.tz
 dt.tz_convert:
@@ -1107,8 +1111,11 @@ dt.year:
   example: _.dt.year
 dtype:
   action:
-    status: todo
-  backends: {}
+    kind: singleton
+    status: supported
+  backends:
+    postgresql:
+      status: wontdo
   category: attributes
   example: _.dtype
   priority: 1
