@@ -7,11 +7,17 @@ from siuba.experimental.pd_groups.translate import SeriesGroupBy, GroupByAgg, GR
 # TODO: make into CallTreeLocal factory function
 
 out = {}
+call_props = set()
 for name, entry in spec.items():
     #if entry['result']['type']: continue
     kind = entry['action'].get('kind') or entry['action'].get('status')
     key = (kind.title(), entry['action']['data_arity'])
     meth = GROUP_METHODS[key]
+
+    # add properties like df.dtype, so we know they are method calls
+    if entry['is_property'] and not entry['accessor']:
+        call_props.add(name)
+
     out[name] = meth(
             name = name.split('.')[-1],
             is_property = entry['is_property'],
@@ -23,7 +29,8 @@ call_listener = CallTreeLocal(
         call_sub_attr = ('str', 'dt', 'cat', 'sparse'),
         chain_sub_attr = True,
         dispatch_cls = GroupByAgg,
-        result_cls = SeriesGroupBy
+        result_cls = SeriesGroupBy,
+        call_props = call_props
         )
 
 
