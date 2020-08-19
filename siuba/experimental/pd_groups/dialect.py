@@ -17,6 +17,7 @@ for name, entry in spec.items():
     if entry['is_property'] and not entry['accessor']:
         call_props.add(name)
 
+
     meth = GROUP_METHODS[key](
             name = name.split('.')[-1],
             is_property = entry['is_property'],
