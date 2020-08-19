@@ -166,19 +166,20 @@ def test_semi_join_no_cross(backend, df1, df2):
             DF1.iloc[:1,]
             )
 
-def test_basic_anti_join(backend, df1, df2):
+
+def test_basic_anti_join_on_map(backend, df1, df2):
     assert_frame_sort_equal(
             anti_join(df1, df2, on = {"ii": "ii"}) >> collect(),
             DF1.iloc[2:,]
             )
 
-def test_basic_anti_join(backend, df1, df2):
+def test_basic_anti_join_on_str(backend, df1, df2):
     assert_frame_sort_equal(
-            anti_join(df1, df2, on = {"ii": "ii"}) >> collect(),
+            anti_join(df1, df2, on = "ii") >> collect(),
             DF1.iloc[2:,]
             )
-
-def test_basic_anti_join(backend, df1, df2):
+    
+def test_basic_anti_join_on_multi(backend, df1, df2):
     assert_frame_sort_equal(
             anti_join(df1, df2, on = {"ii": "ii", "x": "y"}) >> collect(),
             DF1.iloc[2:,]

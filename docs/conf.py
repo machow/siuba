@@ -7,15 +7,21 @@
 extensions = [
     'nbsphinx',
     'sphinx.ext.autodoc',
-    'sphinx.ext.napoleon'
+    'sphinx.ext.napoleon',
     #'sphinx.ext.mathjax',
+    'sphinx.ext.autosectionlabel',
+    #'sphinx_togglebutton',
 ]
 
 # Exclude build directory and Jupyter backup files:
-exclude_patterns = ['_build', '**.ipynb_checkpoints', '**.swp', 'draft-*']
+exclude_patterns = ['_build', '**.ipynb_checkpoints', '**.swp', 'draft*', '.*swp', '.~*.ipynb']
+
+source_suffix = ['.rst', '.ipynb']
 
 # Default language for syntax highlighting in reST and Markdown cells
 highlight_language = 'none'
+
+autosectionlabel_maxdepth = 2
 
 # -- These set defaults that can be overridden through notebook metadata --
 
@@ -58,15 +64,21 @@ import alabaster
 html_title = project + ' version ' + release
 
 html_theme = 'alabaster'
+#html_theme = "sphinx_rtd_theme"
 
 html_theme_options = {
     #"description": "",
     "github_user": "machow",
     "github_repo": "siuba",
-    "fixed_sidebar": False,
     "github_banner": True,
-    "github_button": False
+    "github_button": False,
+    "fixed_sidebar": True,
+    "sidebar_width": "260px"
     }
+
+html_static_path = ['_static']
+
+html_js_files = ['custom.js']
 
 # -- nbsphinx customization ---------------------------------------------------
 

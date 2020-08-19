@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 
 from pandas.core.groupby import DataFrameGroupBy
+from pandas.core.dtypes.inference import is_scalar
 from siuba.siu import Symbolic, Call, strip_symbolic, MetaArg, BinaryOp, create_sym_call, Lazy
 
 DPLY_FUNCTIONS = (
@@ -14,6 +15,7 @@ DPLY_FUNCTIONS = (
         "arrange", "distinct",
         "count", "add_count",
         "head",
+        "top_n",
         # Tidy ----
         "spread", "gather",
         "nest", "unnest",
@@ -34,6 +36,17 @@ __all__ = [*DPLY_FUNCTIONS, "Pipeable", "pipe"]
 # * n_distinct?
 # * separate_rows
 # * tally
+
+def install_siu_methods(cls):
+    """This function attaches siuba's table verbs on a class, to use as methods.
+
+    """
+    func_dict = globals()
+    for func_name in DPLY_FUNCTIONS:
+        f = func_dict[func_name]
+
+        method_name = "siu_{}".format(func_name)
+        setattr(cls, method_name, f)
 
 def install_pd_siu():
     # https://github.com/coursera/pandas-ply/blob/master/pandas_ply/methods.py
@@ -393,10 +406,15 @@ def summarize(__data, **kwargs):
     for k, v in kwargs.items():
         res = v(__data) if callable(v) else v
 
-        # TODO: validation?
+        # validate operations returned single result
+        if not is_scalar(res) and len(res) > 1:
+            raise ValueError("Summarize argument, %s, must return result of length 1 or a scalar." % k)
 
-        results[k] = res
+        # keep result, but use underlying array to avoid crazy index issues
+        # on DataFrame construction (#138)
+        results[k] = res.array if isinstance(res, pd.Series) else res
         
+    # must pass index, or raises error when using all scalar values
     return DataFrame(results, index = [0])
 
     
@@ -641,7 +659,7 @@ def _rename(__data, **kwargs):
 
 def _call_strip_ascending(f):
     if isinstance(f, Symbolic):
-        f = f.source
+        f = strip_symbolic(f)
 
     if isinstance(f, Call) and f.func == "__neg__":
         return f.args[0], False
@@ -1018,11 +1036,17 @@ from pandas.core.reshape.merge import _MergeOperation
 
 # TODO: will need to use multiple dispatch
 @singledispatch2(pd.DataFrame)
-def join(left, right, on = None, how = None):
+def join(left, right, on = None, how = None, *args, by = None, **kwargs):
     if not isinstance(right, DataFrame):
         raise Exception("right hand table must be a DataFrame")
     if how is None:
         raise Exception("Must specify how argument")
+
+    if len(args) or len(kwargs):
+        raise NotImplementedError("extra arguments to pandas join not currently supported")
+
+    if on is None and by is not None:
+        on = by
 
     # pandas uses outer, but dplyr uses term full
     if how == "full":
@@ -1078,6 +1102,8 @@ def anti_join(left, right = None, on = None):
     # copied from semi_join
     if isinstance(on, Mapping):
         left_on, right_on = zip(*on.items())
+    else: 
+        left_on = right_on = on
 
     # manually perform merge, up to getting pieces need for indexing
     merger = _MergeOperation(left, right, left_on = left_on, right_on = right_on)
@@ -1098,6 +1124,59 @@ inner_join = partial(join, how = "inner")
 @singledispatch2(pd.DataFrame)
 def head(__data, n = 5):
     return __data.head(n)
+
+
+# Top N =======================================================================
+
+# TODO: should dispatch to filter, no need to specify pd.DataFrame?
+@singledispatch2((pd.DataFrame, DataFrameGroupBy))
+def top_n(__data, n, wt = None):
+    """Filter to keep the top or bottom entries in each group.
+
+    Args:
+        ___data: a DataFrame
+        n: the number of rows to keep in each group
+        wt: a column or expression that determines ordering (defaults to the last column in data)
+
+    Examples:
+        >>> from siuba import _, top_n
+        >>> df = pd.DataFrame({'x': [3, 1, 2, 4], 'y': [1, 1, 0, 0]})
+        >>> top_n(df, 2, _.x)
+           x  y
+        0  3  1
+        3  4  0
+
+        >>> top_n(df, -2, _.x)
+           x  y
+        1  1  1
+        2  2  0
+
+        >>> top_n(df, 2, _.x*_.y)
+           x  y
+        0  3  1
+        1  1  1
+
+    """
+    # NOTE: using min_rank, since it can return a lazy expr for min_rank(ing)
+    #       but I would rather not have it imported in verbs. will be more 
+    #       reasonable if each verb were its own file? need abstract verb / vector module.
+    #       vector imports experimental right now, so we need to invert deps
+    # TODO: 
+    #   * what if wt is a string? should remove all str -> expr in verbs like group_by etc..
+    #   * verbs like filter allow lambdas, but this func breaks with that   
+    from .vector import min_rank
+    if wt is None:
+        sym_wt = getattr(Symbolic(MetaArg("_")), __data.columns[-1])
+    elif isinstance(wt, Call):
+        sym_wt = Symbolic(wt)
+    else:
+        raise TypeError("wt must be a symbolic expression, eg. _.some_col")
+
+    if n > 0:
+        return filter(__data, min_rank(-sym_wt) <= n)
+    else:
+        return filter(__data, min_rank(sym_wt) <= abs(n))
+
 
 # Gather ======================================================================
 

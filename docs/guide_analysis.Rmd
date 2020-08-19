@@ -1,0 +1,239 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.4.1
+  kernelspec:
+    display_name: Python 3
+    language: python
+    name: python3
+  nbsphinx:
+    allow_errors: true
+
+---
+
+```{python nbsphinx="hidden"}
+import pandas as pd
+
+pd.set_option("display.max_rows", 5)
+```
+
+# Data Analysis guide
+
+**Note: this document is a work in progress. For sections that aren't completed, I have included links to useful documentation and examples.**
+
+See also these resources:
+
+* [pandas Series methods API](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.html)
+* [siuba verb API reference](api_index.rst)
+* [siuba examples](examples)
+
+
+## Overview
+
+
+```{python}
+from siuba.data import cars
+
+cars
+```
+
+## Split-apply-combine
+
+> 🚧 Coming soon. In the meantime, check out these docs with many examples in the User API.
+
+* [filter](api_table_core/01_filter)
+* [arrange](api_table_core/02_arrange)
+* [select](api_table_core/03_select)
+* [mutate](api_table_core/05_mutate)
+* [summarize](api_table_core/07_summarize)
+* [group_by](api_table_core/08_group_by)
+
+
+## Dates and times
+
+> 🚧 Coming soon. See this [article on timeseries](https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html) in the pandas docs.
+
+
+## Strings
+
+> 🚧 Coming soon. See this [article on working with text](https://pandas.pydata.org/pandas-docs/stable/user_guide/text.html) in the pandas docs.
+
+
+## Reshaping
+
+> 🚧 Coming soon. See the following User API entries for reshaping verbs.
+
+* [gather](api_tidy/02_gather.Rmd)
+* [spread](api_tidy/03_spread.Rmd)
+
+
+## Table joins
+
+> 🚧 Coming soon. See the siuba's User API entry for joins.
+
+* [joins](api_table_two/joins.Rmd)
+
+
+## Nested data
+
+> 🚧 Coming soon. See the siuba's User API entry for nest and unnest.
+
+* [nest and unnest](api_tidy/01_nest)
+
+
+## Debugging
+
+This section covers the four most common issues people seem to hit.
+
+1. Referring to a column that doesn't a exist
+2. A pandas Series method raising an error
+3. Python syntax errors
+4. Any of the above in a pipe
+
+> Note that stack traces shown here are shorter than normal, to help make them clearer. This is something siuba does for SQL by default, and will be implemented for pandas in the future.
+
+```{python}
+import pandas as pd
+from siuba import mutate, _
+
+df = pd.DataFrame({
+    'g': ['a','a','b'],
+    'x': [1,2,3]
+})
+
+```
+
+```{python jupyter={'source_hidden': True}, nbsphinx="hidden"}
+test = {}
+
+def limit_traceback(f, keep_first = True, limit = 1):
+    """Wraps the ipython shell._showtraceback, to cut out some pieces.
+    
+    Note: ipython allows Exceptions to have a _render_traceback_ method, to
+          do what this wrapper does, but that doesn't help us change the
+          behavior of existing classes. This is a situation where generic
+          function dispatch would help.
+    """
+    from functools import wraps
+
+    if getattr(f, '_wrapped_lt', False):
+        # don't wrap multiple times. re-wrap original
+        f = f.__wrapped__
+    
+    @wraps(f)
+    def wrapper(etype, evalue, stb):
+        test['stb'] = stb
+        header = stb[0:3] if keep_first and len(stb) > 3 else []
+        body = stb[-limit:]
+        
+        f(etype, evalue, [*header, *body])
+    
+    # ensure we don't wrap multiple times
+    wrapper._wrapped_lt = True
+    
+    # otherwise, return wrapper
+    return wrapper
+
+from IPython.core.magic import (register_line_magic, register_cell_magic,
+                                register_line_cell_magic)
+
+@register_cell_magic
+def short_traceback(line, cell):
+    shell = get_ipython()
+    shell._showtraceback = limit_traceback(shell._showtraceback, limit = 1)
+    shell.run_cell(cell)
+    shell._showtraceback = shell._showtraceback.__wrapped__
+
+shell = get_ipython()
+shell._showtraceback = limit_traceback(shell._showtraceback, limit = 1)
+```
+
+### Missing columns
+
+```{python}
+mutate(df, y = _.X + 1)
+```
+
+In this case, the data doesn't have a column named "X".
+
+```{python}
+df.columns
+```
+
+### Series method error
+
+```{python}
+mutate(df, y = _.x.mean(bad_arg = True))
+```
+
+In this case, it's helpful to try replacing `_` with the actual data.
+
+```{python}
+# expression to debug
+_.x.mean(bad_arg = True)
+
+# replacing _ with the data
+df.x.mean(bad_arg = True)
+```
+
+### Python syntax errors
+
+```{python}
+df
+    >> mutate(y = _.x + 1)
+```
+
+In this case, we either need to use a backslash, or put the code in parentheses.
+
+```{python}
+df \
+    >> mutate(y = _.x + 1)
+
+(df
+    >> mutate(y = _.x + 1)
+)
+```
+
+### Pipes
+
+When the error occurs in a pipe, it's helpful to comment out parts of the pipe.
+
+For example, consider the 3 step pipe below.
+
+```{python}
+from siuba import select, arrange, mutate
+
+(df
+   >> select(_.g, _.x)
+   >> mutate(res = _.X + 1)
+   >> arrange(-_.res)
+)
+```
+
+Notice the arrow pointing to line 6. This is not because that's where the error is, but because python will always point to the last line of a pipe.
+
+Let's debug by running only the first line, then only the first two, etc.., until we find the error.
+
+```{python}
+(df
+   >> select(_.g, _.x)
+#    >> mutate(res = _.X + 1)
+#    >> arrange(-_.res)
+)
+```
+
+Select works okay, now let's uncomment the next line.
+
+```{python}
+(df
+   >> select(_.g, _.x)
+   >> mutate(res = _.X + 1)
+#    >> arrange(-_.res)
+)
+```
+
+We found our bug! Note that when working with SQL, siuba prints out the name of the verb where the error occured. This is very useful, and will be added to working with pandas in the future!

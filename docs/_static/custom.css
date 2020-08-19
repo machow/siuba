@@ -1,0 +1,78 @@
+@media screen and (max-width: 875px) {
+  div.sphinxsidebar {
+    order: 2;
+  }
+}
+
+body {
+  font-size: 16px !important;
+}
+
+div.document {
+  max-width: 1010px;
+  width: auto !important;
+  min-width: 940px;
+  display: flex;
+  flex-direction: column;
+}
+
+div.documentwrapper {
+  padding-bottom: 50px
+}
+
+div.sphinxsidebar {
+  max-height: 100%;
+  overflow-y: auto;
+
+}
+
+div.sphinxsidebar.searchbox {
+  width: 200px;
+}
+
+div.sphinxsidebar a.active {
+  background-color: #aee691;
+}
+
+div.sphinxsidebar ul ul ul {
+  list-style: none !important;
+}
+
+li.toctree-l2 {
+  margin-top: .25em;
+}
+
+li.toctree-l2 a {
+  border: none;
+}
+
+li.toctree-l3 a {
+  border: none;
+}
+
+div.body {
+  padding-left: 45px !important;
+}
+
+table.align-default, .table-container table {
+  margin-left: 0 !important;
+  box-shadow: none !important;
+  border 1px solid #dfe2e5 !important;
+}
+
+table.table-align-left {
+  margin-left: 0 !important;
+  box-shadow: none !important;
+  border 1px solid #dfe2e5 !important;
+  
+}
+
+table.align-default th, table.align-eft th {
+  border: 1px solid #dfe2e5 !important;
+  padding: 6px 13px !important;
+}
+
+table.align-default td, table.align-left td {
+  padding: 6px 13px !important;
+  border: 1px solid #dfe2e5 !important;
+}

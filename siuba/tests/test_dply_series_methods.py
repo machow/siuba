@@ -10,11 +10,16 @@ import numpy as np
 import pandas as pd
 import pkg_resources
 
-def filter_on_result(spec, types):
-    return [k for k,v in spec.items() if v['result']['type'] in types]
+def get_action_kind(spec_entry):
+    action = spec_entry['action']
+    return action.get('kind', action.get('status')).title()
 
-SPEC_IMPLEMENTED = filter_on_result(spec, {"Agg", "Elwise", "Window"})
-SPEC_NOTIMPLEMENTED = filter_on_result(spec, {"Singleton"})
+
+def filter_on_result(spec, types):
+    return [k for k,v in spec.items() if v['action'].get('kind', v['action'].get('status')).title() in types]
+
+SPEC_IMPLEMENTED = filter_on_result(spec, {"Agg", "Elwise", "Window", "Singleton"})
+SPEC_NOTIMPLEMENTED = filter_on_result(spec, {"Wontdo", "Todo", "Maydo"})
 SPEC_AGG = filter_on_result(spec, {"Agg"})
 
 _ = Symbolic()
@@ -63,6 +68,16 @@ data_bool = data_frame(
     y = [True, True, False, False]
         )
 
+data_cat = data_frame(
+    g = ['a', 'a', 'b', 'b'],
+    x = pd.Categorical(['abc', 'cde', 'fg', 'h'])
+    )
+
+data_sparse = data_frame(
+    g = ['a', 'a', 'b', 'b'],
+    x = pd.Series([1, 2, 3, 4], dtype = "Sparse")
+    )
+
 data_default = data_frame(
     g = ['a', 'a', 'a', 'b', 'b', 'b'],
     x = [10, 11, 11, 13, 13, 13],
@@ -73,12 +88,24 @@ DATA = data = {
     'dt': data_dt,
     'str': data_str,
     None: data_default,
-    'bool': data_bool
+    'bool': data_bool,
+    'cat': data_cat,
+    'sparse': data_sparse
+
 }
+
+def get_spec_no_mutate(entry, backend):
+    return "no_mutate" in entry['backends'].get(backend, {}).get('flags', [])
+    
+def get_spec_backend_status(entry, backend):
+    return entry['backends'].get(backend, {}).get('status')
+
+def get_spec_sql_type(entry, backend):
+    return entry['backends'].get(backend, {}).get('result_type')
 
 def get_data(entry, data, backend = None):
 
-    req_bool = entry['result'].get('op') == 'bool'
+    req_bool = entry['action'].get('input_type') == 'bool'
 
     # pandas is forgiving to bool inputs
     if isinstance(backend, PandasBackend):
@@ -89,20 +116,20 @@ def get_data(entry, data, backend = None):
 
 def test_missing_implementation(entry, backend):
     # Check whether test should xfail, skip, or -------------------------------
-    backend_status = entry['result'].get(backend.name)
+    backend_status = get_spec_backend_status(entry, backend.name)
 
     # case: Needs to be implmented
     # TODO(table): uses xfail
-    if backend_status == "xfail":
+    if backend_status == "todo":
         pytest.xfail("TODO: impelement this translation")
     
     # case: Can't be used in a mutate (e.g. a SQL ordered set aggregate function)
     # TODO(table): no_mutate
-    if backend.name in entry['result'].get('no_mutate', []):
+    if get_spec_no_mutate(entry, backend.name):
         pytest.skip("Spec'd failure")
 
     # case: won't be implemented
-    if entry['result'].get(backend.name) == "not_impl":
+    if get_spec_backend_status(entry, backend.name) == "wontdo":
         pytest.skip()
 
 
@@ -113,7 +140,7 @@ def get_df_expr(entry):
     return str_expr, call_expr
 
 def cast_result_type(entry, backend, ser):
-    sql_type = entry['result'].get('sql_type')
+    sql_type = get_spec_sql_type(entry, backend.name)
     if isinstance(backend, SqlBackend) and sql_type == 'float':
         return ser.astype('float')
     
@@ -123,7 +150,7 @@ def cast_result_type(entry, backend, ser):
 
 
 def test_series_against_call(entry):
-    if entry['result']['type'] == "Window":
+    if entry['action']['kind'] == "window":
         pytest.skip()
 
     df = data[entry['accessor']]
@@ -162,8 +189,16 @@ def test_pandas_grouped_frame_fast_not_implemented(notimpl_entry):
     str_expr = str(notimpl_entry['expr_frame'])
     call_expr = strip_symbolic(eval(str_expr, {'_': _}))
 
-    with pytest.raises(NotImplementedError):
-        res = fast_mutate(gdf, result = call_expr)
+    if notimpl_entry['action']['status'] in ["todo", "maydo", "wontdo"] and notimpl_entry["is_property"]:
+        pytest.xfail()
+
+    with pytest.warns(UserWarning):
+        try:
+            # not implemented functions are punted to apply, and
+            # not guaranteed to work (e.g. many lengthen arrays, etc..)
+            res = fast_mutate(gdf, result = call_expr)
+        except:
+            pass
     
 
 
@@ -215,7 +250,7 @@ def test_pandas_grouped_frame_fast_mutate(entry):
     # but since mutate uses apply, it doesn't :/. Currently only affects median func.
     dst_obj = dst.obj
     if str_expr == '_.x.median()':
-        dst_obj['result'] = gdf._try_cast(dst_obj['result'], gdf.x.obj)
+        dst_obj['result'] = dst_obj['result'].astype(gdf.x.obj.dtype)
 
     assert isinstance(dst, DataFrameGroupBy)
     assert_frame_equal(res.obj, dst_obj)
@@ -270,7 +305,7 @@ def test_pandas_grouped_frame_fast_summarize(agg_entry):
     # pandas grouped aggs, when not using cython, _try_cast back to original type
     # but since summarize uses apply, it doesn't :/. Currently only affects median func.
     if str_expr == '_.x.median()':
-        dst['result'] = gdf._try_cast(dst['result'], gdf.x.obj)
+        dst['result'] = dst['result'].astype(gdf.x.obj.dtype)
 
     assert_frame_equal(res, dst)
 

@@ -1,5 +1,5 @@
 from siuba.spec.series import spec
-from siuba.siu import CallTreeLocal
+from siuba.siu import CallTreeLocal, FunctionLookupError
 
 from siuba.experimental.pd_groups.translate import SeriesGroupBy, GroupByAgg, GROUP_METHODS
 
@@ -7,23 +7,37 @@ from siuba.experimental.pd_groups.translate import SeriesGroupBy, GroupByAgg, GR
 # TODO: make into CallTreeLocal factory function
 
 out = {}
+call_props = set()
 for name, entry in spec.items():
     #if entry['result']['type']: continue
-        
-    key = (entry['result']['type'], entry['data_arity'])
-    meth = GROUP_METHODS[key]
-    out[name] = meth(
+    kind = entry['action'].get('kind') or entry['action'].get('status')
+    key = (kind.title(), entry['action']['data_arity'])
+
+    # add properties like df.dtype, so we know they are method calls
+    if entry['is_property'] and not entry['accessor']:
+        call_props.add(name)
+
+
+    meth = GROUP_METHODS[key](
             name = name.split('.')[-1],
             is_property = entry['is_property'],
             accessor = entry['accessor']
             )
 
+    # TODO: returning this exception class from group methods is weird, but I 
+    #       think also used in tests
+    if meth is NotImplementedError:
+        continue
+
+    out[name] = meth
+
 call_listener = CallTreeLocal(
         out,
-        call_sub_attr = ('str', 'dt', 'cat'),
+        call_sub_attr = ('str', 'dt', 'cat', 'sparse'),
         chain_sub_attr = True,
         dispatch_cls = GroupByAgg,
-        result_cls = SeriesGroupBy
+        result_cls = SeriesGroupBy,
+        call_props = call_props
         )
 
 
@@ -32,13 +46,27 @@ call_listener = CallTreeLocal(
 from siuba.siu import Call
 from siuba.dply.verbs import mutate, filter, summarize, singledispatch2, DataFrameGroupBy, _regroup
 from pandas.core.dtypes.inference import is_scalar
+import warnings
+
+def fallback_warning(expr, reason):
+    warnings.warn(
+            "The expression below cannot be executed quickly. "
+            "Using the slow (but general) pandas apply method."
+            "\n\nExpression: {}\nReason: {}"
+                .format(expr, reason)
+            )
+
 
 def grouped_eval(__data, expr, require_agg = False):
     if is_scalar(expr):
         return expr
     
     if isinstance(expr, Call):
-        call = call_listener.enter(expr)
+        try:
+            call = call_listener.enter(expr)
+        except FunctionLookupError as e:
+            fallback_warning(expr, str(e))
+            call = expr
 
         #
         grouped_res = call(__data)
@@ -68,13 +96,40 @@ def grouped_eval(__data, expr, require_agg = False):
 
 # Fast mutate ----
 
+def _transform_args(args):
+    out = []
+    for expr in args:
+        if is_scalar(expr):
+            out.append(expr)
+        elif isinstance(expr, Call):
+            try:
+                call = call_listener.enter(expr)
+                out.append(call)
+            except FunctionLookupError as e:
+                fallback_warning(expr, str(e))
+                return None
+        elif callable(expr):
+            return None
+
+    return out
+
 @singledispatch2(DataFrameGroupBy)
 def fast_mutate(__data, **kwargs):
     """Warning: this function is experimental"""
+
+    # transform call trees, potentially bail out to slow method --------
+    new_vals = _transform_args(kwargs.values())
+
+    if new_vals is None:
+        return mutate(__data, **kwargs)
+
+
+    # perform fast method ----
     out = __data.obj.copy()
     groupings = __data.grouper.groupings
 
-    for name, expr in kwargs.items():
+
+    for name, expr in zip(kwargs, new_vals):
         res = grouped_eval(__data, expr)
         out[name] = res
 
@@ -95,7 +150,14 @@ def _fast_mutate_default(__data, **kwargs):
 @singledispatch2(DataFrameGroupBy)
 def fast_filter(__data, *args):
     """Warning: this function is experimental"""
-    import pandas as pd
+
+    # transform call trees, potentially bail out to slow method --------
+    new_vals = _transform_args(args)
+
+    if new_vals is None:
+        return filter(__data, *args)
+
+    # perform fast method ----
     out = []
     groupings = __data.grouper.groupings
 
@@ -103,7 +165,7 @@ def fast_filter(__data, *args):
         res = grouped_eval(__data, expr)
         out.append(res)
 
-    filter_df = filter.registry[pd.DataFrame]
+    filter_df = filter.registry[__data.obj.__class__]
 
     df_result = filter_df(__data.obj, *out)
 
@@ -126,6 +188,14 @@ def _fast_filter_default(__data, *args, **kwargs):
 @singledispatch2(DataFrameGroupBy)
 def fast_summarize(__data, **kwargs):
     """Warning: this function is experimental"""
+
+    # transform call trees, potentially bail out to slow method --------
+    new_vals = _transform_args(kwargs.values())
+
+    if new_vals is None:
+        return summarize(__data, **kwargs)
+
+    # perform fast method ----
     groupings = __data.grouper.groupings
 
     # TODO: better way of getting this frame?

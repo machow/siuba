@@ -15,17 +15,22 @@ test:
 
 test-travis:
 	py.test --nbval-lax $(filter-out %postgres.ipynb, $(NOTEBOOK_TESTS))
-	pytest --dbs="sqlite,postgresql" siuba/
+	pytest --dbs="sqlite,postgresql" $(PYTEST_FLAGS) siuba/
 
 examples/%.ipynb:
 	jupyter nbconvert --to notebook --inplace --execute $@
 	jupytext --sync $@
 
 docs/api_extra/%.rst: siuba/dply/%.py $(AUTODOC_SCRIPT)
-	python3 docs/generate_autodoc.py . $< >> $@
+	python3 docs/generate_autodoc.py . $< > $@
 
 docs-watch: $(AUTODOC_PAGES)
 	cd docs && sphinx-autobuild . ./_build/html
 
 docs-build: $(AUTODOC_PAGES)
 	cd docs && sphinx-build . ./_build/html
+
+github_traffic:
+	# keep github traffic, since it is only held for 2 weeks
+	github_get_traffic -c gh_traffic/config.ini -o gh_traffic
+
