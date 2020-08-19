@@ -192,8 +192,13 @@ def test_pandas_grouped_frame_fast_not_implemented(notimpl_entry):
     if notimpl_entry['action']['status'] in ["todo", "maydo", "wontdo"] and notimpl_entry["is_property"]:
         pytest.xfail()
 
-    with pytest.raises(NotImplementedError):
-        res = fast_mutate(gdf, result = call_expr)
+    with pytest.warns(UserWarning):
+        try:
+            # not implemented functions are punted to apply, and
+            # not guaranteed to work (e.g. many lengthen arrays, etc..)
+            res = fast_mutate(gdf, result = call_expr)
+        except:
+            pass
     
 
 

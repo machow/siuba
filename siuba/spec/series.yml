@@ -284,13 +284,13 @@ add_prefix:
     status: wontdo
   backends: {}
   category: reindexing
-  example: _.add_prefix()
+  example: _.add_prefix('pre_')
 add_suffix:
   action:
     status: wontdo
   backends: {}
   category: reindexing
-  example: _.add_suffix()
+  example: _.add_suffix('_suff')
 agg:
   action:
     status: wontdo
@@ -330,7 +330,7 @@ append:
     status: todo
   backends: {}
   category: combining
-  example: _.append()
+  example: _.append(_)
   priority: 1
 apply:
   action:
