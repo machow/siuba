@@ -76,6 +76,8 @@ class Pipeable:
         """Handle >> syntax when pipe is on the left (lazy piping)."""
         if isinstance(x, Pipeable):
             return Pipeable(calls = self.calls + x.calls)
+        elif isinstance(x, (Symbolic, Call)):
+            return Pipeable(calls = self.calls + [x])
         elif callable(x):
             return Pipeable(calls = self.calls + [x])
 
