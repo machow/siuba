@@ -4,35 +4,43 @@ from siuba.siu import CallTreeLocal, FunctionLookupError
 from siuba.experimental.pd_groups.translate import SeriesGroupBy, GroupByAgg, GROUP_METHODS
 
 
-# TODO: make into CallTreeLocal factory function
+# factory for creating methods dictionary =====================================
 
-out = {}
-call_props = set()
-for name, entry in spec.items():
-    #if entry['result']['type']: continue
-    kind = entry['action'].get('kind') or entry['action'].get('status')
-    key = (kind.title(), entry['action']['data_arity'])
+def create_grouped_methods(spec, group_methods, keep_only_impl = True, wrap_properties = False):
+    out = {}
+    call_props = set()
+    for name, entry in spec.items():
+        #if entry['result']['type']: continue
+        kind = entry['action'].get('kind') or entry['action'].get('status')
+        key = (kind.title(), entry['action']['data_arity'])
 
-    # add properties like df.dtype, so we know they are method calls
-    if entry['is_property'] and not entry['accessor']:
-        call_props.add(name)
+        # add properties like df.dtype, so we know they are method calls
+        if entry['is_property'] and not entry['accessor']:
+            call_props.add(name)
 
 
-    meth = GROUP_METHODS[key](
-            name = name.split('.')[-1],
-            is_property = entry['is_property'],
-            accessor = entry['accessor']
-            )
+        meth = group_methods[key](
+                name = name.split('.')[-1],
+                is_property = entry['is_property'],
+                accessor = entry['accessor']
+                )
 
-    # TODO: returning this exception class from group methods is weird, but I 
-    #       think also used in tests
-    if meth is NotImplementedError:
-        continue
+        if entry['is_property'] and wrap_properties:
+            meth = property(meth)
 
-    out[name] = meth
+        # TODO: returning this exception class from group methods is weird, but I 
+        #       think also used in tests
+        if meth is NotImplementedError and not keep_only_impl:
+            continue
+
+        out[name] = meth
+
+    return out, call_props
+
+local, call_props = create_grouped_methods(spec, GROUP_METHODS)
 
 call_listener = CallTreeLocal(
-        out,
+        local,
         call_sub_attr = ('str', 'dt', 'cat', 'sparse'),
         chain_sub_attr = True,
         dispatch_cls = GroupByAgg,
