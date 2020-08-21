@@ -1,7 +1,7 @@
-from pandas.core.groupby import DataFrameGroupBy, SeriesGroupBy
+from pandas.core.groupby import GroupBy, DataFrameGroupBy, SeriesGroupBy
+from pandas import Series
 import inspect
 from pandas.core import algorithms
-import pandas as pd
 
 
 # Custom SeriesGroupBy class ==================================================
@@ -23,7 +23,7 @@ class GroupByAgg(SeriesGroupBy):
     
     @classmethod
     def from_result(cls, result, groupby):
-        if not isinstance(result, pd.Series):
+        if not isinstance(result, Series):
             raise TypeError("requires pandas Series")
 
         # Series.groupby is hard-coded to produce a SeriesGroupBy,
@@ -55,7 +55,7 @@ def broadcast_agg_result(grouper, result, obj, cast = False):
     # once when aggregating....
     if cast:
         out = try_cast(out, obj)
-    return pd.Series(out, index=obj.index, name=obj.name)
+    return Series(out, index=obj.index, name=obj.name)
 
 
 # Utils =======================================================================
@@ -65,13 +65,19 @@ def all_isinstance(cls, *args):
 
 def _regroup(res, groupby):
     if isinstance(groupby, GroupByAgg):
-        # need to manually a constructor, since Series classes are hardcoded
+        # need to manually use this constructor, since Series classes are hardcoded
         # all over the pandas library :/ :/ :/
         return groupby.from_result(res, groupby)
-    elif isinstance(groupby, SeriesGroupBy):
+    elif isinstance(groupby, GroupBy):
+        if not isinstance(res, Series) and len(res) == groupby.obj.shape[0]:
+            # array-like with same length as nrows grouped data
+            ser = Series(res, index = groupby.obj.index)
+            return ser.groupby(groupby.grouper)
+
         return res.groupby(groupby.grouper)
     
     raise ValueError("Unknown group by class: %s"% type(groupby))
+
 
 
 # Broadcasting Groupby elements -----------------------------------------------
