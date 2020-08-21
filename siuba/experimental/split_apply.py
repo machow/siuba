@@ -9,7 +9,7 @@ from siuba.experimental.pd_groups.groupby import GroupByAgg, _regroup
 from siuba.siu import symbolic_dispatch, strip_symbolic
 
 @symbolic_dispatch(cls = SeriesGroupBy)
-def split_apply2(col_x, col_y, f, args = tuple(), kwargs = None, is_agg = False):
+def split_apply2(col_x, col_y, f, args = tuple(), kwargs = None, is_agg = False) -> SeriesGroupBy:
     """Split-apply-combine over two series from a grouped DataFrame.
 
     Note: this function requires the apply step (f) to operate on numpy arrays.
@@ -58,7 +58,7 @@ def split_apply2(col_x, col_y, f, args = tuple(), kwargs = None, is_agg = False)
 # example corr function ----
 
 @symbolic_dispatch(cls = SeriesGroupBy)
-def corr(x, y, method = "pearson", min_periods = 1):
+def corr(x, y, method = "pearson", min_periods = 1) -> GroupByAgg:
     from pandas.core.series import nanops
     y = strip_symbolic(y)
 
@@ -66,7 +66,7 @@ def corr(x, y, method = "pearson", min_periods = 1):
     return split_apply2(x, y, nanops.nancorr, kwargs = kwargs, is_agg = True)
 
 @corr.register(Series)
-def _corr_ser(x, y, *args, **kwargs):
+def _corr_ser(x, y, *args, **kwargs) -> Series:
     return x.corr(y, *args, **kwargs)
 
 
