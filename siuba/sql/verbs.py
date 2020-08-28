@@ -88,18 +88,33 @@ class WindowReplacer(CallListener):
             over.set_over(group_by, order_by)
 
         if len(over_clauses) and self.window_cte is not None:
-            label = col_expr.label(None)
-            self.windows.append(label)
+            # custom name, or parameters like "%(...)s" may nest and break psycopg2
+            # with columns you can set a key to fix this, but it doesn't seem to 
+            # be an option with labels
+            name = self._get_unique_name('win', self.window_cte.columns)
+            label = col_expr.label(name)
 
             # optionally put into CTE, and return its resulting column
             self.window_cte.append_column(label)
             win_col = self.window_cte.c.values()[-1]
 
-            # custom key, or parameters like "%(...)s" may nest and break psycopg2
-            win_col.key = 'win'
+            self.windows.append(win_col)
             return win_col
                 
         return col_expr
+    
+    @staticmethod
+    def _get_unique_name(prefix, columns):
+        column_names = set(columns.keys())
+
+        i = 1
+        name = prefix + str(i)
+        while name in column_names:
+            i += 1
+            name = prefix + str(i)
+
+
+        return name
 
 
 def track_call_windows(call, columns, group_by, order_by, window_cte = None):
@@ -445,7 +460,7 @@ def _filter(__data, *args):
     # Note: currently always produces 2 additional select statements,
     #       1 for window/aggs, and 1 for the where clause
     sel = __data.last_op.alias()                   # original select
-    win_sel = sql.select([sel], from_obj = sel)    # first cte
+    win_sel = sql.select([sel], from_obj = sel)
 
     conds = []
     windows = []
@@ -461,19 +476,33 @@ def _filter(__data, *args):
                     )
 
             conds.append(col_expr)
+            windows.extend(win_cols)
+            
         else:
             conds.append(arg)
 
     bool_clause = sql.and_(*conds)
 
-    # move non-window functions to refer to win_sel clause (not the innermost) ---
-    win_alias = win_sel.alias()
-    bool_clause = sql.util.ClauseAdapter(win_alias).traverse(bool_clause)
+    # first cte, windows ----
+    if len(windows):
+        win_alias = win_sel.alias()
 
+        # because track_call_windows in the loop above used select.append_column
+        # multiple times, sqlalchemy doesn't know our window columns are the ones
+        # in the final mutated for of win_sel
+        col_key_map = {col.key: col for col in win_alias.columns.values()}
+        equivalents = {col: [col_key_map[col.key]] for col in windows}
+
+        # move non-window functions to refer to win_sel clause (not the innermost) ---
+        bool_clause = sql.util.ClauseAdapter(win_alias, equivalents = equivalents) \
+                .traverse(bool_clause)
+
+        orig_cols = [win_alias.columns[k] for k in sel.columns.keys()]
+    else:
+        orig_cols = [sel]
     
     # create second cte ----
-    orig_cols = [win_alias.columns[k] for k in sel.columns.keys()]
-    filt_sel = sql.select(orig_cols, from_obj = win_alias, whereclause = bool_clause)
+    filt_sel = sql.select(orig_cols, whereclause = bool_clause)
     return __data.append_op(filt_sel)
 
 
@@ -843,7 +872,7 @@ def _join(left, right, on = None, *args, how = "inner", sql_on = None):
             )
 
     sel = sql.select(labeled_cols, from_obj = join)
-    return left.append_op(sel)
+    return left.append_op(sel, order_by = tuple())
 
 
 @semi_join.register(LazyTbl)
@@ -873,7 +902,7 @@ def _semi_join(left, right = None, on = None, *args, sql_on = None):
             whereclause = sql.exists(exists_clause)
             )
 
-    return left.append_op(sel)
+    return left.append_op(sel, order_by = tuple())
 
 
 @anti_join.register(LazyTbl)
@@ -892,7 +921,8 @@ def _anti_join(left, right = None, on = None, *args, sql_on = None):
     # create inner join ----
     not_exists = ~sql.exists([1], from_obj = right_sel).where(bool_clause)
     sel = sql.select(left_sel.columns, from_obj = left_sel).where(not_exists)
-    return left.append_op(sel)
+    
+    return left.append_op(sel, order_by = tuple())
        
 def _raise_if_args(args):
     if len(args):
