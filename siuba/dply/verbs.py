@@ -97,7 +97,7 @@ class Pipeable:
 pipe = Pipeable
 
 def _regroup(df):
-    # try to regroup, when user kept index (e.g. group_keys = True)
+    # try to regroup after an apply, when user kept index (e.g. group_keys = True)
     if len(df.index.names) > 1:
         # handle cases where...
         # 1. grouping with named indices (as_index = True)
@@ -706,7 +706,19 @@ def arrange(__data, *args):
 
 @arrange.register(DataFrameGroupBy)
 def _arrange(__data, *args):
-    raise NotImplementedError("TODO: arrange with grouped DataFrame")
+    for arg in args:
+        f, desc = _call_strip_ascending(arg)
+        if not simple_varname(f):
+            raise NotImplementedError(
+                    "Arrange over DataFrameGroupBy only supports simple "
+                    "column names, not expressions"
+                    )
+
+    df_sorted = arrange(__data.obj, *args)
+
+    group_cols = [ping.name for ping in __data.grouper.groupings]
+    return df_sorted.groupby(group_cols)
+
 
 
 
