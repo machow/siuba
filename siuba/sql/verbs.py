@@ -590,6 +590,7 @@ def _arrange(__data, *args):
     new_calls = []
     for ii, expr in enumerate(args):
         if callable(expr):
+
             res = __data.shape_call(
                     expr, window = False,
                     verb_name = "Arrange", arg_name = ii
@@ -615,9 +616,10 @@ def _create_order_by_clause(columns, *args):
             sort_cols.append(columns[arg])
         # an expression
         elif callable(arg):
-            #f, asc = _call_strip_ascending(arg)
-            #col_op = f(cols) if asc else f(cols).desc()
-            col_op = arg(columns)
+            # handle special case where -_.colname -> colname DESC
+            f, asc = _call_strip_ascending(arg)
+            col_op = f(columns) if asc else f(columns).desc()
+            #col_op = arg(columns)
             sort_cols.append(col_op)
         else:
             raise NotImplementedError("Must be string or callable")
