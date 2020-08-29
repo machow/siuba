@@ -134,8 +134,7 @@ def col_expr_requires_cte(call, sel, is_mutate = False):
 
     call_vars = set(call.op_vars(attr_calls = False))
 
-    columns = lift_inner_cols(sel)
-    sel_labs = set(k for k,v in columns.items() if isinstance(v, sql.elements.Label))
+    sel_labs = get_inner_labels(sel)
 
     # I use the acronym fwg sol (frog soul) to remember sql clause eval order
     # from, where, group by, select, order by, limit
@@ -146,6 +145,11 @@ def col_expr_requires_cte(call, sel, is_mutate = False):
             or len(sel._order_by_clause)
             or not sel_labs.isdisjoint(call_vars)
             )
+
+def get_inner_labels(sel):
+    columns = lift_inner_cols(sel)
+    sel_labs = set(k for k,v in columns.items() if isinstance(v, sql.elements.Label))
+    return sel_labs
 
 def get_missing_columns(call, columns):
     missing_cols = set(call.op_vars(attr_calls = False)) - set(columns.keys())
@@ -465,6 +469,7 @@ def _filter(__data, *args):
     conds = []
     windows = []
     for ii, arg in enumerate(args):
+
         if isinstance(arg, Call):
             new_call = __data.shape_call(arg, verb_name = "Filter", arg_name = ii)
             #var_cols = new_call.op_vars(attr_calls = False)
@@ -690,9 +695,10 @@ def _summarize(__data, **kwargs):
                 )
 
     needs_cte = [col_expr_requires_cte(call, sel) for call in new_calls.values()]
+    group_on_labels = set(__data.group_by) & get_inner_labels(sel)
 
     # create select statement ----
-    if any(needs_cte):
+    if any(needs_cte) or len(group_on_labels):
         # need a cte, due to alias cols or existing group by
         # current select stmt has group by clause, so need to make it subquery
         cte = sel.alias()
