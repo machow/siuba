@@ -48,6 +48,7 @@ def df3(backend):
     return backend.load_df(DF3)
 
 
+# Test different ways to specify on argument ----------------------------------
 
 @backend_sql("TODO: pandas")
 def test_join_diff_vars_keeps_left(backend, df1, df2_jj):
@@ -184,4 +185,16 @@ def test_basic_anti_join_on_multi(backend, df1, df2):
             anti_join(df1, df2, on = {"ii": "ii", "x": "y"}) >> collect(),
             DF1.iloc[2:,]
             )
+
+
+# Test that sql joins reset order by ------------------------------------------
+from siuba import arrange
+from pandas.testing import assert_frame_equal
+
+@backend_sql
+def test_inner_join_arrange(backend, df1, df2):
+    # NOTE: joins are free to scramble order in SQL. TODO: check dplyr
+    joined = inner_join(arrange(df1, _.ii), df2, on = "ii")
+
+    assert joined.order_by == tuple()
 
