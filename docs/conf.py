@@ -14,7 +14,7 @@ extensions = [
 ]
 
 # Exclude build directory and Jupyter backup files:
-exclude_patterns = ['_build', '**.ipynb_checkpoints', '**.swp', 'draft*', '.*swp', '.~*.ipynb']
+exclude_patterns = ['_build', '**.ipynb_checkpoints', '**.swp', 'draft*', 'scripts', '.*swp', '.~*.ipynb']
 
 source_suffix = ['.rst', '.ipynb']
 
