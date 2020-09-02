@@ -29,56 +29,76 @@ local, call_props = create_grouped_methods(
         wrap_properties = True
         )
 
-def _series_group_swap_wrapper(f):
+def _forward_method(f):
+    # Wrap a method for a DataDecorator, so it replaces any DataDecorator instances
+    # with the underlying data. This is important because it allows DataDecorator
+    # to essentially do the same job as a visitor over expressions.
     if isinstance(f, property):
         return property(
-                _series_group_swap_wrapper(f.__get__),
+                _forward_method(f.__get__),
                 f.__set__,
                 f.__delattr__
                 )
 
     @wraps(f)
     def wrapper(self, *args, **kwargs):
-        res = f(self._data, *args, **kwargs)
+        new_args = map(strip_data, args)
+        new_kwargs = {k: strip_data(v) for k,v in kwargs.items()}
+        res = f(strip_data(self), *new_args, **new_kwargs)
 
-        if not isinstance(res, GroupByAgg):
-            return FastGroupedSeries(res)
-        return res
+        # since whole system relies on methods returning grouped series
+        # should be trivially true, but putting in as sanity check
+        from pandas.core.groupby import SeriesGroupBy
+        assert isinstance(res, SeriesGroupBy)
+
+        return self.__class__(res)
+
 
     return wrapper
+
+def strip_data(x):
+    if isinstance(x, (DataDecorator)):
+        return x._data
+    
+    return x
 
 
 # classes =====================================================================
 
-class FastGroupedDataFrame:
-    def __init__(self, df):
-        self.__data = df
-
-    def __getitem__(self, x):
-        if isinstance(x, str):
-            return FastGroupedSeries(self.__data[x])
-
-        raise TypeError("%s can only accept a single column name as as string" %self.__class__.__name__)
-
-    def __getattr__(self, x):
-        if x in self.__data.obj.columns:
-            return FastGroupedSeries(self.__data[x])
-
-        raise AttributeError("no column named %s" %x)
-
-class FastGroupedSeries(metaclass=ABCMeta):
+class DataDecorator:
     """
-    Imagine that Series only have 3 attributes:
-        * __getitem__  (for filtering)
-        * index
-        * array
-        * grouper (for SeriesGroupBy)
-        * obj     (for SeriesGroupBy)
+    used for class decorator pattern.
+    see https://en.wikipedia.org/wiki/Decorator_pattern.
     """
 
     def __init__(self, data):
         self._data = data
+
     
+
+class FastGroupedDataFrame(DataDecorator):
+    """Decorates a DataFrameGroupBy to produce the FastGroupedSeries class below."""
+
+    def __getitem__(self, x):
+        if isinstance(x, str):
+            return FastGroupedSeries(self._data[x])
+
+        raise TypeError("%s can only accept a single column name as as string" %self.__class__.__name__)
+
+    def __getattr__(self, x):
+        if x in self._data.obj.columns:
+            return FastGroupedSeries(self._data[x])
+
+        raise AttributeError("no column named %s" %x)
+
+class FastGroupedSeries(DataDecorator):
+    """Forwards fast versions of methods to underlying SeriesGroupBy.
+
+    """
+    # Note that loop at bottom of class puts methods onto it
+
+    # These properties are forwarded for convenience, in case people want to 
+    # inspect them without having to get _data.
     @property
     def grouper(self):
         return self._data.grouper
@@ -91,24 +111,30 @@ class FastGroupedSeries(metaclass=ABCMeta):
     def obj(self):
         return self._data.obj
 
-    @property
-    def __class__(self):
-        # This allows this class to pass as SeriesGroupBy, but is also dangerous,
-        # since class construction using self.__class__... will now use SeriesGroupBy
-        return SeriesGroupBy
 
 
-
-def extract(grouped_ser):
-    f_broadcast = getattr(grouped_ser, '_broadcast_agg_result', None)
-    if f_broadcast is not None:
-        return f_broadcast
-
-    return grouped_ser.obj
-
-
+# put methods onto FastGroupedSeries ----
 for k, meth in local.items():
-    setattr(FastGroupedSeries, k, _series_group_swap_wrapper(meth))
+    setattr(FastGroupedSeries, k, _forward_method(meth))
 
 del k, meth
+
+# generic function to extract underlying data from grouped objects -----
+
+from functools import singledispatch
+
+@singledispatch
+def extract(data):
+    """Return a Series from a grouped data class."""
+    return data.obj
+
+@extract.register(GroupByAgg)
+def _extract_gser(data):
+    return data._broadcast_agg_result()
+
+@extract.register(FastGroupedSeries)
+def _extract_fgs(data):
+    wrapped_cls = data._data.__class__
+    f = extract.dispatch(wrapped_cls)
+    return f(data._data)
 

@@ -6,6 +6,11 @@ from siuba.experimental.pd_groups.translate import SeriesGroupBy, GroupByAgg, GR
 
 # factory for creating methods dictionary =====================================
 
+def _raise_not_impl(name):
+    def wrapped(*args, **kwargs):
+        raise NotImplementedError(name)
+    return wrapped
+
 def create_grouped_methods(spec, group_methods, keep_only_impl = True, wrap_properties = False):
     out = {}
     call_props = set()
@@ -25,13 +30,15 @@ def create_grouped_methods(spec, group_methods, keep_only_impl = True, wrap_prop
                 accessor = entry['accessor']
                 )
 
-        if entry['is_property'] and wrap_properties:
-            meth = property(meth)
-
         # TODO: returning this exception class from group methods is weird, but I 
         #       think also used in tests
-        if meth is NotImplementedError and not keep_only_impl:
+        if meth is NotImplementedError and keep_only_impl:
             continue
+        elif meth is NotImplementedError:
+            meth = _raise_not_impl(name)
+
+        if entry['is_property'] and wrap_properties:
+            meth = property(meth)
 
         out[name] = meth
 
