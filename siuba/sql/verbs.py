@@ -23,10 +23,13 @@ from .utils import get_dialect_funcs, get_sql_classes, _FixedSqlDatabase
 from sqlalchemy import sql
 import sqlalchemy
 from siuba.siu import Call, CallTreeLocal, str_to_getitem_call, Lazy, FunctionLookupError
+from siuba.spec.series import spec_prop_methods
+
 # TODO: currently needed for select, but can we remove pandas?
 from pandas import Series
 
 from sqlalchemy.sql import schema
+
 
 
 # TODO:
@@ -162,7 +165,7 @@ class LazyTbl:
             ops = None, group_by = tuple(), order_by = tuple(), funcs = None,
             rm_attr = ('str', 'dt'), call_sub_attr = ('dt', 'str'),
             dispatch_cls = None,
-            result_cls = sql.elements.ClauseElement
+            result_cls = sql.elements.ClauseElement,
             ):
         """Create a representation of a SQL table.
 
@@ -249,7 +252,8 @@ class LazyTbl:
                 funcs,
                 call_sub_attr = self.call_sub_attr,
                 dispatch_cls = dispatch_cls,
-                result_cls = self.result_cls
+                result_cls = self.result_cls,
+                call_props = spec_prop_methods
                 )
 
         # raise informative error message if missing translation

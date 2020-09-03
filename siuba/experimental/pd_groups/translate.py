@@ -1,6 +1,8 @@
 from .groupby import DataFrameGroupBy, GroupByAgg, SeriesGroupBy, broadcast_group_elements, _regroup
 import pandas as pd
 
+from types import MethodType
+
 
 # utilities -------------------------------------------------------------------
 
@@ -19,7 +21,11 @@ def _apply_grouped_method(ser, name, is_property, accessor, args, kwargs):
     else:
         method = getattr(ser, name)
 
-    res = method(*args, **kwargs) if not is_property else method
+    if is_property and not isinstance(method, MethodType):
+        # e.g. Series.size, but SeriesGroupBy.size()
+        res = method
+    else:
+        res = method(*args, **kwargs)
 
     return res
 

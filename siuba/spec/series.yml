@@ -1893,7 +1893,8 @@ shift:
   priority: 0
 size:
   action:
-    status: maydo
+    kind: agg
+    status: supported
   backends: {}
   category: attributes
   example: _.size

@@ -415,9 +415,11 @@ base_agg = dict(
         min = sql_agg("min"),
         max = sql_agg("max"),
         count = sql_agg("count"),
+        size = lambda col: sql.func.count(1),
         # TODO: generalize case where doesn't use col
         # need better handeling of vector funcs
         nunique = lambda col: sql.func.count(sql.func.distinct(col)),
+
 
         # POSTGRES compatibility ----------------------------------------------
         quantile = set_agg("percentile_cont"),
@@ -444,6 +446,7 @@ base_win = dict(
 
         # counts ----
         count = win_agg("count"),
+        size = lambda col: AggOver(sql.func.count(1)),
         #n
         #n_distinct
 
