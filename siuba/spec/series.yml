@@ -437,10 +437,13 @@ between_time:
   priority: 0
 bfill:
   action:
-    status: todo
-  backends: {}
+    kind: window
+    status: supported
+  backends:
+    postgresql:
+      status: todo
   category: missing_data
-  example: _.bfill(1)
+  example: _.bfill()
 bool:
   action:
     status: todo
@@ -1180,10 +1183,13 @@ factorize:
   example: _.factorize()
 ffill:
   action:
-    status: todo
-  backends: {}
+    kind: window
+    status: supported
+  backends:
+    postgresql:
+      status: todo
   category: missing_data
-  example: _.ffill(1)
+  example: _.ffill()
 fillna:
   action:
     kind: elwise
@@ -1340,21 +1346,21 @@ is_copy:
   priority: 1
 is_monotonic:
   action:
-    status: todo
+    status: wontdo
   backends: {}
   category: computations
   example: _.is_monotonic
   priority: 3
 is_monotonic_decreasing:
   action:
-    status: todo
+    status: wontdo
   backends: {}
   category: computations
   example: _.is_monotonic_decreasing
   priority: 3
 is_monotonic_increasing:
   action:
-    status: todo
+    status: wontdo
   backends: {}
   category: computations
   example: _.is_monotonic_increasing
