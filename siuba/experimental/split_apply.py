@@ -1,12 +1,14 @@
 import numpy as np
 
 from pandas._libs import lib
-from pandas.core.groupby import SeriesGroupBy
+from pandas.core.groupby import SeriesGroupBy, DataFrameGroupBy
 from pandas import Series
 
 from siuba.experimental.pd_groups.groupby import GroupByAgg, _regroup
 
 from siuba.siu import symbolic_dispatch, strip_symbolic
+
+# Attempt 1, split_apply2 =====================================================
 
 @symbolic_dispatch(cls = SeriesGroupBy)
 def split_apply2(col_x, col_y, f, args = tuple(), kwargs = None, is_agg = False) -> SeriesGroupBy:
@@ -68,6 +70,85 @@ def corr(x, y, method = "pearson", min_periods = 1) -> GroupByAgg:
 @corr.register(Series)
 def _corr_ser(x, y, *args, **kwargs) -> Series:
     return x.corr(y, *args, **kwargs)
+
+
+# Attempt 2, general DataFrame splitting function =============================
+
+
+class NamedSequence:
+    def __init__(self, data, keys):
+        self.__key_to_indx = {k: ii for ii, k in enumerate(keys)}
+
+        if len(self.__key_to_indx) > len(keys):
+            raise ValueError("Keys must be unique")
+
+        self.__data = tuple(data)
+
+    def __getattr__(self, x):
+        ii = self.__key_to_indx[x]
+        return self.__data[ii]
+
+    def __getitem__(self, ii):
+        return self.__data[ii]
+
+class LazySplit:
+    def __init__(self, data, start, end):
+        self.__data = data
+        self.__start = start
+        self.__end = end
+
+    def __getattr__(self, k):
+        return getattr(self.__data, k)[self.__start:self.__end]
+
+    def __getitem__(self, ii):
+        return self.__data[ii][self.__start:self.__end]
+
+    def __len__(self):
+        return self.__end - self.__start
+
+
+def iter_split(data, splitter = None, array_type = 'values'):
+    if splitter is None:
+        splitter = data.grouper._get_splitter(data.obj)
+    sdata = splitter._get_sorted_data()
+
+    arrays = [getattr(col, array_type) for k, col in sdata.iteritems()]
+    named_seq = NamedSequence(arrays, sdata.columns)
+
+    starts, ends = lib.generate_slices(splitter.slabels, splitter.ngroups)
+    for i, (start, end) in enumerate(zip(starts, ends)):
+        yield LazySplit(named_seq, start, end)
+
+@symbolic_dispatch(cls = DataFrameGroupBy)
+def split_apply(data, f, args = tuple(), kwargs = None, is_agg = False):
+
+    call = strip_symbolic(f)
+
+    if kwargs is None:
+        kwargs = {}
+
+    results = []
+    splitter = data.grouper._get_splitter(data.obj)
+    for split in iter_split(data, splitter):
+        calc = call(split, *args, **kwargs)
+
+        if np.ndim(calc) == 0:
+            # TODO: handle
+            pass
+        elif is_agg:
+            raise ValueError()
+        elif len(calc) != len(split):
+            raise ValueError()
+
+        results.append(calc)
+
+    if is_agg:
+        flat = np.array(results)
+        index = data.grouper.result_index
+        return GroupByAgg.from_result(Series(flat, index = index), data)
+
+    flat = np.concatenate(results).ravel()
+    return _regroup(flat[splitter.sort_idx], data)
 
 
 # Tests ======================================================================
