@@ -325,4 +325,26 @@ def test_frame_set_aggregates_postgresql():
             data_frame(g = ['a', 'b'], result = [11., 13.])
             )
 
+@pytest.mark.parametrize("keep,res", [
+    ("first", [False, False, True, False, True, False]),
+    ("last",  [False, True, False, True, False, False]),
+    (False,   [False, True, True, True, True, False]),
+    ])
+@pytest.mark.skip_backend('sqlite')
+def test_series_duplicated_keep_arg(skip_backend, backend, keep, res):
+    from siuba.experimental.pd_groups.dialect import fast_mutate
+    data = data_frame(
+        row = [1, 2, 3, 4, 5, 6],
+        g = ['a', 'a', 'a', 'b', 'b', 'b'],
+        x = [10, 13, 13, 13, 13, 10]
+        )
+
+    dfs = backend.load_df(data)
+
+    assert_equal_query(
+            dfs,
+            group_by(_.g) >> fast_mutate(res = _.x.duplicated(keep = keep)),
+            data.assign(res = res)
+            )
+
 

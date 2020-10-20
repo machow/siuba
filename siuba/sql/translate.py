@@ -84,7 +84,8 @@ class RankOver(Over, CustomOverClause):
 
 class CumlOver(Over, CustomOverClause):
     def set_over(self, group_by, order_by):
-        self.partition_by = group_by
+        crnt_partition = getattr(self.partition_by, 'clauses', tuple())
+        self.partition_by = sql.elements.ClauseList(*crnt_partition, *group_by.clauses)
         self.order_by = order_by
 
         if not len(order_by):
@@ -233,6 +234,18 @@ def sql_func_astype(col, _type):
         raise ValueError("sql astype currently only supports type objects: str, int, float, bool")
     return sql.cast(col, sa_type)
 
+def sql_duplicated(col, keep = "first"):
+    row_num_over = CumlOver(sql.func.row_number(), partition_by = col)
+    count_over = CumlOver(sql.func.count(1), partition_by = col)
+
+    if keep == "first":
+        return row_num_over != 1
+    elif keep == "last":
+        return row_num_over != count_over
+    elif keep == False:
+        return count_over > 1
+    
+    raise ValueError("keep argument must be 'first', 'last', or False")
 
 # Base translations ===========================================================
 
@@ -447,6 +460,7 @@ base_win = dict(
         # counts ----
         count = win_agg("count"),
         size = lambda col: AggOver(sql.func.count(1)),
+        duplicated = sql_duplicated,
         #n
         #n_distinct
 

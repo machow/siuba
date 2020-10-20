@@ -1131,7 +1131,8 @@ dtypes:
   priority: 1
 duplicated:
   action:
-    status: todo
+    kind: window
+    status: supported
   backends: {}
   category: reindexing
   example: _.duplicated()

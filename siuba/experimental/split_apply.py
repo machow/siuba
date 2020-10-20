@@ -8,6 +8,8 @@ from siuba.experimental.pd_groups.groupby import GroupByAgg, _regroup
 
 from siuba.siu import symbolic_dispatch, strip_symbolic
 
+from functools import singledispatch
+
 # Attempt 1, split_apply2 =====================================================
 
 @symbolic_dispatch(cls = SeriesGroupBy)
@@ -107,6 +109,7 @@ class LazySplit:
         return self.__end - self.__start
 
 
+@singledispatch
 def iter_split(data, splitter = None, array_type = 'values'):
     if splitter is None:
         splitter = data.grouper._get_splitter(data.obj)
@@ -118,6 +121,7 @@ def iter_split(data, splitter = None, array_type = 'values'):
     starts, ends = lib.generate_slices(splitter.slabels, splitter.ngroups)
     for i, (start, end) in enumerate(zip(starts, ends)):
         yield LazySplit(named_seq, start, end)
+
 
 @symbolic_dispatch(cls = DataFrameGroupBy)
 def split_apply(data, f, args = tuple(), kwargs = None, is_agg = False):
@@ -149,6 +153,54 @@ def split_apply(data, f, args = tuple(), kwargs = None, is_agg = False):
 
     flat = np.concatenate(results).ravel()
     return _regroup(flat[splitter.sort_idx], data)
+
+# ndarray ----
+
+@iter_split.register(np.ndarray)
+def _iter_split_ndarray(data, splitter):
+    sdata = data.take(splitter.sort_idx)
+    starts, ends = lib.generate_slices(splitter.slabels, splitter.ngroups)
+
+    for i, (start, end) in enumerate(zip(starts, ends)):
+        yield sdata[start:end]
+
+
+@split_apply.register(np.ndarray)
+def _split_apply_ndarray(data, f, groupby, args = tuple(), kwargs = None, is_agg = False):
+    call = strip_symbolic(f)
+
+    if kwargs is None:
+        kwargs = {}
+
+    # NOTE: this is a hack, since we're not passing a series or frame to splitter
+    #       works out fine, but should not try to _get_sorted_data
+    #       will also make type system angry
+    grouper = groupby.grouper
+    splitter = grouper._get_splitter(data)
+
+    results = []
+    for chunk in iter_split(data, splitter):
+        calc = f(chunk, *args, **kwargs)
+
+        # ensure length of each result is correct
+        if is_agg:
+            if np.ndim(calc) != 0:
+                raise ValueError()
+        elif len(calc) != len(chunk):
+            raise ValueError()
+
+        results.append(calc)
+
+    if is_agg:
+        flat = np.array(results)
+        index = grouper.result_index
+        return GroupByAgg.from_result(Series(flat, index = index), data)
+
+    flat = np.concatenate(results).ravel()
+    return _regroup(flat[splitter.sort_idx.argsort()], groupby)
+
+
+# Attempt 3 ===================================================================
 
 
 # Tests ======================================================================

@@ -138,4 +138,22 @@ GROUP_METHODS = {
         }
 
 
+def _method_duplicated(gser: SeriesGroupBy, keep = "first") -> SeriesGroupBy:
+    # TODO: taken from siuba.dply.vector, which imports method_agg_op from here
+    from pandas.core.algorithms import _ensure_data
+    from pandas._libs import hashtable as htable
+    from siuba.experimental.split_apply import split_apply
+
+    values, _ = _ensure_data(gser.obj)
+    ndtype = values.dtype.name
+    f = getattr(htable, f"duplicated_{ndtype}")
+
+    return split_apply(values, f, gser, kwargs = dict(keep = keep))
+    
+
+
+CUSTOM_METHODS = {
+        "duplicated": _method_duplicated,
+        }
+
 

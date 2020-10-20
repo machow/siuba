@@ -1,7 +1,7 @@
 from siuba.spec.series import spec
 from siuba.siu import CallTreeLocal, FunctionLookupError
 
-from siuba.experimental.pd_groups.translate import SeriesGroupBy, GroupByAgg, GROUP_METHODS
+from siuba.experimental.pd_groups.translate import SeriesGroupBy, GroupByAgg, GROUP_METHODS, CUSTOM_METHODS
 
 
 # TODO: make into CallTreeLocal factory function
@@ -9,26 +9,28 @@ from siuba.experimental.pd_groups.translate import SeriesGroupBy, GroupByAgg, GR
 out = {}
 call_props = set()
 for name, entry in spec.items():
-    #if entry['result']['type']: continue
-    kind = entry['action'].get('kind') or entry['action'].get('status')
-    key = (kind.title(), entry['action']['data_arity'])
-
-    # add properties like df.dtype, so we know they are method calls
-    if entry['is_property'] and not entry['accessor']:
-        call_props.add(name)
-
-
-    meth = GROUP_METHODS[key](
-            name = name.split('.')[-1],
-            is_property = entry['is_property'],
-            accessor = entry['accessor']
-            )
-
-    # TODO: returning this exception class from group methods is weird, but I 
-    #       think also used in tests
-    if meth is NotImplementedError:
-        continue
-
+    if name in CUSTOM_METHODS:
+        meth = CUSTOM_METHODS[name]
+    else:
+        kind = entry['action'].get('kind') or entry['action'].get('status')
+        key = (kind.title(), entry['action']['data_arity'])
+    
+        # add properties like df.dtype, so we know they are method calls
+        if entry['is_property'] and not entry['accessor']:
+            call_props.add(name)
+    
+    
+        meth = GROUP_METHODS[key](
+                name = name.split('.')[-1],
+                is_property = entry['is_property'],
+                accessor = entry['accessor']
+                )
+    
+        # TODO: returning this exception class from group methods is weird, but I 
+        #       think also used in tests
+        if meth is NotImplementedError:
+            continue
+    
     out[name] = meth
 
 call_listener = CallTreeLocal(
