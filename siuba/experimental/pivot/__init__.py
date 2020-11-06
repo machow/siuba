@@ -11,7 +11,7 @@ def pivot_longer_spec(data,
                       spec,
                       names_repair: Optional[str] = "check_unique",
                       values_drop_na: bool = False):
-    pass
+    raise NotImplementedError("TODO: see https://github.com/machow/siuba/issues/293")
 
 
 @singledispatch2(pd.DataFrame)
