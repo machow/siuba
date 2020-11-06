@@ -97,7 +97,7 @@ class Pipeable:
 pipe = Pipeable
 
 def _regroup(df):
-    # try to regroup, when user kept index (e.g. group_keys = True)
+    # try to regroup after an apply, when user kept index (e.g. group_keys = True)
     if len(df.index.names) > 1:
         # handle cases where...
         # 1. grouping with named indices (as_index = True)
@@ -706,7 +706,19 @@ def arrange(__data, *args):
 
 @arrange.register(DataFrameGroupBy)
 def _arrange(__data, *args):
-    raise NotImplementedError("TODO: arrange with grouped DataFrame")
+    for arg in args:
+        f, desc = _call_strip_ascending(arg)
+        if not simple_varname(f):
+            raise NotImplementedError(
+                    "Arrange over DataFrameGroupBy only supports simple "
+                    "column names, not expressions"
+                    )
+
+    df_sorted = arrange(__data.obj, *args)
+
+    group_cols = [ping.name for ping in __data.grouper.groupings]
+    return df_sorted.groupby(group_cols)
+
 
 
 
@@ -1099,6 +1111,8 @@ def anti_join(left, right = None, on = None):
     # copied from semi_join
     if isinstance(on, Mapping):
         left_on, right_on = zip(*on.items())
+    else: 
+        left_on = right_on = on
 
     # manually perform merge, up to getting pieces need for indexing
     merger = _MergeOperation(left, right, left_on = left_on, right_on = right_on)
@@ -1250,7 +1264,7 @@ from pandas.core.reshape.util import cartesian_product
 @singledispatch2(pd.DataFrame)
 def expand(__data, *args, fill = None):
     var_names = list(map(simple_varname, args))
-    cols = [__data[name] for name in var_names]
+    cols = [__data[name].unique() for name in var_names]
     # see https://stackoverflow.com/a/25636395/1144523
     cprod = cartesian_product(cols)
     expanded = pd.DataFrame(np.array(cprod).T)

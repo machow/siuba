@@ -1,0 +1,27 @@
+name: main
+on:
+  push:
+    branches:
+      - 'master'
+
+jobs:
+  spec-to-airtable:
+    # Job name is Greeting
+    name: Upload method spec to airtable
+    # This job runs on Linux
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.7' # Version range or exact version of a Python version to use, using SemVer's version range syntax
+      - name: Install dependencies
+        run: |
+          python -m pip install -e . 
+          python -m pip install airtable-python-wrapper==0.15.0
+      - name: Upload spec
+        run: |
+          python docs/scripts/upload_airtable.py
+        env:
+          AIRTABLE_API_KEY: ${{ secrets.AIRTABLE_API_KEY }}
+
