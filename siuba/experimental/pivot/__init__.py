@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 
 from typing import Union, Tuple, Dict, Optional
+from pandas.core.groupby import DataFrameGroupBy
 
 from siuba.dply.verbs import singledispatch2, gather, var_create, var_select
 
@@ -135,3 +136,20 @@ def pivot_longer(
         output_df = keep_data.merge(stacked_df, left_index=True, right_index=True)
     
     return output_df
+
+@pivot_longer.register(DataFrameGroupBy)
+def _pivot_longer_gdf(__data, *args, **kwargs):
+    # TODO: consolidate all verbs that punt to DataFrame version (#118)
+    prior_groups = [el.name for el in __data.grouper.groupings]
+
+    df = __data.obj
+    res = pivot_longer(df, *args, **kwargs)
+
+    missing_groups = set(prior_groups) - set(res.columns)
+    if missing_groups:
+        raise ValueError(
+                "When using pivot_longer on grouped data, the result must contain "
+                "original grouping columns. Missing group columns: %s" %missing_groups
+                )
+
+    return res.groupby(prior_groups)

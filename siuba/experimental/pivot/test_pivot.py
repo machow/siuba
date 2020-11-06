@@ -15,7 +15,10 @@ from . import pivot_longer, pivot_longer_spec
 import pytest
 import pandas as pd
 import numpy as np
+
 from siuba.siu import Symbolic
+from siuba import group_by
+
 from siuba.tests.helpers import data_frame, assert_frame_sort_equal
 from pandas.testing import assert_frame_equal, assert_series_equal
 
@@ -184,7 +187,6 @@ def test_type_error_message_uses_var_names():
         print(err)
 
 
-@pytest.mark.xfail
 def test_grouping_is_preserved():
     # In siuba this actually tests 3 things:
     # 1) Can we pipe a grouped DataFrame in to `pivot_longer`? - Not yet
@@ -206,6 +208,9 @@ def test_grouping_is_preserved():
         g = [1, 1, 2, 2],
         x = ["x1", "x2", "x1", "x2"],
         v = [1, 3, 2, 4],
-    )
+        _index = [0, 0, 1, 1]
+    ).groupby("g")
+
     # assert_frame_equal does not work with DataFrameGroupBy.
-    assert_frame_equal(out, expected.groupby("g"))
+    isinstance(out, expected.__class__)
+    assert_frame_equal(out.obj, expected.obj)
