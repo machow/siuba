@@ -35,7 +35,7 @@ jobs:
 
   # bleeding edge
   - name: "Pure setup.py install"
-    if: branch = latest
+    if: branch = nightly
     install:
       - pip install -r requirements-test.txt
       - pip install ./
