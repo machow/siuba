@@ -1,8 +1,20 @@
+/* nbsphinx specific */
+
+.nbinput .prompt, .nboutput .prompt {
+    display: none;
+}
+
+
+/* media queries */
+
 @media screen and (max-width: 875px) {
   div.sphinxsidebar {
     order: 2;
   }
 }
+
+
+/* general site styles */
 
 body {
   font-size: 16px !important;
@@ -26,7 +38,7 @@ div.sphinxsidebar {
 
 }
 
-div.sphinxsidebar.searchbox {
+div.sphinxsidebar .search {
   width: 200px;
 }
 
@@ -76,3 +88,4 @@ table.align-default td, table.align-left td {
   padding: 6px 13px !important;
   border: 1px solid #dfe2e5 !important;
 }
+
