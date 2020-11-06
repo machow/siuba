@@ -110,6 +110,7 @@ def test_symbol_rhs_exec(_, op):
     "_.a",
     "_['a':'b']",
     """_["'a'":'b']""",
+    "_.a.mean(1,b = 2)",
     ])
 def test_explain_other(_, expr):
     sym = eval(expr, {'_': _})

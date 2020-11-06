@@ -6,9 +6,13 @@ import pandas as pd
 import os
 import numpy as np
 
-def data_frame(**kwargs):
+def data_frame(*args, _index = None, **kwargs):
+    if len(args):
+        raise NotImplementedError("all arguments to data_frame must be named")
+
+    
     fixed = {k: [v] if not np.ndim(v) else v for k,v in kwargs.items()}
-    return pd.DataFrame(fixed)
+    return pd.DataFrame(fixed, index = _index)
 
 BACKEND_CONFIG = {
         "postgresql": {
