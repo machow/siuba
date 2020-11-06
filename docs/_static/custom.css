@@ -13,6 +13,12 @@
   }
 }
 
+@media screen and (min-width: 1080px) {
+  div.body {
+    padding-left: 45px !important;
+  }
+}
+
 
 /* general site styles */
 
@@ -23,7 +29,7 @@ body {
 div.document {
   max-width: 1010px;
   width: auto !important;
-  min-width: 940px;
+  /*min-width: 940px;*/
   display: flex;
   flex-direction: column;
 }
@@ -60,10 +66,6 @@ li.toctree-l2 a {
 
 li.toctree-l3 a {
   border: none;
-}
-
-div.body {
-  padding-left: 45px !important;
 }
 
 table.align-default, .table-container table {
