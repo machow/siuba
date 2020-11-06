@@ -284,13 +284,13 @@ add_prefix:
     status: wontdo
   backends: {}
   category: reindexing
-  example: _.add_prefix()
+  example: _.add_prefix('pre_')
 add_suffix:
   action:
     status: wontdo
   backends: {}
   category: reindexing
-  example: _.add_suffix()
+  example: _.add_suffix('_suff')
 agg:
   action:
     status: wontdo
@@ -330,7 +330,7 @@ append:
     status: todo
   backends: {}
   category: combining
-  example: _.append()
+  example: _.append(_)
   priority: 1
 apply:
   action:
@@ -806,7 +806,9 @@ dt.freq:
   action:
     kind: singleton
     status: supported
-  backends: {}
+  backends:
+    postgresql:
+      status: wontdo
   category: datetime_properties
   example: _.dt.freq
 dt.hour:
@@ -1050,7 +1052,9 @@ dt.tz:
   action:
     kind: singleton
     status: supported
-  backends: {}
+  backends:
+    postgresql:
+      status: wontdo
   category: datetime_properties
   example: _.dt.tz
 dt.tz_convert:
@@ -1107,18 +1111,20 @@ dt.year:
   example: _.dt.year
 dtype:
   action:
-    status: todo
-  backends: {}
+    kind: singleton
+    status: supported
+  backends:
+    postgresql:
+      status: wontdo
   category: attributes
   example: _.dtype
   priority: 1
 dtypes:
   action:
-    status: todo
+    status: wontdo
   backends: {}
   category: attributes
   example: _.dtypes
-  priority: 1
 duplicated:
   action:
     status: todo

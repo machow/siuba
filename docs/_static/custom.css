@@ -5,6 +5,15 @@
 }
 
 
+/* media queries */
+
+@media screen and (max-width: 875px) {
+  div.sphinxsidebar {
+    order: 2;
+  }
+}
+
+
 /* general site styles */
 
 body {
@@ -15,6 +24,12 @@ div.document {
   max-width: 1010px;
   width: auto !important;
   min-width: 940px;
+  display: flex;
+  flex-direction: column;
+}
+
+div.documentwrapper {
+  padding-bottom: 50px
 }
 
 div.sphinxsidebar {
@@ -73,3 +88,4 @@ table.align-default td, table.align-left td {
   padding: 6px 13px !important;
   border: 1px solid #dfe2e5 !important;
 }
+

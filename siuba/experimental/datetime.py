@@ -7,6 +7,11 @@ from pandas.core.dtypes.common import is_period_dtype, is_datetime64_any_dtype
 
 from abc import ABC
 
+try:
+    from pandas.tseries.offsets import prefix_mapping
+except ImportError:
+    from pandas._libs.tslibs.offsets import prefix_mapping
+
 LUBRIDATE_OFFSETS = {
         "second": "S",
         "minute": "M",
@@ -32,7 +37,7 @@ DatetimeType = _make_abc("DatetimeType", [DatetimeIndex, DatetimeArray, Timestam
 PeriodType   = _make_abc("PeriodType",   [PeriodIndex, PeriodArray, Period])
 
 def _get_offset(unit):
-    cls = offsets.prefix_mapping.get(unit)
+    cls = prefix_mapping.get(unit)
     if cls is None:
         raise ValueError("unit {} not a valid offset".format(unit))
 

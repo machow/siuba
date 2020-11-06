@@ -6,9 +6,17 @@ import pandas as pd
 import os
 import numpy as np
 
-def data_frame(**kwargs):
-    fixed = {k: [v] if not np.ndim(v) else v for k,v in kwargs.items()}
-    return pd.DataFrame(fixed)
+def data_frame(*args, _index = None, **kwargs):
+    if len(args):
+        raise NotImplementedError("all arguments to data_frame must be named")
+
+    all_scalars = all(not np.ndim(v) for v in kwargs.values())
+
+    if all_scalars:
+        fixed = {k: [v] for k,v in kwargs.items()}
+        return pd.DataFrame(fixed, index = _index)
+    
+    return pd.DataFrame(kwargs, index = _index)
 
 BACKEND_CONFIG = {
         "postgresql": {
