@@ -139,8 +139,8 @@ def test_basic_left_join(df1, df2):
 @backend_sql("TODO: pandas returns columns in rev name order")
 def test_basic_right_join(backend, df1, df2):
     # same as left join, but flip df arguments
-    out = right_join(df2, df1, {"ii": "ii"}) >> collect()
-    target = DF1.assign(y = ["a", "b", None, None])
+    out = right_join(df1, df2, {"ii": "ii"}) >> collect()
+    target = DF2.assign(x = ["a", "b", None])[["ii", "x", "y"]]
     assert_frame_sort_equal(out, target)
 
 def test_basic_inner_join(df1, df2):
