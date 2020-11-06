@@ -1264,7 +1264,7 @@ from pandas.core.reshape.util import cartesian_product
 @singledispatch2(pd.DataFrame)
 def expand(__data, *args, fill = None):
     var_names = list(map(simple_varname, args))
-    cols = [__data[name] for name in var_names]
+    cols = [__data[name].unique() for name in var_names]
     # see https://stackoverflow.com/a/25636395/1144523
     cprod = cartesian_product(cols)
     expanded = pd.DataFrame(np.array(cprod).T)
