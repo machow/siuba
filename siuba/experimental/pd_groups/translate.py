@@ -93,13 +93,36 @@ def method_win_op(name, is_property, accessor):
     return f
 
 
+def method_agg_singleton(name, is_property, accessor):
+    def f(__ser, *args, **kwargs):
+        _validate_data_args(__ser)
+        if accessor is not None:
+            op_function = getattr(getattr(__ser.obj, accessor, __ser.obj), name)
+        else:
+            op_function = getattr(__ser.obj, name)
+
+        # cast singleton result to be GroupByAgg, as if we did an aggregation
+        # could create a class to for grouped singletons, but seems like overkill
+        # for now
+        singleton = op_function if is_property else op_function()
+        dtype = 'object' if singleton is None else None
+
+        # note that when the value is None, need to explicitly make dtype object
+        res = pd.Series(singleton, index = __ser.grouper.levels, dtype = dtype) 
+
+        return GroupByAgg.from_result(res, __ser)
+    return f
+
+
+
+
 GROUP_METHODS = { 
         ("Elwise", 1): method_el_op,
         ("Elwise", 2): method_el_op2,
         ("Agg", 1): method_agg_op,
         ("Window", 1): method_win_op,
         ("Window", 2): method_win_op,
-        ("Singleton", 1): not_implemented,
+        ("Singleton", 1): method_agg_singleton,
         ("Todo", 1): not_implemented,
         ("Maydo", 1): not_implemented,
         ("Wontdo", 1): not_implemented,

@@ -50,6 +50,7 @@ scalar = SqlTranslator(
         concat = sql.func.concat,
         cat = sql.func.concat,
         str_c = sql.func.concat,
+        __floordiv__ = lambda x, y: sql.cast(x / y, sa_types.Integer())
         )
 
 aggregate = SqlTranslator(

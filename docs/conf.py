@@ -15,7 +15,7 @@ extensions = [
 ]
 
 # Exclude build directory and Jupyter backup files:
-exclude_patterns = ['_build', '**.ipynb_checkpoints', '**.swp', 'draft*', '.*swp', '.~*.ipynb']
+exclude_patterns = ['_build', '**.ipynb_checkpoints', '**.swp', 'draft*', 'scripts', '.*swp', '.~*.ipynb']
 
 source_suffix = ['.rst', '.ipynb']
 
@@ -90,9 +90,6 @@ nbsphinx_custom_formats = {
     '.Rmd': lambda s: jupytext.reads(s, '.Rmd'),
 }
 
-# hide prompt numbers. we change pd display options in a hidden cell, so it looks
-# funny to start at [2]
-nbsphinx_prompt_width = 0
 
 # This is processed by Jinja2 and inserted before each notebook
 nbsphinx_epilog = r"""

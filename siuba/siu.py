@@ -1,4 +1,5 @@
 import itertools
+import operator
 
 # TODO: symbolic formatting: __add__ -> "+"
 
@@ -190,9 +191,12 @@ class Call:
         # TODO: temporary workaround, for when only __get_attribute__ is defined
         if self.func == "__getattr__":
             return getattr(inst, *rest)
+        elif self.func == "__call__":
+            return getattr(inst, self.func)(*rest, **kwargs)
 
         # in normal case, get method to call, and then call it
-        return getattr(inst, self.func)(*rest, **kwargs)
+        f_op = getattr(operator, self.func)
+        return f_op(inst, *rest, **kwargs)
 
     @staticmethod
     def evaluate_calls(arg, x):
@@ -501,7 +505,8 @@ class CallTreeLocal(CallListener):
             call_sub_attr = None,
             chain_sub_attr = False,
             dispatch_cls = None,
-            result_cls = None
+            result_cls = None,
+            call_props = None
             ):
         """
         Arguments:
@@ -514,12 +519,14 @@ class CallTreeLocal(CallListener):
                           to try and get their corresponding local function.
             result_cls: if custom calls are dispatchers, require their result annotation to be a subclass
                           of this class.
+            call_props: property methods to potentially convert to local calls.
         """
         self.local = local
         self.call_sub_attr = set(call_sub_attr or [])
         self.chain_sub_attr = chain_sub_attr
         self.dispatch_cls = dispatch_cls
         self.result_cls = result_cls
+        self.call_props = set(call_props or [])
 
     def create_local_call(self, name, prev_obj, cls, func_args = None, func_kwargs = None):
         # need call attr name (arg[0].args[1]) 
@@ -564,6 +571,8 @@ class CallTreeLocal(CallListener):
                 # e.g. dt.round, rather than round
                 attr = prev_attr + '.' + attr
             return self.create_local_call(attr, prev_obj, Call)
+        elif attr in self.call_props:
+            return self.create_local_call(attr, obj, Call)
 
         return self.generic_enter(node)
 

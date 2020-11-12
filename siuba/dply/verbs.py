@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 
 from pandas.core.groupby import DataFrameGroupBy
+from pandas.core.dtypes.inference import is_scalar
 from siuba.siu import Symbolic, Call, strip_symbolic, MetaArg, BinaryOp, create_sym_call, Lazy
 
 DPLY_FUNCTIONS = (
@@ -35,6 +36,17 @@ __all__ = [*DPLY_FUNCTIONS, "Pipeable", "pipe"]
 # * n_distinct?
 # * separate_rows
 # * tally
+
+def install_siu_methods(cls):
+    """This function attaches siuba's table verbs on a class, to use as methods.
+
+    """
+    func_dict = globals()
+    for func_name in DPLY_FUNCTIONS:
+        f = func_dict[func_name]
+
+        method_name = "siu_{}".format(func_name)
+        setattr(cls, method_name, f)
 
 def install_pd_siu():
     # https://github.com/coursera/pandas-ply/blob/master/pandas_ply/methods.py
@@ -85,7 +97,7 @@ class Pipeable:
 pipe = Pipeable
 
 def _regroup(df):
-    # try to regroup, when user kept index (e.g. group_keys = True)
+    # try to regroup after an apply, when user kept index (e.g. group_keys = True)
     if len(df.index.names) > 1:
         # handle cases where...
         # 1. grouping with named indices (as_index = True)
@@ -391,10 +403,15 @@ def summarize(__data, **kwargs):
     for k, v in kwargs.items():
         res = v(__data) if callable(v) else v
 
-        # TODO: validation?
+        # validate operations returned single result
+        if not is_scalar(res) and len(res) > 1:
+            raise ValueError("Summarize argument, %s, must return result of length 1 or a scalar." % k)
 
-        results[k] = res
+        # keep result, but use underlying array to avoid crazy index issues
+        # on DataFrame construction (#138)
+        results[k] = res.array if isinstance(res, pd.Series) else res
         
+    # must pass index, or raises error when using all scalar values
     return DataFrame(results, index = [0])
 
     
@@ -689,7 +706,19 @@ def arrange(__data, *args):
 
 @arrange.register(DataFrameGroupBy)
 def _arrange(__data, *args):
-    raise NotImplementedError("TODO: arrange with grouped DataFrame")
+    for arg in args:
+        f, desc = _call_strip_ascending(arg)
+        if not simple_varname(f):
+            raise NotImplementedError(
+                    "Arrange over DataFrameGroupBy only supports simple "
+                    "column names, not expressions"
+                    )
+
+    df_sorted = arrange(__data.obj, *args)
+
+    group_cols = [ping.name for ping in __data.grouper.groupings]
+    return df_sorted.groupby(group_cols)
+
 
 
 
@@ -1082,6 +1111,8 @@ def anti_join(left, right = None, on = None):
     # copied from semi_join
     if isinstance(on, Mapping):
         left_on, right_on = zip(*on.items())
+    else: 
+        left_on = right_on = on
 
     # manually perform merge, up to getting pieces need for indexing
     merger = _MergeOperation(left, right, left_on = left_on, right_on = right_on)
@@ -1233,7 +1264,7 @@ from pandas.core.reshape.util import cartesian_product
 @singledispatch2(pd.DataFrame)
 def expand(__data, *args, fill = None):
     var_names = list(map(simple_varname, args))
-    cols = [__data[name] for name in var_names]
+    cols = [__data[name].unique() for name in var_names]
     # see https://stackoverflow.com/a/25636395/1144523
     cprod = cartesian_product(cols)
     expanded = pd.DataFrame(np.array(cprod).T)

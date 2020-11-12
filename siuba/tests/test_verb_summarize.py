@@ -4,7 +4,7 @@ Note: this test file was heavily influenced by its dbplyr counterpart.
 https://github.com/tidyverse/dbplyr/blob/master/tests/testthat/test-verb-mutate.R
 """
     
-from siuba import _, mutate, select, group_by, summarize, filter
+from siuba import _, mutate, select, group_by, summarize, filter, show_query
 from siuba.dply.vector import row_number, n
 
 import pytest
@@ -35,7 +35,7 @@ def test_summarize_ungrouped(df, query, output):
 
 
 @pytest.mark.skip("TODO: should return 1 row (#63)")
-def test_ungrouped_summarize_literal(df, query, output):
+def test_ungrouped_summarize_literal(df):
     assert_equal_query(df, summarize(y = 1), data_frame(y = 1)) 
 
 
@@ -99,10 +99,53 @@ def test_summarize_unnamed_args(df):
             )
 
 
-@pytest.mark.skip("TODO: Summarize should fail when result len > 1 (#138)")
+def test_summarize_validates_length():
+    with pytest.raises(ValueError):
+        summarize(data_frame(x = [1,2]), res = _.x + 1)
+
+
 def test_frame_mode_returns_many():
+    # related to length validation above
     with pytest.raises(ValueError):
         df = data_frame(x = [1, 2, 3])
         res = summarize(df, result = _.x.mode())
 
+
+def test_summarize_removes_series_index():
+    # Note: currently wouldn't work in postgresql, since _.x + _.y not an agg func
+    df = data_frame(g = ['a', 'b', 'c'], x = [1,2,3], y = [4,5,6])
+
+    assert_equal_query(
+            df,
+            group_by(_.g) >> summarize(res = _.x + _.y),
+            df.assign(res = df.x + df.y).drop(columns = ["x", "y"])
+            )
+            
+
+@backend_sql
+def test_summarize_subquery_group_vars(backend, df):
+    query = mutate(g2 = _.g.str.upper()) >> group_by(_.g2) >> summarize(low = _.x.min())
+    assert_equal_query(
+            df,
+            query,
+            data_frame(g2 = ['A', 'B'], low = [1, 3])
+            )
+
+    # check that is uses a subquery, since g2 is defined in first query
+    text = str(query(df).last_op)
+    assert text.count('FROM') == 2
+
+
+@backend_sql
+def test_summarize_subquery_op_vars(backend, df):
+    query = mutate(x2 = _.x + 1) >> group_by(_.g) >> summarize(low = _.x2.min())
+    assert_equal_query(
+            df,
+            query,
+            data_frame(g = ['a', 'b'], low = [2, 4])
+            )
+
+    # check that is uses a subquery, since x2 is defined in first query
+    text = str(query(df).last_op)
+    assert text.count('FROM') == 2
 

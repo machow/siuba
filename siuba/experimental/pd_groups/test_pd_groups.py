@@ -92,9 +92,13 @@ def test_agg_groupby_broadcasted_equal_to_transform(f_op, f_dst):
 
 # Test user-defined functions =================================================
 
-from .dialect import fast_mutate, fast_summarize, fast_filter
+from .dialect import fast_mutate, fast_summarize, fast_filter, _transform_args
 from siuba.siu import symbolic_dispatch, _, FunctionLookupError
 from typing import Any
+
+def test_transform_args():
+    pass
+
 
 def test_fast_grouped_custom_user_funcs():
     @symbolic_dispatch
@@ -124,10 +128,17 @@ def test_fast_grouped_custom_user_func_default():
 def test_fast_grouped_custom_user_func_fail():
     @symbolic_dispatch
     def f(x):
+        return x.mean()
+
+    @f.register(GroupByAgg)
+    def _f_gser(x):
+        # note, no return annotation, so translator will raise an error
         return GroupByAgg.from_result(x.mean(), x)
 
+
     gdf = data_default.groupby('g')
-    with pytest.raises(FunctionLookupError):
+    
+    with pytest.warns(UserWarning):
         g_out = fast_mutate(gdf, result1 = f(_.x), result2 = _.x.mean() + 10)
 
 
@@ -157,3 +168,30 @@ def test_fast_methods_constant():
             )
 
     
+def test_fast_methods_lambda():
+    # testing ways to do operations via slower apply route
+
+    gdf = data_default.groupby('g')
+
+    # mutate ----
+    out = fast_mutate(gdf, y = lambda d: len(d['x']))
+    assert_frame_equal(
+            gdf.obj.assign(y = gdf['x'].transform('size')),
+            out.obj
+            )
+
+    # summarize ----
+    out = fast_summarize(gdf, y = lambda d: len(d['x']))
+
+    agg_frame = gdf.grouper.result_index.to_frame()
+    assert_frame_equal(
+            agg_frame.assign(y = gdf['x'].agg('size')).reset_index(drop = True),
+            out
+            )
+
+    # filter ----
+    out = fast_filter(gdf, lambda d: d['x'] > d['x'].values.min())
+    assert_frame_equal(
+            gdf.obj[gdf.obj['x'] > gdf['x'].transform('min')],
+            out.obj
+            )

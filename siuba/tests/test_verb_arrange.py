@@ -1,5 +1,5 @@
 from siuba.dply.verbs import simple_varname
-from siuba import _, filter, group_by, arrange, mutate
+from siuba import _, filter, group_by, arrange, mutate, ungroup
 from siuba.dply.vector import row_number, desc
 import pandas as pd
 
@@ -40,6 +40,31 @@ def test_arrange_desc(df, query, output):
     ])
 def test_arrange_with_expr(df, query, output):
     assert_equal_query(df, query, output)
+
+
+def test_arrange_grouped_trivial(df):
+    # note: only 1 level for z
+    assert_equal_query(
+            df,
+            group_by(_.z) >> arrange(_.x),
+            DATA.sort_values(['x'])
+            )
+
+@backend_notimpl("sqlite")
+def test_arrange_grouped(backend, df):
+    q = group_by(_.y) >> arrange(_.x)
+    assert_equal_query(
+            df,
+            q,
+            DATA.sort_values(['x'])
+            )
+
+    # arrange w/ mutate is the same, whether used before or after group_by
+    assert_equal_query(
+            df,
+            q >> mutate(res = row_number(_)),
+            mutate(DATA.sort_values(['x']).groupby('y'), res = row_number(_))
+            )
 
 
 # SQL -------------------------------------------------------------------------

@@ -9,7 +9,7 @@ siuba
 
 <img width="30%" align="right" src="./docs/siuba_small.svg">
 
-siuba is a port of [dplyr](https://github.com/tidyverse/dplyr) and other R libraries. It supports a tabular data analysis workflow centered on 5 common actions:
+siuba ([小巴](http://www.cantonese.sheik.co.uk/dictionary/words/9139/)) is a port of [dplyr](https://github.com/tidyverse/dplyr) and other R libraries. It supports a tabular data analysis workflow centered on 5 common actions:
 
 * `select()` - keep certain columns of data.
 * `filter()` - keep certain rows of data.
@@ -88,7 +88,7 @@ Out[2]:
 └─4
 ```
 
-You can also think siu expressions as a shorthand for a lambda function.
+You can also think of siu expressions as a shorthand for a lambda function.
 
 ```python
 from siuba import _
@@ -114,7 +114,7 @@ Out[3]:
 
 See [siu expression section here](https://siuba.readthedocs.io/en/latest/intro.html#Concise-pandas-operations-with-siu-expressions-(_)).
 
-### Using with SQL
+### Using with a SQL database
 
 A killer feature of siuba is that the same analysis code can be run on a local DataFrame, or a SQL source.
 
