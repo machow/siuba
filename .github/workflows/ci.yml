@@ -68,7 +68,7 @@ jobs:
           REQUIREMENTS: ${{ matrix.requirements }}
       - name: Test with pytest
         run: |
-          make test travis
+          make test-travis
         env:
           SB_TEST_PGPORT: 5432
           PYTEST_FLAGS: ${{ matrix.pytest_flags }}
