@@ -1,6 +1,9 @@
 name: CI
 
-on: [push]
+on:
+  push:
+  release:
+    types: [published]
 
 jobs:
   checks:
@@ -67,4 +70,12 @@ jobs:
         env:
           SB_TEST_PGPORT: 5432
           PYTEST_FLAGS: ${{ matrix.pytest_flags }}
-          
+  deploy:
+    needs: [checks]
+    if: ${{ github.event_name == "release" && success() }}
+    steps:
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@master
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          repository_url: https://test.pypi.org/legacy/
