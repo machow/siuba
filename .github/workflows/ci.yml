@@ -14,7 +14,7 @@ jobs:
         include:
           # historical requirements
           - name: "Minimum install_requires versions"
-            requirements: numpy~=1.12.0 pandas~=0.24.0 SQLAlchemy~=1.1.18 psycopg2~=2.7.0
+            requirements: numpy~=1.12.0 pandas~=0.24.0 SQLAlchemy~=1.2.19 psycopg2~=2.7.0
             pytest_flags: --ignore=siuba/dply/forcats.py siuba
             python-version: 3.6
           - name: "2019-late dependencies"
