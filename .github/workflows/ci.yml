@@ -41,7 +41,7 @@ jobs:
       postgres:
         image: postgres
         env:
-          POSTGRES_PASSWORD: ""
+          POSTGRES_PASSWORD: "abc"
         # Set health checks to wait until postgres has started
         options: >-
           --health-cmd pg_isready
@@ -71,4 +71,5 @@ jobs:
           PYTEST_FLAGS: ${{ matrix.pytest_flags }}
           # TODO: this is hard-coded in an example notebook
           PGPORT: 5432
+          SB_TEST_PGPASSWORD: "abc"
           
