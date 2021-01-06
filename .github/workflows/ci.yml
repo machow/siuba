@@ -69,4 +69,6 @@ jobs:
         env:
           SB_TEST_PGPORT: 5432
           PYTEST_FLAGS: ${{ matrix.pytest_flags }}
+          # TODO: this is hard-coded in an example notebook
+          PGPORT: 5432
           
