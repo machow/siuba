@@ -72,7 +72,7 @@ jobs:
           PYTEST_FLAGS: ${{ matrix.pytest_flags }}
   deploy:
     needs: [checks]
-    if: ${{ github.event_name == "release" && success() }}
+    if:  github.event_name == "release" && success()
     steps:
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@master
