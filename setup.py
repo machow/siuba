@@ -28,7 +28,7 @@ setup(
     install_requires=[
         "pandas>=0.24.0",
         "numpy>=1.12.0",
-        "SQLAlchemy>=1.1.18",
+        "SQLAlchemy>=1.2.19",
         "PyYAML>=3.0.0"
     ],
     python_requires=">=3.6",

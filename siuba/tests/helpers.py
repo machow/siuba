@@ -22,7 +22,7 @@ BACKEND_CONFIG = {
         "postgresql": {
             "dialect": "postgresql",
             "dbname": ["SB_TEST_PGDATABASE", "postgres"],
-            "port": ["SB_TEST_PGPORT", "5433"],
+            "port": ["SB_TEST_PGPORT", "5432"],
             "user": ["SB_TEST_PGUSER", "postgres"],
             "password": ["SB_TEST_PGPASSWORD", ""],
             "host": ["SB_TEST_PGHOST", "localhost"],
