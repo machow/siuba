@@ -73,16 +73,22 @@ class Pipeable:
             self.calls = calls
 
     def __rshift__(self, x):
+        """Handle >> syntax when pipe is on the left (lazy piping)."""
         if isinstance(x, Pipeable):
             return Pipeable(calls = self.calls + x.calls)
+        elif isinstance(x, (Symbolic, Call)):
+            call = strip_symbolic(x)
+            return Pipeable(calls = self.calls + [call])
         elif callable(x):
             return Pipeable(calls = self.calls + [x])
 
         raise Exception()
 
     def __rrshift__(self, x):
-        if isinstance(x, Pipeable):
-            return Pipeable(calls = x.calls + self.calls)
+        """Handle >> syntax when pipe is on the right (eager piping)."""
+        if isinstance(x, (Symbolic, Call)):
+            call = strip_symbolic(x)
+            return Pipeable(calls = [call] + self.calls)
         elif callable(x):
             return Pipeable(calls = [x] + self.calls)
 
