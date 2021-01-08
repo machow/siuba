@@ -25,8 +25,12 @@ def test_filter_basic(backend):
 
     assert_equal_query(dfs, filter(_.x > 3), df[lambda _: _.x > 3])
 
+def test_filter_basic_two_args(backend):
+    df = data_frame(x = [1,2,3,4,5], y = [5,4,3,2,1])
+    dfs = backend.load_df(df)
 
-@backend_sql("TODO: pandas - grouped col should be first after mutate")
+    assert_equal_query(dfs, filter(_.x > 3, _.y < 2), df[lambda _: (_.x > 3) & (_.y < 2)])
+
 @backend_notimpl("sqlite")
 def test_filter_via_group_by(backend):
     df = data_frame(
@@ -43,7 +47,6 @@ def test_filter_via_group_by(backend):
             )
 
 
-@backend_sql("TODO: pandas - grouped col should be first after mutate")
 @backend_notimpl("sqlite")
 def test_filter_via_group_by_agg(backend):
     dfs = backend.load_df(x = range(1,11), g = [1]*5 + [2]*5)
@@ -53,6 +56,18 @@ def test_filter_via_group_by_agg(backend):
             group_by(_.g) >> filter(_.x > _.x.mean()),
             data_frame(x = [4, 5, 9, 10], g = [1, 1, 2, 2])
             )
+
+
+@backend_notimpl("sqlite")
+def test_filter_via_group_by_agg_two_args(backend):
+    dfs = backend.load_df(x = range(1,11), g = [1]*5 + [2]*5)
+
+    assert_equal_query(
+            dfs,
+            group_by(_.g) >> filter(_.x > _.x.mean(), _.x != _.x.max()),
+            data_frame(x = [4, 9], g = [1, 2])
+            )
+
 
 @backend_sql("TODO: pandas - implement arrange over group by")
 @backend_notimpl("sqlite")

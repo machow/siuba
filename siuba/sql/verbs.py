@@ -88,18 +88,33 @@ class WindowReplacer(CallListener):
             over.set_over(group_by, order_by)
 
         if len(over_clauses) and self.window_cte is not None:
-            label = col_expr.label(None)
-            self.windows.append(label)
+            # custom name, or parameters like "%(...)s" may nest and break psycopg2
+            # with columns you can set a key to fix this, but it doesn't seem to 
+            # be an option with labels
+            name = self._get_unique_name('win', self.window_cte.columns)
+            label = col_expr.label(name)
 
             # optionally put into CTE, and return its resulting column
             self.window_cte.append_column(label)
             win_col = self.window_cte.c.values()[-1]
 
-            # custom key, or parameters like "%(...)s" may nest and break psycopg2
-            win_col.key = 'win'
+            self.windows.append(win_col)
             return win_col
                 
         return col_expr
+    
+    @staticmethod
+    def _get_unique_name(prefix, columns):
+        column_names = set(columns.keys())
+
+        i = 1
+        name = prefix + str(i)
+        while name in column_names:
+            i += 1
+            name = prefix + str(i)
+
+
+        return name
 
 
 def track_call_windows(call, columns, group_by, order_by, window_cte = None):
@@ -119,8 +134,7 @@ def col_expr_requires_cte(call, sel, is_mutate = False):
 
     call_vars = set(call.op_vars(attr_calls = False))
 
-    columns = lift_inner_cols(sel)
-    sel_labs = set(k for k,v in columns.items() if isinstance(v, sql.elements.Label))
+    sel_labs = get_inner_labels(sel)
 
     # I use the acronym fwg sol (frog soul) to remember sql clause eval order
     # from, where, group by, select, order by, limit
@@ -131,6 +145,11 @@ def col_expr_requires_cte(call, sel, is_mutate = False):
             or len(sel._order_by_clause)
             or not sel_labs.isdisjoint(call_vars)
             )
+
+def get_inner_labels(sel):
+    columns = lift_inner_cols(sel)
+    sel_labs = set(k for k,v in columns.items() if isinstance(v, sql.elements.Label))
+    return sel_labs
 
 def get_missing_columns(call, columns):
     missing_cols = set(call.op_vars(attr_calls = False)) - set(columns.keys())
@@ -445,11 +464,12 @@ def _filter(__data, *args):
     # Note: currently always produces 2 additional select statements,
     #       1 for window/aggs, and 1 for the where clause
     sel = __data.last_op.alias()                   # original select
-    win_sel = sql.select([sel], from_obj = sel)    # first cte
+    win_sel = sql.select([sel], from_obj = sel)
 
     conds = []
     windows = []
     for ii, arg in enumerate(args):
+
         if isinstance(arg, Call):
             new_call = __data.shape_call(arg, verb_name = "Filter", arg_name = ii)
             #var_cols = new_call.op_vars(attr_calls = False)
@@ -461,19 +481,33 @@ def _filter(__data, *args):
                     )
 
             conds.append(col_expr)
+            windows.extend(win_cols)
+            
         else:
             conds.append(arg)
 
     bool_clause = sql.and_(*conds)
 
-    # move non-window functions to refer to win_sel clause (not the innermost) ---
-    win_alias = win_sel.alias()
-    bool_clause = sql.util.ClauseAdapter(win_alias).traverse(bool_clause)
+    # first cte, windows ----
+    if len(windows):
+        win_alias = win_sel.alias()
 
+        # because track_call_windows in the loop above used select.append_column
+        # multiple times, sqlalchemy doesn't know our window columns are the ones
+        # in the final mutated for of win_sel
+        col_key_map = {col.key: col for col in win_alias.columns.values()}
+        equivalents = {col: [col_key_map[col.key]] for col in windows}
+
+        # move non-window functions to refer to win_sel clause (not the innermost) ---
+        bool_clause = sql.util.ClauseAdapter(win_alias, equivalents = equivalents) \
+                .traverse(bool_clause)
+
+        orig_cols = [win_alias.columns[k] for k in sel.columns.keys()]
+    else:
+        orig_cols = [sel]
     
     # create second cte ----
-    orig_cols = [win_alias.columns[k] for k in sel.columns.keys()]
-    filt_sel = sql.select(orig_cols, from_obj = win_alias, whereclause = bool_clause)
+    filt_sel = sql.select(orig_cols, whereclause = bool_clause)
     return __data.append_op(filt_sel)
 
 
@@ -556,6 +590,7 @@ def _arrange(__data, *args):
     new_calls = []
     for ii, expr in enumerate(args):
         if callable(expr):
+
             res = __data.shape_call(
                     expr, window = False,
                     verb_name = "Arrange", arg_name = ii
@@ -581,9 +616,10 @@ def _create_order_by_clause(columns, *args):
             sort_cols.append(columns[arg])
         # an expression
         elif callable(arg):
-            #f, asc = _call_strip_ascending(arg)
-            #col_op = f(cols) if asc else f(cols).desc()
-            col_op = arg(columns)
+            # handle special case where -_.colname -> colname DESC
+            f, asc = _call_strip_ascending(arg)
+            col_op = f(columns) if asc else f(columns).desc()
+            #col_op = arg(columns)
             sort_cols.append(col_op)
         else:
             raise NotImplementedError("Must be string or callable")
@@ -661,9 +697,10 @@ def _summarize(__data, **kwargs):
                 )
 
     needs_cte = [col_expr_requires_cte(call, sel) for call in new_calls.values()]
+    group_on_labels = set(__data.group_by) & get_inner_labels(sel)
 
     # create select statement ----
-    if any(needs_cte):
+    if any(needs_cte) or len(group_on_labels):
         # need a cte, due to alias cols or existing group by
         # current select stmt has group by clause, so need to make it subquery
         cte = sel.alias()
@@ -763,13 +800,14 @@ def _case_when(__data, cases):
 
 from collections.abc import Mapping
 
-def _joined_cols(left_cols, right_cols, on_keys, full = False):
+def _joined_cols(left_cols, right_cols, on_keys, how, suffix = ("_x", "_y")):
     """Return labeled columns, according to selection rules for joins.
 
     Rules:
         1. For join keys, keep left table's column
         2. When keys have the same labels, add suffix
     """
+
     # TODO: remove sets, so uses stable ordering
     # when left and right cols have same name, suffix with _x / _y
     keep_right = set(right_cols.keys()) - set(on_keys.values())
@@ -778,15 +816,21 @@ def _joined_cols(left_cols, right_cols, on_keys, full = False):
     right_cols_no_keys = {k: right_cols[k] for k in keep_right}
 
     # for an outer join, have key columns coalesce values
-    if full:
-        left_cols = {**left_cols}
+
+    left_cols = {**left_cols}
+    if how == "full":
         for lk, rk in on_keys.items():
             col = sql.functions.coalesce(left_cols[lk], right_cols[rk])
             left_cols[lk] = col.label(lk)
+    elif how == "right":
+        for lk, rk in on_keys.items():
+            # Make left key columns actually be right ones (which contain left + extra)
+            left_cols[lk] = right_cols[rk].label(lk)
+
 
     # create labels ----
-    l_labs = _relabeled_cols(left_cols, shared_labs, "_x")
-    r_labs = _relabeled_cols(right_cols_no_keys, shared_labs, "_y")
+    l_labs = _relabeled_cols(left_cols, shared_labs, suffix[0])
+    r_labs = _relabeled_cols(right_cols_no_keys, shared_labs, suffix[1])
 
     return l_labs + r_labs
     
@@ -820,6 +864,7 @@ def _join(left, right, on = None, *args, how = "inner", sql_on = None):
         # switch joins, since sqlalchemy doesn't have right join arg
         # see https://stackoverflow.com/q/11400307/1144523
         left_sel, right_sel = right_sel, left_sel
+        on = {v:k for k,v in on.items()}
 
     # create join conditions ----
     bool_clause = _create_join_conds(left_sel, right_sel, on)
@@ -831,7 +876,12 @@ def _join(left, right, on = None, *args, how = "inner", sql_on = None):
             isouter = how != "inner",
             full = how == "full"
             )
-    
+
+    # if right join, set selects back
+    if how == "right":
+        left_sel, right_sel = right_sel, left_sel
+        on = {v:k for k,v in on.items()}
+
     # note, shared_keys assumes on is a mapping...
     # TODO: shared_keys appears to be for when on is not specified, but was unused
     #shared_keys = [k for k,v in on.items() if k == v]
@@ -839,11 +889,11 @@ def _join(left, right, on = None, *args, how = "inner", sql_on = None):
             left_sel.columns,
             right_sel.columns,
             on_keys = consolidate_keys,
-            full = how == "full"
+            how = how
             )
 
     sel = sql.select(labeled_cols, from_obj = join)
-    return left.append_op(sel)
+    return left.append_op(sel, order_by = tuple())
 
 
 @semi_join.register(LazyTbl)
@@ -873,7 +923,7 @@ def _semi_join(left, right = None, on = None, *args, sql_on = None):
             whereclause = sql.exists(exists_clause)
             )
 
-    return left.append_op(sel)
+    return left.append_op(sel, order_by = tuple())
 
 
 @anti_join.register(LazyTbl)
@@ -892,7 +942,8 @@ def _anti_join(left, right = None, on = None, *args, sql_on = None):
     # create inner join ----
     not_exists = ~sql.exists([1], from_obj = right_sel).where(bool_clause)
     sel = sql.select(left_sel.columns, from_obj = left_sel).where(not_exists)
-    return left.append_op(sel)
+    
+    return left.append_op(sel, order_by = tuple())
        
 def _raise_if_args(args):
     if len(args):

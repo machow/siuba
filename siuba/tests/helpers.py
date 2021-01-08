@@ -10,15 +10,19 @@ def data_frame(*args, _index = None, **kwargs):
     if len(args):
         raise NotImplementedError("all arguments to data_frame must be named")
 
+    all_scalars = all(not np.ndim(v) for v in kwargs.values())
+
+    if all_scalars:
+        fixed = {k: [v] for k,v in kwargs.items()}
+        return pd.DataFrame(fixed, index = _index)
     
-    fixed = {k: [v] if not np.ndim(v) else v for k,v in kwargs.items()}
-    return pd.DataFrame(fixed, index = _index)
+    return pd.DataFrame(kwargs, index = _index)
 
 BACKEND_CONFIG = {
         "postgresql": {
             "dialect": "postgresql",
             "dbname": ["SB_TEST_PGDATABASE", "postgres"],
-            "port": ["SB_TEST_PGPORT", "5433"],
+            "port": ["SB_TEST_PGPORT", "5432"],
             "user": ["SB_TEST_PGUSER", "postgres"],
             "password": ["SB_TEST_PGPASSWORD", ""],
             "host": ["SB_TEST_PGHOST", "localhost"],
