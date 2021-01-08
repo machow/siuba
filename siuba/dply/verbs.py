@@ -77,7 +77,8 @@ class Pipeable:
         if isinstance(x, Pipeable):
             return Pipeable(calls = self.calls + x.calls)
         elif isinstance(x, (Symbolic, Call)):
-            return Pipeable(calls = self.calls + [x])
+            call = strip_symbolic(x)
+            return Pipeable(calls = self.calls + [call])
         elif callable(x):
             return Pipeable(calls = self.calls + [x])
 
