@@ -1121,11 +1121,10 @@ dtype:
   priority: 1
 dtypes:
   action:
-    status: todo
+    status: wontdo
   backends: {}
   category: attributes
   example: _.dtypes
-  priority: 1
 duplicated:
   action:
     status: todo

@@ -3,7 +3,7 @@ NOTEBOOK_TESTS=$(addprefix examples/, \
 		examples-siu.ipynb \
 		)
 
-AUTODOC_SCRIPT=docs/generate_autodoc.py
+AUTODOC_SCRIPT=docs/scripts/generate_autodoc.py
 
 AUTODOC_PAGES=docs/api_extra/vector.rst docs/api_extra/forcats.rst
 
