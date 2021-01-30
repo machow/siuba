@@ -1,3 +1,43 @@
+"""Aggregate class, generic methods for fast pandas grouped operations.
+
+Examples:
+    .. code-block:: python    
+
+       from siuba.data import mtcars
+       g_cyl = mtcars.groupby("cyl")
+
+       avg_hp_raw = g_cyl.hp.mean()
+
+       # imagine that avg_hp was not SeriesGroupBy, but a GroupByAgg object
+       avg_hp = GroupByAgg.from_result(avg_hp_raw, g_cyl.hp)
+
+       # avg_hp plus hp ----
+       x, y, grp = broadcast_group_elements(avg_hp, g_cyl.hp)
+       res1 = regroup(grp, x + y) 
+
+       # avg_hp plus avg_hp ----
+       x, y, grp = broadcast_group_elements(avg_hp, avg_hp)
+       res2 = regroup(grp, x + y)
+
+       # avg_hp rounded ----
+       res3 = regroup(grp, avg_hp.mean())
+       broadcast_agg(res3)                # ungroup, same len as original data
+
+       # detecting incompatible groupby objects ----
+       # this works, since avg_hp is an aggregate of g_cyl
+       is_compatible(g_cyl, avg_hp)
+
+
+Notes:
+    * regroup ensures an operation's output is the same as the input grouped data.
+      (since the return type is often hard-coded in pandas).
+    * broadcast_agg gets the underlying Series, broadcasted to original length.
+    * this module makes fast operations possible; modules like transform.py
+      create functions for performing each operation (e.g. a fast mean function).
+
+
+"""
+
 import inspect
 
 from functools import singledispatch

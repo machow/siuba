@@ -1,3 +1,36 @@
+"""Functions for creating fast versions of methods like .mean().
+
+Examples:
+    .. code-block:: python    
+
+       from siuba.data import mtcars
+       g_cyl = mtcars.groupby("cyl")
+
+       avg_hp_raw = g_cyl.hp.mean()
+
+       # imagine that avg_hp was not SeriesGroupBy, but a GroupByAgg object
+       avg_hp = GroupByAgg.from_result(avg_hp_raw, g_cyl.hp)
+
+       f_mean = method_agg_op("mean", is_property = False, accessor = None)
+       f_mean(g_cyl.hp)        # returns GroupByAgg
+
+       f_add = method_el_op2("__add__", is_property = False, accessor = None)
+       f_add(g_cyl.hp, g_cyl.hp)
+       f_add(f_mean(g_cyl.hp), g_cyl.hp)
+
+       # property methods ----
+       f_is_unique = method_el_op("is_unique", is_property = True, None)
+       f_is_unique(g_cyl.hp)
+
+       # accessor methods ----
+       import pandas as pd
+       gdf = pd.DataFrame({'g': ['a', 'b'], 'x': ['AA', 'BB']}).groupby('g')
+
+       f_str_lower = method_el_op("lower", False, "str")
+       f_str_lower(gdf.x)
+
+"""
+
 from .groupby import GroupByAgg, SeriesGroupBy, broadcast_group_elements, regroup
 import pandas as pd
 
