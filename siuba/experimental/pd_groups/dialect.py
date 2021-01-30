@@ -2,6 +2,7 @@ from siuba.spec.series import spec
 from siuba.siu import CallTreeLocal, FunctionLookupError
 
 from siuba.experimental.pd_groups.translate import SeriesGroupBy, GroupByAgg, GROUP_METHODS
+from siuba.experimental.pd_groups.groupby import broadcast_agg, is_compatible
 
 
 # TODO: make into CallTreeLocal factory function
@@ -44,7 +45,7 @@ call_listener = CallTreeLocal(
 # Fast group by verbs =========================================================
 
 from siuba.siu import Call
-from siuba.dply.verbs import mutate, filter, summarize, singledispatch2, DataFrameGroupBy, _regroup
+from siuba.dply.verbs import mutate, filter, summarize, singledispatch2, DataFrameGroupBy
 from pandas.core.dtypes.inference import is_scalar
 import warnings
 
@@ -71,19 +72,18 @@ def grouped_eval(__data, expr, require_agg = False):
         #
         grouped_res = call(__data)
 
-        if isinstance(grouped_res, GroupByAgg):
-            # TODO: may want to validate its grouper
+        if isinstance(grouped_res, SeriesGroupBy):
+            if not is_compatible(grouped_res, __data):
+                raise ValueError("Incompatible groupers")
+
+            # TODO: may want to validate result is correct length / index?
+            #       e.g. a SeriesGroupBy could be compatible and not an agg
             if require_agg:
-                # need an agg, got an agg. we are done.
-                if not grouped_res._orig_grouper is __data.grouper:
-                    raise ValueError("Incompatible groupers")
-                return grouped_res
+                return grouped_res.obj
             else:
                 # broadcast from aggregate to original length (like transform)
-                return grouped_res._broadcast_agg_result()
-        elif isinstance(grouped_res, SeriesGroupBy) and not require_agg:
-            # TODO: may want to validate its grouper
-            return grouped_res.obj
+                return broadcast_agg(grouped_res)
+
         else:
             # can happen right now if user selects, e.g., a property of the
             # groupby object, like .dtype, which returns a single value
@@ -205,15 +205,7 @@ def fast_summarize(__data, **kwargs):
         # special case: set scalars directly
         res = grouped_eval(__data, expr, require_agg = True)
 
-        if isinstance(res, GroupByAgg):
-            # TODO: would be faster to check that res has matching grouper, since
-            #       here it goes through the work of matching up indexes (which if
-            #       the groupers match are identical)
-            out[name] = res.obj
-
-        # otherwise, assign like a scalar
-        else:
-            out[name] = res
+        out[name] = res
 
     return out.reset_index(drop = True)
 
