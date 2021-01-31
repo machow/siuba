@@ -168,7 +168,7 @@ def fast_filter(__data, *args):
         res = grouped_eval(__data, expr)
         out.append(res)
 
-    filter_df = filter.registry[__data.obj.__class__]
+    filter_df = filter.dispatch(__data.obj.__class__)
 
     df_result = filter_df(__data.obj, *out)
 
