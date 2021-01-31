@@ -113,7 +113,19 @@ def _transform_args(args):
 
     return out
 
-@singledispatch2(DataFrameGroupBy)
+def _copy_dispatch(dispatcher, cls, func = None):
+    if func is None:
+        return lambda f: _copy_dispatch(dispatcher, cls, f)
+
+    # Note stripping symbolics may occur twice. Once in the original, and once
+    # in this dispatcher.
+    new_dispatch = singledispatch2(cls, func)
+    new_dispatch.register(object, dispatcher)
+
+    return new_dispatch
+
+
+@_copy_dispatch(mutate, DataFrameGroupBy)
 def fast_mutate(__data, **kwargs):
     """Warning: this function is experimental"""
 
@@ -136,18 +148,9 @@ def fast_mutate(__data, **kwargs):
     return out.groupby(groupings)
 
 
-@fast_mutate.register(object)
-def _fast_mutate_default(__data, **kwargs):
-    # TODO: had to register object second, since singledispatch2 sets object dispatch
-    #       to be a pipe (e.g. unknown types become a pipe by default)
-    # by default dispatch to regular mutate
-    f = mutate.registry[type(__data)]
-    return f(__data, **kwargs)
-
-
 # Fast filter ----
 
-@singledispatch2(DataFrameGroupBy)
+@_copy_dispatch(filter, DataFrameGroupBy)
 def fast_filter(__data, *args):
     """Warning: this function is experimental"""
 
@@ -174,18 +177,9 @@ def fast_filter(__data, *args):
     return df_result.groupby(group_names)
 
 
-@fast_filter.register(object)
-def _fast_filter_default(__data, *args, **kwargs):
-    # TODO: had to register object second, since singledispatch2 sets object dispatch
-    #       to be a pipe (e.g. unknown types become a pipe by default)
-    # by default dispatch to regular mutate
-    f = filter.registry[type(__data)]
-    return f(__data, *args, **kwargs)
-
-
 # Fast summarize ----
 
-@singledispatch2(DataFrameGroupBy)
+@_copy_dispatch(summarize, DataFrameGroupBy)
 def fast_summarize(__data, **kwargs):
     """Warning: this function is experimental"""
 
@@ -209,12 +203,4 @@ def fast_summarize(__data, **kwargs):
 
     return out.reset_index(drop = True)
 
-
-@fast_summarize.register(object)
-def _fast_summarize_default(__data, **kwargs):
-    # TODO: had to register object second, since singledispatch2 sets object dispatch
-    #       to be a pipe (e.g. unknown types become a pipe by default)
-    # by default dispatch to regular mutate
-    f = summarize.registry[type(__data)]
-    return f(__data, **kwargs)
 
