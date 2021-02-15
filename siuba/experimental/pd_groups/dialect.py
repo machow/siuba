@@ -10,7 +10,12 @@ out = {}
 call_props = set()
 for name, entry in spec.items():
     #if entry['result']['type']: continue
-    kind = entry['action'].get('kind') or entry['action'].get('status')
+    status = entry['action'].get('status', 'supported')
+    if status != "supported":
+        kind = status
+    else:
+        kind = entry['action'].get('kind')
+
     key = (kind.title(), entry['action']['data_arity'])
 
     # add properties like df.dtype, so we know they are method calls

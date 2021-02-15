@@ -113,13 +113,13 @@ def method_agg_singleton(name, is_property, accessor):
         return GroupByAgg.from_result(res, __ser)
     return f
 
-
-
+from siuba.ops.utils import default
 
 GROUP_METHODS = { 
         ("Elwise", 1): method_el_op,
         ("Elwise", 2): method_el_op2,
         ("Agg", 1): method_agg_op,
+        ("Agg", 2): not_implemented,
         ("Window", 1): method_win_op,
         ("Window", 2): method_win_op,
         ("Singleton", 1): method_agg_singleton,

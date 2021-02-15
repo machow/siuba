@@ -27,7 +27,8 @@ DATA_SPEC = data_frames([
 OMNIBUS_VECTOR_FUNCS = [
         #cumall, cumany, cummean,
         #desc,
-        v.dense_rank(_.x, na_option = "keep"),
+        ## removed below, since pandas was giving 0 and eg .1^(-16) same rank
+        #v.dense_rank(_.x, na_option = "keep"),
         #v.percent_rank(_.x),
         v.min_rank(_.x, na_option = "keep"),
         v.cume_dist(_.x, na_option = "keep"),

@@ -1,6 +1,6 @@
 from siuba.sql import group_by, mutate, LazyTbl, collect
 from siuba.siu import _
-from siuba.sql.translate import funcs
+from siuba.sql.dialects.base import funcs
 
 
 from sqlalchemy import sql

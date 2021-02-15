@@ -15,12 +15,20 @@ def get_action_kind(spec_entry):
     return action.get('kind', action.get('status')).title()
 
 
-def filter_on_result(spec, types):
-    return [k for k,v in spec.items() if v['action'].get('kind', v['action'].get('status')).title() in types]
+def filter_entry(spec, f):
+    out = []
+    for k, v in spec.items():
+        kind = v["action"].get("kind", "unknown").title()
+        status = v["action"].get("status", "Supported").title()
 
-SPEC_IMPLEMENTED = filter_on_result(spec, {"Agg", "Elwise", "Window", "Singleton"})
-SPEC_NOTIMPLEMENTED = filter_on_result(spec, {"Wontdo", "Todo", "Maydo"})
-SPEC_AGG = filter_on_result(spec, {"Agg"})
+        if f(kind, status):
+            out.append(k)
+
+    return out
+
+SPEC_IMPLEMENTED = filter_entry(spec, lambda k, s: k in {"Agg", "Elwise", "Window", "Singleton"} and s == "Supported")
+SPEC_NOTIMPLEMENTED = filter_entry(spec, lambda k, s: s in {"Wontdo", "Todo", "Maydo"})
+SPEC_AGG = filter_entry(spec, lambda k, s: k in {"Agg"} and s == "Supported")
 
 _ = Symbolic()
 

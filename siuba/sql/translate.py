@@ -35,9 +35,11 @@ def warn_arg_default(func_name, arg_name, arg, correct):
 from sqlalchemy.sql.elements import ColumnClause
 from sqlalchemy.sql.base import ImmutableColumnCollection
 
-class SqlColumn(ColumnClause): pass
+class SqlBase(ColumnClause): pass
 
-class SqlColumnAgg(SqlColumn): pass
+class SqlColumn(SqlBase): pass
+
+class SqlColumnAgg(SqlBase): pass
 
 # Custom over clause handling  ================================================
 
@@ -100,12 +102,13 @@ class CumlOver(Over, CustomOverClause):
 
 # Windows ----
 
+# TODO: move parts using siu to separate file (includes CallTreeLocal stuff below)
+from siuba.siu import FunctionLookupBound
+
 def win_absent(name):
-    from typing import Any
-    def not_implemented(*args, **kwargs) -> Any:
-        raise NotImplementedError("SQL dialect does not support {}.".format(name))
-    
-    return not_implemented
+    # Return an error, that is picked up by the translator.
+    # this allows us to report errors at translation, rather than call time.
+    return FunctionLookupBound("SQL dialect does not support {}.".format(name))
 
 def win_over(name: str):
     sa_func = getattr(sql.func, name)
@@ -234,269 +237,232 @@ def sql_func_astype(col, _type):
     return sql.cast(col, sa_type)
 
 
-# Base translations ===========================================================
-
-base_scalar = dict(
-        # infix operators -----
-        # NOTE: all sqlalchemy.Column operators are used
-        # TODO: need way to implement ** operator
-
-        # sqlalchemy.ColumnElement methods ----
-        cast = sql_colmeth("cast"),
-        between = sql_colmeth("between"),
-        isin = sql_colmeth("in_"),
-
-        # bitwise operations -----
-        # TODO
-
-        # these are methods on sql.funcs ---- 
-        abs = sql_scalar("abs"),
-        acos = sql_scalar("acos"),
-        asin = sql_scalar("asin"),
-        atan = sql_scalar("atan"),
-        atan2 = sql_scalar("atan2"),
-        cos = sql_scalar("cos"),
-        cot = sql_scalar("cot"),
-        astype = sql_func_astype,
-        # I was lazy here and wrote lambdas directly ---
-        # TODO: I think these are postgres specific?
-        isna = sql_colmeth("is_", None),
-        isnull = sql_colmeth("is_", None),
-        notna = lambda col: ~col.is_(None),
-        fillna = sql.functions.coalesce,
-        # dply.vector funcs ----
-
-        # TODO: move to postgres specific
-        # TODO: this is to support a DictCall (e.g. used in case_when)
-        dict = dict,
-        # TODO: don't use singledispatch to add sql support to case_when
-        case_when = case_when,
-        if_else = if_else,
-
-        # POSTGRES compatility ------------------------------------------------
-        # _special_methods
-        __round__ = sql_scalar("round"),
-
-        #
-        copy = sql_not_impl(),
-
-        # binary
-        add = sql_colmeth('__add__'),
-        sub = sql_colmeth('__sub__'),
-        #truediv
-        #floordiv
-        mul = sql_colmeth('__mul__'),
-        mod = sql_colmeth('__mod__'),
-        #pow = sql_colmeth('__pow__'),
-        lt = sql_colmeth('__lt__'),
-        gt = sql_colmeth('__gt__'),
-        le = sql_colmeth('__le__'),
-        ge = sql_colmeth('__ge__'),
-        ne = sql_colmeth('__ne__'),
-        eq = sql_colmeth('__eq__'),
-        #round = sql_scalar("round"),
-        radd = sql_colmeth('__radd__'),
-        rsub = sql_colmeth('__rsub__'),
-        #rtruediv
-        #rfloordiv
-        rmul = sql_colmeth('__rmul__'),
-        rmod = sql_colmeth('__rmod__'),
-
-        # computations ---
-        clip = lambda col, lower, upper: fn.least(fn.greatest(col, lower), upper),
-
-        # datetime_properties ---
-        date = sql_not_impl(),
-        time = sql_not_impl(),
-        timetz = sql_not_impl(),
-        year = sql_extract('year'),# , sql.cast(col, sql.sqltypes.Date)),
-        month = sql_extract('month'),
-        day = sql_extract('day'),
-        hour = sql_extract('hour'),
-        minute = sql_extract('minute'),
-        second = sql_extract('second'),
-        #microsecond = sql_extract('microsecond'), # TODO: postgres includes seconds
-        nanosecond = sql_not_impl(),
-        week = sql_extract('week'),
-        weekofyear = sql_extract('week'),
-        dayofweek = sql_func_extract_dow_monday,
-        weekday = sql_func_extract_dow_monday,
-        dayofyear = sql_extract('doy'),
-        quarter = sql_extract('quarter'),
-        is_month_start = sql_is_first_of('day', 'month'),
-        is_month_end = sql_is_last_day_of('month'),
-        is_quarter_start = sql_is_first_of('day', 'quarter'),
-        #is_quarter_end = sql_is_last_day_of('quarter'),
-        is_year_start = sql_is_first_of('day', 'year'),
-        is_year_end = sql_is_last_day_of('year'),
-        is_leap_year = sql_not_impl(),
-        daysinmonth = sql_func_days_in_month,
-        days_in_month = sql_func_days_in_month,
-        tz = sql_not_impl(),
-        freq = sql_not_impl(),
-
-        # datetime methods ---
-        #to_period = ,
-        ## dt.to_pydatetime
-        #tz_localize = 
-        ## dt.tz_convert
-        #normalize = 
-        #strftime = 
-        #round = 
-        #floor = 
-        #ceil = 
-        #month_name = 
-        #day_name =
-        # TODO: slotting in a floor_date method, since I can't do my job
-        #       or make common SQL queries without it....
-        floor_date = sql_func_floor_date,
-
-
-        # string methdos ---
-        
-        capitalize = sql_func_capitalize,
-        #casefold = ,
-        #cat  = ,
-        center = sql_not_impl(),
-        contains = sql_not_impl(),
-#        count = ,
-#        # str.decode
-#        encode = ,
-        endswith = sql_colmeth("endswith"),
-#        #extract = 
-#        # str.extractall
-#        find = ,
-#        findall = ,
-#        #get
-#        #index
-#        #join
-        len = sql.func.length,
-#        ljust = ,
-        lower = sql.func.lower,
-        # TODO: whitespace options based loosely on builtin string.isspace
-        lstrip = sql_str_strip('ltrim'),
-#        match = ,
-#        # str.normalize
-#        pad = ,
-#        # str.partition
-#        # str.repeat
-#        replace = ,
-#        rfind = ,
-#        # str.rindex
-#        rjust = ,
-#        # str.rpartition
-        rstrip = sql_str_strip('rtrim'),
-#        slice = ,
-#        slice_replace = ,
-#        split = ,
-#        rsplit = ,
-        startswith = sql_colmeth("startswith"),
-        strip = sql_str_strip('trim'),
-#        swapcase = ,
-        title = sql.func.initcap,
-#        # str.translate
-        upper = sql.func.upper,
-#        wrap = ,
-#        # str.zfill
-#        isalnum = ,
-#        isalpha = ,
-#        isdigit = ,
-#        isspace = ,
-#        islower = ,
-#        isupper = ,
-#        istitle = ,
-#        isnumeric = ,
-#        isdecimal = ,
-        )
-
-base_agg = dict(
-        mean = sql_agg("avg"),
-        sum = sql_agg("sum"),
-        min = sql_agg("min"),
-        max = sql_agg("max"),
-        count = sql_agg("count"),
-        # TODO: generalize case where doesn't use col
-        # need better handeling of vector funcs
-        nunique = lambda col: sql.func.count(sql.func.distinct(col)),
-
-        # POSTGRES compatibility ----------------------------------------------
-        quantile = set_agg("percentile_cont"),
-        )
-
-base_win = dict(
-        rank = win_over("rank"),
-        #first = win_over2("first"),
-        #last = win_over2("last"),
-        #nth = win_over3
-        #lead = win_over4
-        #lag
-
-        # aggregate functions ---
-        mean = win_agg("avg"),
-        var = win_agg("variance"),
-        sum = win_agg("sum"),
-        min = win_agg("min"),
-        max = win_agg("max"),
-
-        # ordered set funcs ---
-        #quantile
-        #median
-
-        # counts ----
-        count = win_agg("count"),
-        #n
-        #n_distinct
-
-        # cumulative funcs ---
-        #avg("id") OVER (PARTITION BY "email" ORDER BY "id" ROWS UNBOUNDED PRECEDING)
-        #cummean = win_agg("
-        cumsum = win_cumul("sum"),
-        #cummin
-        #cummax
-        diff = sql_func_diff,
-
-        # POSTGRES compatibility ----------------------------------------------
-        # computations
-        #prod = lambda col: AggOver(fn.exp(fn.sum(fn.log(col)))),
-        std = win_agg("stddev_samp"),
-        )
-
-# based on https://github.com/tidyverse/dbplyr/blob/master/R/backend-.R
-base_nowin = dict(
-        #row_number   = win_absent("ROW_NUMBER"),
-        #min_rank     = win_absent("RANK"),
-        rank         = win_absent("RANK"),
-        dense_rank   = win_absent("DENSE_RANK"),
-        percent_rank = win_absent("PERCENT_RANK"),
-        cume_dist    = win_absent("CUME_DIST"),
-        ntile        = win_absent("NTILE"),
-        mean         = win_absent("AVG"),
-        sd           = win_absent("SD"),
-        var          = win_absent("VAR"),
-        cov          = win_absent("COV"),
-        cor          = win_absent("COR"),
-        sum          = win_absent("SUM"),
-        min          = win_absent("MIN"),
-        max          = win_absent("MAX"),
-        median       = win_absent("PERCENTILE_CONT"),
-        quantile    = win_absent("PERCENTILE_CONT"),
-        n            = win_absent("N"),
-        n_distinct   = win_absent("N_DISTINCT"),
-        cummean      = win_absent("MEAN"),
-        cumsum       = win_absent("SUM"),
-        cummin       = win_absent("MIN"),
-        cummax       = win_absent("MAX"),
-        nth          = win_absent("NTH_VALUE"),
-        first        = win_absent("FIRST_VALUE"),
-        last         = win_absent("LAST_VALUE"),
-        lead         = win_absent("LEAD"),
-        lag          = win_absent("LAG"),
-        order_by     = win_absent("ORDER_BY"),
-        str_flatten  = win_absent("STR_FLATTEN"),
-        count        = win_absent("COUNT")
-        )
-
-funcs = dict(scalar = base_scalar, aggregate = base_agg, window = base_win)
+## Base translations ===========================================================
+#
+#base_scalar = dict(
+#        # infix operators -----
+#        # NOTE: all sqlalchemy.Column operators are used
+#        # TODO: need way to implement ** operator
+#
+#        # sqlalchemy.ColumnElement methods ----
+#        cast = sql_colmeth("cast"),
+#        between = sql_colmeth("between"),
+#        isin = sql_colmeth("in_"),
+#
+#        # bitwise operations -----
+#        # TODO
+#
+#        # these are methods on sql.funcs ---- 
+#        abs = sql_scalar("abs"),
+#        acos = sql_scalar("acos"),
+#        asin = sql_scalar("asin"),
+#        atan = sql_scalar("atan"),
+#        atan2 = sql_scalar("atan2"),
+#        cos = sql_scalar("cos"),
+#        cot = sql_scalar("cot"),
+#        astype = sql_func_astype,
+#        # I was lazy here and wrote lambdas directly ---
+#        # TODO: I think these are postgres specific?
+#        isna = sql_colmeth("is_", None),
+#        isnull = sql_colmeth("is_", None),
+#        notna = lambda col: ~col.is_(None),
+#        fillna = sql.functions.coalesce,
+#        # dply.vector funcs ----
+#
+#        # TODO: move to postgres specific
+#        # TODO: this is to support a DictCall (e.g. used in case_when)
+#        dict = dict,
+#        # TODO: don't use singledispatch to add sql support to case_when
+#        case_when = case_when,
+#        if_else = if_else,
+#
+#        # POSTGRES compatility ------------------------------------------------
+#        # _special_methods
+#        __round__ = sql_scalar("round"),
+#
+#        #
+#        copy = sql_not_impl(),
+#
+#        # binary
+#        add = sql_colmeth('__add__'),
+#        sub = sql_colmeth('__sub__'),
+#        #truediv
+#        #floordiv
+#        mul = sql_colmeth('__mul__'),
+#        mod = sql_colmeth('__mod__'),
+#        #pow = sql_colmeth('__pow__'),
+#        lt = sql_colmeth('__lt__'),
+#        gt = sql_colmeth('__gt__'),
+#        le = sql_colmeth('__le__'),
+#        ge = sql_colmeth('__ge__'),
+#        ne = sql_colmeth('__ne__'),
+#        eq = sql_colmeth('__eq__'),
+#        #round = sql_scalar("round"),
+#        radd = sql_colmeth('__radd__'),
+#        rsub = sql_colmeth('__rsub__'),
+#        #rtruediv
+#        #rfloordiv
+#        rmul = sql_colmeth('__rmul__'),
+#        rmod = sql_colmeth('__rmod__'),
+#
+#        # computations ---
+#        clip = lambda col, lower, upper: fn.least(fn.greatest(col, lower), upper),
+#
+#        # datetime_properties ---
+#        date = sql_not_impl(),
+#        time = sql_not_impl(),
+#        timetz = sql_not_impl(),
+#        year = sql_extract('year'),# , sql.cast(col, sql.sqltypes.Date)),
+#        month = sql_extract('month'),
+#        day = sql_extract('day'),
+#        hour = sql_extract('hour'),
+#        minute = sql_extract('minute'),
+#        second = sql_extract('second'),
+#        #microsecond = sql_extract('microsecond'), # TODO: postgres includes seconds
+#        nanosecond = sql_not_impl(),
+#        week = sql_extract('week'),
+#        weekofyear = sql_extract('week'),
+#        dayofweek = sql_func_extract_dow_monday,
+#        weekday = sql_func_extract_dow_monday,
+#        dayofyear = sql_extract('doy'),
+#        quarter = sql_extract('quarter'),
+#        is_month_start = sql_is_first_of('day', 'month'),
+#        is_month_end = sql_is_last_day_of('month'),
+#        is_quarter_start = sql_is_first_of('day', 'quarter'),
+#        #is_quarter_end = sql_is_last_day_of('quarter'),
+#        is_year_start = sql_is_first_of('day', 'year'),
+#        is_year_end = sql_is_last_day_of('year'),
+#        is_leap_year = sql_not_impl(),
+#        daysinmonth = sql_func_days_in_month,
+#        days_in_month = sql_func_days_in_month,
+#        tz = sql_not_impl(),
+#        freq = sql_not_impl(),
+#
+#        # datetime methods ---
+#        #to_period = ,
+#        ## dt.to_pydatetime
+#        #tz_localize = 
+#        ## dt.tz_convert
+#        #normalize = 
+#        #strftime = 
+#        #round = 
+#        #floor = 
+#        #ceil = 
+#        #month_name = 
+#        #day_name =
+#        # TODO: slotting in a floor_date method, since I can't do my job
+#        #       or make common SQL queries without it....
+#        floor_date = sql_func_floor_date,
+#
+#
+#        # string methdos ---
+#        
+#        capitalize = sql_func_capitalize,
+#        #casefold = ,
+#        #cat  = ,
+#        center = sql_not_impl(),
+#        contains = sql_not_impl(),
+##        count = ,
+##        # str.decode
+##        encode = ,
+#        endswith = sql_colmeth("endswith"),
+##        #extract = 
+##        # str.extractall
+##        find = ,
+##        findall = ,
+##        #get
+##        #index
+##        #join
+#        len = sql.func.length,
+##        ljust = ,
+#        lower = sql.func.lower,
+#        # TODO: whitespace options based loosely on builtin string.isspace
+#        lstrip = sql_str_strip('ltrim'),
+##        match = ,
+##        # str.normalize
+##        pad = ,
+##        # str.partition
+##        # str.repeat
+##        replace = ,
+##        rfind = ,
+##        # str.rindex
+##        rjust = ,
+##        # str.rpartition
+#        rstrip = sql_str_strip('rtrim'),
+##        slice = ,
+##        slice_replace = ,
+##        split = ,
+##        rsplit = ,
+#        startswith = sql_colmeth("startswith"),
+#        strip = sql_str_strip('trim'),
+##        swapcase = ,
+#        title = sql.func.initcap,
+##        # str.translate
+#        upper = sql.func.upper,
+##        wrap = ,
+##        # str.zfill
+##        isalnum = ,
+##        isalpha = ,
+##        isdigit = ,
+##        isspace = ,
+##        islower = ,
+##        isupper = ,
+##        istitle = ,
+##        isnumeric = ,
+##        isdecimal = ,
+#        )
+#
+#base_agg = dict(
+#        mean = sql_agg("avg"),
+#        sum = sql_agg("sum"),
+#        min = sql_agg("min"),
+#        max = sql_agg("max"),
+#        count = sql_agg("count"),
+#        # TODO: generalize case where doesn't use col
+#        # need better handeling of vector funcs
+#        nunique = lambda col: sql.func.count(sql.func.distinct(col)),
+#
+#        # POSTGRES compatibility ----------------------------------------------
+#        quantile = set_agg("percentile_cont"),
+#        )
+#
+#base_win = dict(
+#        rank = win_over("rank"),
+#        #first = win_over2("first"),
+#        #last = win_over2("last"),
+#        #nth = win_over3
+#        #lead = win_over4
+#        #lag
+#
+#        # aggregate functions ---
+#        mean = win_agg("avg"),
+#        var = win_agg("variance"),
+#        sum = win_agg("sum"),
+#        min = win_agg("min"),
+#        max = win_agg("max"),
+#
+#        # ordered set funcs ---
+#        #quantile
+#        #median
+#
+#        # counts ----
+#        count = win_agg("count"),
+#        #n
+#        #n_distinct
+#
+#        # cumulative funcs ---
+#        #avg("id") OVER (PARTITION BY "email" ORDER BY "id" ROWS UNBOUNDED PRECEDING)
+#        #cummean = win_agg("
+#        cumsum = win_cumul("sum"),
+#        #cummin
+#        #cummax
+#        diff = sql_func_diff,
+#
+#        # POSTGRES compatibility ----------------------------------------------
+#        # computations
+#        #prod = lambda col: AggOver(fn.exp(fn.sum(fn.log(col)))),
+#        std = win_agg("stddev_samp"),
+#        )
 
 # MISC ===========================================================================
 # scalar, aggregate, window #no_win, agg_no_win
@@ -533,3 +499,13 @@ class SqlTranslator(MutableMapping):
     def __delitem__(self, k):
         del self.d[k]
     
+
+# 
+
+from siuba.ops.translate import create_pandas_translator
+
+def create_sql_translators(funcs, WinCls, AggCls):
+    return {
+            "window": create_pandas_translator(funcs, WinCls, SqlColumn),
+            "aggregate": create_pandas_translator(funcs, AggCls, SqlColumn)
+            }

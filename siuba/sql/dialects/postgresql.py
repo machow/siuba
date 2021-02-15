@@ -1,9 +1,12 @@
 # sqlvariant, allow defining 3 namespaces to override defaults
 from ..translate import (
-        SqlColumn, SqlColumnAgg,
-        base_scalar, base_agg, base_win, SqlTranslator, 
-        win_agg, sql_scalar, sql_agg
+        SqlColumn, SqlColumnAgg, SqlTranslator, 
+        win_agg, sql_scalar, sql_agg,
+        create_sql_translators
         )
+
+from .base import base_scalar, base_win, base_agg
+
 import sqlalchemy.sql.sqltypes as sa_types
 from sqlalchemy import sql
 
@@ -45,12 +48,14 @@ scalar = SqlTranslator(
         base_scalar,
         log = sql_log,
         round = sql_round,
-        contains = sql_func_contains,
         #year = lambda col: sql.func.extract('year', sql.cast(col, sql.sqltypes.Date)),
         concat = sql.func.concat,
         cat = sql.func.concat,
         str_c = sql.func.concat,
-        __floordiv__ = lambda x, y: sql.cast(x / y, sa_types.Integer())
+        __floordiv__ = lambda x, y: sql.cast(x / y, sa_types.Integer()),
+        **{
+            "str.contains": sql_func_contains,
+        },
         )
 
 aggregate = SqlTranslator(
@@ -66,7 +71,13 @@ window = SqlTranslator(
         any = win_agg("bool_or"),
         all = win_agg("bool_and"),
         lag = win_agg("lag"),
+        std = win_agg("stddev_samp"),
         var = win_agg("var_samp"),
         )
 
 funcs = dict(scalar = scalar, aggregate = aggregate, window = window)
+
+# translate(config, CallTreeLocal, PostgresqlColumn, _.a + _.b)
+
+
+translators = create_sql_translators(funcs, PostgresqlColumn, PostgresqlColumnAgg)

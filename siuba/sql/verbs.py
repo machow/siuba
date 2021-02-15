@@ -266,9 +266,10 @@ class LazyTbl:
 
         call_shaper = CallTreeLocal(
                 funcs,
+                chain_sub_attr = True,
                 call_sub_attr = self.call_sub_attr,
                 dispatch_cls = dispatch_cls,
-                result_cls = self.result_cls
+                result_cls = self.result_cls,
                 )
 
         # raise informative error message if missing translation

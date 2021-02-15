@@ -418,6 +418,13 @@ from .error import ShortException
 
 class FunctionLookupError(ShortException): pass
 
+class FunctionLookupBound:
+    def __init__(self, msg):
+        self.msg = msg
+
+    def __call__(self):
+        raise NotImplementedError(self.msg)
+
 
 class CallVisitor:
     """
@@ -539,8 +546,12 @@ class CallTreeLocal(CallListener):
         except KeyError as err:
             raise FunctionLookupError("Missing translation for function call: %s"% name)
 
-        if isclass(local_func) and issubclass(local_func, Exception):
-            raise local_func
+        if isinstance(local_func, FunctionLookupBound):
+            #raise FunctionLookupError(local_func)
+            local_func()
+
+        #if isclass(local_func) and issubclass(local_func, Exception):
+        #    raise local_func
 
         return cls(
                 "__call__",
@@ -586,6 +597,10 @@ class CallTreeLocal(CallListener):
             ):
             # allow custom functions that dispatch on dispatch_cls
             f_for_cls = func.dispatch(self.dispatch_cls)
+
+            if isinstance(f_for_cls, FunctionLookupBound):
+                f_for_cls()
+
             if (self.result_cls is None
                 or is_dispatch_func_subtype(f_for_cls, self.dispatch_cls, self.result_cls)
                 ):
@@ -768,6 +783,24 @@ def _dispatch_not_impl(func_name):
     return f
 
 def symbolic_dispatch(f = None, cls = object):
+    """Return a generic dispatch function with symbolic data implementations.
+
+    The function dispatches (Call or Symbolic) -> FuncArg.
+
+    Examples:
+      ::
+
+        @symbolic_dispatch(int)
+        def add1(x): return x + 1
+        
+        @add1.register(str)
+        def _add1_str: return int(x) + 1
+        
+        
+        @symbolic_dispatch
+        def my_func(x): raise NotImplementedError("no default method")
+
+    """
     if f is None:
         return lambda f: symbolic_dispatch(f, cls)
 
@@ -790,6 +823,7 @@ def symbolic_dispatch(f = None, cls = object):
         return strip_symbolic(create_sym_call(FuncArg(dispatch_func), __data, *args, **kwargs))
 
     return dispatch_func
+
 
     
 # Do some gnarly method setting -----------------------------------------------

@@ -327,7 +327,7 @@ any:
   example: _.any()
 append:
   action:
-    status: todo
+    status: wontdo
   backends: {}
   category: combining
   example: _.append(_)
@@ -364,12 +364,14 @@ array:
   example: _.array
 asfreq:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: time_series
   example: _.asfreq('D')
 asof:
   action:
+    kind: window
     status: todo
   backends: {}
   category: time_series
@@ -384,6 +386,7 @@ astype:
   example: _.astype('str')
 at:
   action:
+    kind: window
     status: todo
   backends: {}
   category: indexing
@@ -391,7 +394,7 @@ at:
   priority: 3
 at_time:
   action:
-    status: todo
+    status: wontdo
   backends: {}
   category: time_series
   example: _.at_time()
@@ -404,6 +407,7 @@ attrs:
   example: _.attrs
 autocorr:
   action:
+    kind: window
     status: todo
   backends: {}
   category: computations
@@ -430,26 +434,30 @@ between:
   example: _.between(2,5)
 between_time:
   action:
-    status: maydo
+    kind: elwise
+    status: todo
   backends: {}
   category: time_series
   example: _.between_time()
   priority: 0
 bfill:
   action:
+    kind: window
     status: todo
   backends: {}
   category: missing_data
   example: _.bfill(1)
 bool:
   action:
-    status: todo
+    kind: agg
+    status: wontdo
   backends: {}
   category: conversion
   example: _.bool
   priority: 1
 cat.add_categories:
   action:
+    kind: window
     status: todo
   backends: {}
   category: categories
@@ -457,6 +465,7 @@ cat.add_categories:
   priority: 1
 cat.as_ordered:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: categories
@@ -464,6 +473,7 @@ cat.as_ordered:
   priority: 1
 cat.as_unordered:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: categories
@@ -484,13 +494,15 @@ cat.codes:
   example: _.cat.codes
 cat.ordered:
   action:
-    status: todo
+    status: wontdo
+    kind: agg
   backends: {}
   category: categories
   example: _.cat.ordered
   priority: 1
 cat.remove_categories:
   action:
+    kind: window
     status: todo
   backends: {}
   category: categories
@@ -498,6 +510,7 @@ cat.remove_categories:
   priority: 1
 cat.remove_unused_categories:
   action:
+    kind: window
     status: todo
   backends: {}
   category: categories
@@ -505,6 +518,7 @@ cat.remove_unused_categories:
   priority: 1
 cat.rename_categories:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: categories
@@ -512,6 +526,7 @@ cat.rename_categories:
   priority: 1
 cat.reorder_categories:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: categories
@@ -519,6 +534,7 @@ cat.reorder_categories:
   priority: 1
 cat.set_categories:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: categories
@@ -534,6 +550,7 @@ clip:
   priority: 1
 combine:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: binary
@@ -541,6 +558,7 @@ combine:
   priority: 1
 combine_first:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: binary
@@ -548,12 +566,13 @@ combine_first:
   priority: 1
 compound:
   action:
-    status: maydo
+    status: wontdo
   backends: {}
   category: computations
   example: _.compound()
 convert_dtypes:
   action:
+    kind: window
     status: todo
   backends: {}
   category: conversion
@@ -569,6 +588,7 @@ copy:
   example: _.copy()
 corr:
   action:
+    kind: agg
     status: todo
   backends: {}
   category: computations
@@ -654,18 +674,21 @@ div:
   example: _.div(_)
 divide:
   action:
+    kind: agg
     status: todo
   backends: {}
   category: binary
   example: _.divide(_)
 divmod:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: binary
   example: _.divmod(_)
 dot:
   action:
+    kind: agg
     status: todo
   backends: {}
   category: binary
@@ -679,7 +702,8 @@ drop:
   example: _.drop
 drop_duplicates:
   action:
-    status: todo
+    kind: window
+    status: wontdo
   backends: {}
   category: reindexing
   example: _.drop_duplicates()
@@ -692,12 +716,13 @@ droplevel:
   example: _.droplevel
 dropna:
   action:
-    status: maydo
+    status: wontdo
   backends: {}
   category: missing_data
   example: _.dropna()
 dt.asfreq:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: period_properties
@@ -713,7 +738,7 @@ dt.ceil:
   example: _.dt.ceil('D')
 dt.components:
   action:
-    status: maydo
+    status: wontdo
   backends: {}
   category: timedelta_properties
   example: _.dt.components
@@ -764,6 +789,7 @@ dt.dayofyear:
   example: _.dt.dayofyear
 dt.days:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: timedelta_properties
@@ -788,7 +814,7 @@ dt.daysinmonth:
   example: _.dt.daysinmonth
 dt.end_time:
   action:
-    status: todo
+    status: wontdo
   backends: {}
   category: period_properties
   example: _.dt.end_time
@@ -884,6 +910,7 @@ dt.microsecond:
   example: _.dt.microsecond
 dt.microseconds:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: timedelta_properties
@@ -926,6 +953,7 @@ dt.nanosecond:
   example: _.dt.nanosecond
 dt.nanoseconds:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: timedelta_properties
@@ -950,6 +978,7 @@ dt.quarter:
   example: _.dt.quarter
 dt.qyear:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: period_properties
@@ -975,13 +1004,14 @@ dt.second:
   example: _.dt.second
 dt.seconds:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: timedelta_properties
   example: _.dt.seconds
 dt.start_time:
   action:
-    status: todo
+    status: wontdo
   backends: {}
   category: period_properties
   example: _.dt.start_time
@@ -1024,6 +1054,7 @@ dt.to_period:
   example: _.dt.to_period('D')
 dt.to_pydatetime:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: datetime_methods
@@ -1031,18 +1062,21 @@ dt.to_pydatetime:
   priority: 1
 dt.to_pytimedelta:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: timedelta_methods
   example: _.dt.to_pytimedelta
 dt.to_timestamp:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: period_properties
   example: _.dt.to_timestamp()
 dt.total_seconds:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: timedelta_methods
@@ -1059,6 +1093,7 @@ dt.tz:
   example: _.dt.tz
 dt.tz_convert:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: datetime_methods
@@ -1127,6 +1162,7 @@ dtypes:
   example: _.dtypes
 duplicated:
   action:
+    kind: window
     status: todo
   backends: {}
   category: reindexing
@@ -1134,6 +1170,7 @@ duplicated:
   priority: 3
 empty:
   action:
+    kind: agg
     status: todo
   backends: {}
   category: attributes
@@ -1148,6 +1185,7 @@ eq:
   example: _.eq(_)
 equals:
   action:
+    kind: agg
     status: todo
   backends: {}
   category: reindexing
@@ -1173,12 +1211,13 @@ explode:
   example: _.explode()
 factorize:
   action:
-    status: maydo
+    status: wontdo
   backends: {}
   category: computations
   example: _.factorize()
 ffill:
   action:
+    kind: window
     status: todo
   backends: {}
   category: missing_data
@@ -1198,6 +1237,7 @@ filter:
   example: _.filter()
 first:
   action:
+    kind: window
     status: maydo
   backends: {}
   category: reindexing
@@ -1205,7 +1245,7 @@ first:
   priority: 0
 first_valid_index:
   action:
-    status: todo
+    status: wontdo
   backends: {}
   category: time_series
   example: _.first_valid_index()
@@ -1246,6 +1286,7 @@ ge:
   example: _.ge(_)
 get:
   action:
+    kind: window
     status: todo
   backends: {}
   category: indexing
@@ -1272,6 +1313,7 @@ gt:
   example: _.gt(_)
 hasnans:
   action:
+    kind: agg
     status: todo
   backends: {}
   category: attributes
@@ -1279,6 +1321,7 @@ hasnans:
   priority: 1
 head:
   action:
+    kind: window
     status: todo
   backends: {}
   category: reindexing
@@ -1286,6 +1329,7 @@ head:
   priority: 0
 iat:
   action:
+    kind: window
     status: todo
   backends: {}
   category: indexing
@@ -1293,6 +1337,7 @@ iat:
   priority: 3
 idxmax:
   action:
+    kind: agg
     status: todo
   backends: {}
   category: reindexing
@@ -1300,6 +1345,7 @@ idxmax:
   priority: 0
 idxmin:
   action:
+    kind: agg
     status: todo
   backends: {}
   category: reindexing
@@ -1307,6 +1353,7 @@ idxmin:
   priority: 0
 iloc:
   action:
+    kind: window
     status: todo
   backends: {}
   category: indexing
@@ -1319,6 +1366,7 @@ index:
   example: _.index
 infer_objects:
   action:
+    kind: window
     status: todo
   backends: {}
   category: conversion
@@ -1332,6 +1380,7 @@ interpolate:
   example: _.interpolate()
 is_copy:
   action:
+    kind: singleton
     status: todo
   backends: {}
   category: attributes
@@ -1339,6 +1388,7 @@ is_copy:
   priority: 1
 is_monotonic:
   action:
+    kind: window
     status: todo
   backends: {}
   category: computations
@@ -1346,6 +1396,7 @@ is_monotonic:
   priority: 3
 is_monotonic_decreasing:
   action:
+    kind: window
     status: todo
   backends: {}
   category: computations
@@ -1353,6 +1404,7 @@ is_monotonic_decreasing:
   priority: 3
 is_monotonic_increasing:
   action:
+    kind: window
     status: todo
   backends: {}
   category: computations
@@ -1360,6 +1412,7 @@ is_monotonic_increasing:
   priority: 3
 is_unique:
   action:
+    kind: agg
     status: todo
   backends: {}
   category: computations
@@ -1420,6 +1473,7 @@ keys:
   example: _.keys()
 kurt:
   action:
+    kind: agg
     status: todo
   backends: {}
   category: computations
@@ -1427,6 +1481,7 @@ kurt:
   priority: 2
 kurtosis:
   action:
+    kind: agg
     status: todo
   backends: {}
   category: computations
@@ -1483,6 +1538,7 @@ map:
   example: _.map
 mask:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: reindexing
@@ -1513,6 +1569,7 @@ median:
   example: _.median()
 memory_usage:
   action:
+    kind: agg
     status: todo
   backends: {}
   category: attributes
@@ -1534,7 +1591,7 @@ mod:
   example: _.mod(_)
 mode:
   action:
-    status: maydo
+    status: wontdo
   backends: {}
   category: computations
   example: _.mode()
@@ -1557,6 +1614,7 @@ multiply:
   example: _.multiply(_)
 name:
   action:
+    kind: singleton
     status: todo
   backends: {}
   category: attributes
@@ -1564,6 +1622,7 @@ name:
   priority: 1
 nbytes:
   action:
+    kind: agg
     status: todo
   backends: {}
   category: attributes
@@ -1571,6 +1630,7 @@ nbytes:
   priority: 1
 ndim:
   action:
+    kind: singleton
     status: todo
   backends: {}
   category: attributes
@@ -1585,7 +1645,7 @@ ne:
   example: _.ne(_)
 nlargest:
   action:
-    status: maydo
+    status: wontdo
   backends: {}
   category: computations
   example: _.nlargest()
@@ -1608,7 +1668,7 @@ notnull:
   example: _.notnull()
 nsmallest:
   action:
-    status: maydo
+    status: wontdo
   backends: {}
   category: computations
   example: _.nsmallest()
@@ -1664,6 +1724,7 @@ prod:
   example: _.prod()
 product:
   action:
+    kind: agg
     status: todo
   backends: {}
   category: binary
@@ -1718,6 +1779,7 @@ rdiv:
   example: _.rdiv(_)
 rdivmod:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: binary
@@ -1761,6 +1823,7 @@ repeat:
   example: _.repeat()
 replace:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: combining
@@ -1768,7 +1831,7 @@ replace:
   priority: 1
 resample:
   action:
-    status: todo
+    status: wontdo
   backends: {}
   category: time_series
   example: _.resample()
@@ -1879,6 +1942,7 @@ shape:
   example: _.shape
 shift:
   action:
+    kind: window
     status: todo
   backends: {}
   category: time_series
@@ -1886,6 +1950,7 @@ shift:
   priority: 0
 size:
   action:
+    kind: agg
     status: maydo
   backends: {}
   category: attributes
@@ -1901,7 +1966,7 @@ skew:
   example: _.skew()
 slice_shift:
   action:
-    status: maydo
+    status: wontdo
   backends: {}
   category: time_series
   example: _.slice_shift()
@@ -2444,7 +2509,8 @@ swaplevel:
   example: _.swaplevel
 tail:
   action:
-    status: todo
+    kind: window
+    status: wontdo
   backends: {}
   category: reindexing
   example: _.tail()
@@ -2505,7 +2571,7 @@ to_hdf:
   priority: 0
 to_json:
   action:
-    status: todo
+    status: wontdo
   backends: {}
   category: io
   example: _.to_json()
@@ -2525,7 +2591,7 @@ to_list:
   example: _.to_list()
 to_markdown:
   action:
-    status: todo
+    status: wontdo
   backends: {}
   category: io
   example: _.to_markdown()
@@ -2543,6 +2609,7 @@ to_numpy:
   example: _.to_numpy()
 to_period:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: conversion
@@ -2618,7 +2685,8 @@ truncate:
   example: _.truncate
 tshift:
   action:
-    status: todo
+    kind: window
+    status: wontdo
   backends: {}
   category: time_series
   example: _.tshift()
@@ -2632,6 +2700,7 @@ tz_convert:
   priority: 0
 tz_localize:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: time_series
@@ -2684,6 +2753,7 @@ view:
   example: _.view
 where:
   action:
+    kind: elwise
     status: todo
   backends: {}
   category: reindexing
