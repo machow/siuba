@@ -1,6 +1,6 @@
 # sqlvariant, allow defining 3 namespaces to override defaults
 from ..translate import (
-        SqlColumn, SqlColumnAgg, SqlTranslator, win_agg,
+        SqlColumn, SqlColumnAgg, SqlTranslations, win_agg,
         create_sql_translators
         )
 
@@ -13,15 +13,15 @@ from sqlalchemy import sql
 class SqliteColumn(SqlColumn): pass
 class SqliteColumnAgg(SqlColumnAgg, SqliteColumn): pass
 
-scalar = SqlTranslator(
+scalar = SqlTranslations(
         base_scalar,
         )
 
-aggregate = SqlTranslator(
+aggregate = SqlTranslations(
         base_agg
         )
 
-window = SqlTranslator(
+window = SqlTranslations(
         # TODO: should check sqlite version, since < 3.25 can't use windows
         base_nowin,
         sd = win_agg("stddev")
@@ -29,4 +29,7 @@ window = SqlTranslator(
 
 funcs = dict(scalar = scalar, aggregate = aggregate, window = window)
 
-translators = create_sql_translators(funcs, SqliteColumn, SqliteColumnAgg)
+translator = create_sql_translators(
+        scalar, aggregate, window,
+        SqliteColumn, SqliteColumnAgg
+        )

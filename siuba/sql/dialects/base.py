@@ -397,4 +397,7 @@ base_nowin = dict(
 
 funcs = dict(scalar = base_scalar, aggregate = base_agg, window = base_win)
 
-translators = create_sql_translators(funcs, SqlColumn, SqlColumnAgg)
+translator = create_sql_translators(
+        base_scalar, base_agg, base_win,
+        SqlColumn, SqlColumnAgg
+        )

@@ -1,6 +1,6 @@
 # sqlvariant, allow defining 3 namespaces to override defaults
 from ..translate import (
-        SqlColumn, SqlColumnAgg, SqlTranslator, 
+        SqlColumn, SqlColumnAgg, SqlTranslations, 
         win_agg, sql_scalar, sql_agg,
         create_sql_translators
         )
@@ -44,7 +44,7 @@ def sql_func_contains(col, pat, case = True, flags = 0, na = None, regex = True)
 
     return col.op(full_op)(pat)
 
-scalar = SqlTranslator(
+scalar = SqlTranslations(
         base_scalar,
         log = sql_log,
         round = sql_round,
@@ -58,7 +58,7 @@ scalar = SqlTranslator(
         },
         )
 
-aggregate = SqlTranslator(
+aggregate = SqlTranslations(
         base_agg,
         all = sql_agg("bool_and"),
         any = sql_agg("bool_or"),
@@ -66,7 +66,7 @@ aggregate = SqlTranslator(
         var = sql_agg("var_samp"),
         )
 
-window = SqlTranslator(
+window = SqlTranslations(
         base_win,
         any = win_agg("bool_or"),
         all = win_agg("bool_and"),
@@ -78,6 +78,7 @@ window = SqlTranslator(
 funcs = dict(scalar = scalar, aggregate = aggregate, window = window)
 
 # translate(config, CallTreeLocal, PostgresqlColumn, _.a + _.b)
-
-
-translators = create_sql_translators(funcs, PostgresqlColumn, PostgresqlColumnAgg)
+translator = create_sql_translators(
+        scalar, aggregate, window,
+        PostgresqlColumn, PostgresqlColumnAgg
+        )

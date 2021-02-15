@@ -1,9 +1,8 @@
 import importlib
 
-def get_dialect_config(name):
+def get_dialect_translator(name):
     mod = importlib.import_module('siuba.sql.dialects.{}'.format(name))
-    return mod.config
-
+    return mod.translator
 
 def get_dialect_funcs(name):
     #dialect = engine.dialect.name

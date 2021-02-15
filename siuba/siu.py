@@ -535,6 +535,16 @@ class CallTreeLocal(CallListener):
         self.result_cls = result_cls
         self.call_props = set(call_props or [])
 
+    def translate(self, expr):
+        """Return the translation of an expression.
+
+        This method is meant to be a high-level entrypoint.
+
+        """
+
+        # note that by contract, don't need to strip symbolic
+        return self.enter(strip_symbolic(expr))
+
     def create_local_call(self, name, prev_obj, cls, func_args = None, func_kwargs = None):
         # need call attr name (arg[0].args[1]) 
         # need call arg and kwargs

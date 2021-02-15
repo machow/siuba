@@ -35,7 +35,7 @@ def warn_arg_default(func_name, arg_name, arg, correct):
 from sqlalchemy.sql.elements import ColumnClause
 from sqlalchemy.sql.base import ImmutableColumnCollection
 
-class SqlBase(ColumnClause): pass
+class SqlBase(sql.elements.ColumnClause): pass
 
 class SqlColumn(SqlBase): pass
 
@@ -474,7 +474,7 @@ def sql_func_astype(col, _type):
 from collections.abc import MutableMapping
 import itertools
 
-class SqlTranslator(MutableMapping):
+class SqlTranslations(MutableMapping):
     def __init__(self, d, **kwargs):
         self.d = d
         self.kwargs = kwargs
@@ -504,8 +504,23 @@ class SqlTranslator(MutableMapping):
 
 from siuba.ops.translate import create_pandas_translator
 
-def create_sql_translators(funcs, WinCls, AggCls):
-    return {
-            "window": create_pandas_translator(funcs, WinCls, SqlColumn),
-            "aggregate": create_pandas_translator(funcs, AggCls, SqlColumn)
-            }
+# TODO: should inherit from a ITranslate class (w/ abstract translate method)
+class SqlTranslator:
+    def __init__(self, window, aggregate):
+        self.window = window
+        self.aggregate = aggregate
+
+    def translate(self, expr, window = True):
+        if window:
+            return self.window.translate(expr)
+
+        return self.aggregate.translate(expr)
+
+
+def create_sql_translators(base, agg, window, WinCls, AggCls):
+    trans_win = {**base, **window}
+    trans_agg = {**base, **agg}
+    return SqlTranslator(
+            window = create_pandas_translator(trans_win, WinCls, sql.elements.ClauseElement),
+            aggregate = create_pandas_translator(trans_agg, AggCls, sql.elements.ClauseElement)
+            )

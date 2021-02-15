@@ -18,7 +18,7 @@ from siuba.dply.verbs import (
         if_else
         )
 from .translate import sa_get_over_clauses, CustomOverClause, SqlColumn, SqlColumnAgg
-from .utils import get_dialect_funcs, get_sql_classes, _FixedSqlDatabase
+from .utils import get_dialect_translator, get_sql_classes, _FixedSqlDatabase
 
 from sqlalchemy import sql
 import sqlalchemy
@@ -178,10 +178,8 @@ def ordered_union(x, y):
 class LazyTbl:
     def __init__(
             self, source, tbl, columns = None,
-            ops = None, group_by = tuple(), order_by = tuple(), funcs = None,
-            rm_attr = ('str', 'dt'), call_sub_attr = ('dt', 'str'),
-            dispatch_cls = None,
-            result_cls = sql.elements.ClauseElement
+            ops = None, group_by = tuple(), order_by = tuple(),
+            translator = None
             ):
         """Create a representation of a SQL table.
 
@@ -209,9 +207,7 @@ class LazyTbl:
         self.source = sqlalchemy.create_engine(source) if isinstance(source, str) else source
 
         dialect = self.source.dialect.name
-        self.funcs = get_dialect_funcs(dialect) if funcs is None else funcs
-        self.dispatch_cls = get_sql_classes(dialect) if dispatch_cls is None else dispatch_cls
-        self.result_cls = result_cls
+        self.translator = get_dialect_translator(dialect)
 
         self.tbl = self._create_table(tbl, columns, self.source)
 
@@ -220,12 +216,6 @@ class LazyTbl:
 
         self.group_by = group_by
         self.order_by = order_by
-
-        # customizations to allow interop with pandas (e.g. handle dt methods)
-        self.rm_attr = rm_attr
-        self.call_sub_attr = call_sub_attr
-
-        self.result_cls = result_cls
 
 
     def append_op(self, op, **kwargs):
@@ -241,8 +231,6 @@ class LazyTbl:
             call, window = True, str_accessors = False,
             verb_name = None, arg_name = None,
             ):
-        # TODO: error if mutate receives a literal value?
-        # TODO: dispatch_cls currently unused
         if str_accessors and isinstance(call, str):
             # verbs that can use strings as accessors, like group_by, or
             # arrange, need to convert those strings into a getitem call
@@ -254,27 +242,9 @@ class LazyTbl:
             # that returns a sqlalchemy "literal" object
             return Lazy(sql.literal(call))
 
-        # set up locals funcs dict
-        f_dict1 = self.funcs['scalar']
-        f_dict2 = self.funcs['window' if window else 'aggregate']
-
-        funcs = {**f_dict1, **f_dict2}
-
-        # determine dispatch class
-        cls_name = 'window' if window else 'aggregate'
-        dispatch_cls = self.dispatch_cls[cls_name]
-
-        call_shaper = CallTreeLocal(
-                funcs,
-                chain_sub_attr = True,
-                call_sub_attr = self.call_sub_attr,
-                dispatch_cls = dispatch_cls,
-                result_cls = self.result_cls,
-                )
-
         # raise informative error message if missing translation
         try:
-            return call_shaper.enter(call)
+            return self.translator.translate(call, window = window)
         except FunctionLookupError as err:
             raise SqlFunctionLookupError.from_verb(
                     verb_name or "Unknown",
