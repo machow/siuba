@@ -100,6 +100,18 @@ class CumlOver(Over, CustomOverClause):
 
 # Translator creation funcs ===================================================
 
+def annotate(f, **kwargs):
+    from functools import wraps
+
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        return f(*args, **kwargs)
+
+    wrapper.operation = kwargs
+
+    return wrapper
+
+
 # Windows ----
 
 # TODO: move parts using siu to separate file (includes CallTreeLocal stuff below)

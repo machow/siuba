@@ -2,6 +2,7 @@
 from ..translate import (
         SqlColumn, SqlColumnAgg, SqlTranslations, 
         win_agg, sql_scalar, sql_agg,
+        annotate,
         create_sql_translators
         )
 
@@ -19,6 +20,8 @@ class PostgresqlColumnAgg(SqlColumnAgg, PostgresqlColumn): pass
 
 # Custom translations =========================================================
 
+def returns_float(ns, func_names):
+    return {k: annotate(ns[k], return_type = "float") for k in func_names}
 
 def sql_log(col, base = None):
     if base is None:
@@ -49,13 +52,19 @@ scalar = SqlTranslations(
         log = sql_log,
         round = sql_round,
         #year = lambda col: sql.func.extract('year', sql.cast(col, sql.sqltypes.Date)),
-        concat = sql.func.concat,
-        cat = sql.func.concat,
-        str_c = sql.func.concat,
+        concat = lambda col: sql.func.concat(col),
+        cat = lambda col: sql.func.concat(col),
+        str_c = lambda col: sql.func.concat(col),
         __floordiv__ = lambda x, y: sql.cast(x / y, sa_types.Integer()),
         **{
             "str.contains": sql_func_contains,
         },
+        **returns_float(base_scalar, [
+             "dt.day", "dt.dayofweek", "dt.dayofyear", "dt.days_in_month",
+             "dt.daysinmonth", "dt.hour", "dt.minute", "dt.month",
+             "dt.quarter", "dt.second", "dt.week", "dt.weekday",
+             "dt.weekofyear", "dt.year"
+             ]),
         )
 
 aggregate = SqlTranslations(

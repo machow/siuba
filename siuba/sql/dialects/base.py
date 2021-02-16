@@ -147,14 +147,14 @@ base_scalar = dict(
       #"str.isalpha"       :,
       #"str.isdecimal"     :,
       #"str.isdigit"       :,
-      "str.islower"       : sql.func.lower,
+      "str.islower"       : lambda col: sql.func.lower(col),
       #"str.isnumeric"     :,
       #"str.isspace"       :,
       #"str.istitle"       :,
       #"str.isupper"       :,
-      "str.len"           : sql.func.length,
+      "str.len"           : lambda col: sql.func.length(col),
       #"str.ljust"         :,
-      "str.lower"         : sql.func.lower,
+      "str.lower"         : lambda col: sql.func.lower(col),
       "str.lstrip"        : sql_str_strip("ltrim"),
       #"str.match"         :,
       #"str.pad"           :,
@@ -169,8 +169,8 @@ base_scalar = dict(
       "str.startswith"    : sql_colmeth("startswith"),
       "str.strip"         : sql_str_strip("trim"),
       #"str.swapcase"      :,
-      "str.title"         : sql.func.initcap,
-      "str.upper"         : sql.func.upper,
+      "str.title"         : lambda col: sql.func.initcap(col),
+      "str.upper"         : lambda col: sql.func.upper(col),
       #"str.wrap"          :,
     },
 
@@ -237,7 +237,7 @@ base_scalar = dict(
 
     # Missing values ----
 
-    fillna      = sql.functions.coalesce,
+    fillna      = lambda col: sql.functions.coalesce(col),
     isna        = sql_colmeth("is_", None),
     isnull      = sql_colmeth("is_", None),
     notna       = lambda col: ~col.is_(None),
@@ -279,10 +279,10 @@ base_win = dict(
     mean = win_agg("avg"),
     #median = 
     min = win_agg("min"),
-    nunique = lambda col: sql.func.count(sql.func.distinct(col)),
+    nunique = win_absent("nunique"),
     #prod = 
     #product = 
-    quantile =  NotImplementedError(),
+    quantile =  win_absent("quantile"),
     #sem = 
     #skew = 
     #std =  # TODO(pg)
@@ -301,6 +301,21 @@ base_win = dict(
 
     #bfill       = TODO: pg
     #ffill       = TODO: pg
+
+    # index (strict aggregates) ----
+
+    #equals =  #TODO(pg) combine == and all
+    #idxmax =  #TODO?
+    #idxmin = 
+
+
+    # attributes (strict aggregates) ----
+
+    #empty = 
+    #hasnans = # TODO
+    #memory_usage = 
+    #nbytes = 
+    size = win_absent("count"),
 )
 
 
@@ -380,6 +395,7 @@ base_nowin = dict(
         quantile    = win_absent("PERCENTILE_CONT"),
         n            = win_absent("N"),
         n_distinct   = win_absent("N_DISTINCT"),
+        nunique      = win_absent("nunique function"),
         cummean      = win_absent("MEAN"),
         cumsum       = win_absent("SUM"),
         cummin       = win_absent("MIN"),
@@ -391,7 +407,8 @@ base_nowin = dict(
         lag          = win_absent("LAG"),
         order_by     = win_absent("ORDER_BY"),
         str_flatten  = win_absent("STR_FLATTEN"),
-        count        = win_absent("COUNT")
+        count        = win_absent("COUNT"),
+        size         = win_absent("size function"),
         )
 
 
