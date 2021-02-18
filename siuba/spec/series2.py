@@ -51,8 +51,8 @@ def read_dialect(name):
     for k, v in translator.aggregate.local.items():
         agg_support.append(read_sql_op(k, v))
 
-    wins = pd.DataFrame(win_support).convert_dtypes()
-    aggs = pd.DataFrame(agg_support).convert_dtypes()
+    wins = pd.DataFrame(win_support)
+    aggs = pd.DataFrame(agg_support)
 
     missing = set(aggs.full_name) - set(wins.full_name)
     if len(missing) > 0:
@@ -67,6 +67,10 @@ def read_dialect(name):
             "full_name"
             )
         >> mutate(
+                # once update to pandas 1.0+, can use convert_dtypes()
+                # to get the boolean logic used below
+                is_supported_x = _.is_supported_x.fillna(False),
+                is_supported_y = _.is_supported_y.fillna(False),
                 is_supported = _["is_supported_x"] | _["is_supported_y"],
                 flags = if_else(_.is_supported & ~_["is_supported_x"], "no_mutate", ""),
             )
