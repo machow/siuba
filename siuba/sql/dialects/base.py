@@ -17,7 +17,8 @@ from siuba.sql.translate import (
         sql_scalar,
         sql_colmeth,
         sql_not_impl,
-        create_sql_translators
+        create_sql_translators,
+        annotate
         )
 
 # TODO: move anything using this into base.py
@@ -54,34 +55,37 @@ from siuba.sql.translate import sql_func_astype
 #       cot = sql_scalar("cot"),
 # 
 
+def req_bool(f):
+    return annotate(f, input_type = "bool")
+
 base_scalar = dict(
     # infix ----
     __add__       = sql_colmeth("__add__"),
-    __and__       = sql_colmeth("__and__"),
+    __and__       = req_bool(sql_colmeth("__and__")),
     __div__       = sql_colmeth("__div__"),
     __eq__        = sql_colmeth("__eq__"),
     __floordiv__  = sql_not_impl(),
     __ge__        = sql_colmeth("__ge__"),
     __gt__        = sql_colmeth("__gt__"),
-    __invert__    = sql_colmeth("__invert__"),
+    __invert__    = req_bool(sql_colmeth("__invert__")),
     __le__        = sql_colmeth("__le__"),
     __lt__        = sql_colmeth("__lt__"),
     __mod__       = sql_colmeth("__mod__"),
     __mul__       = sql_colmeth("__mul__"),
     __ne__        = sql_colmeth("__ne__"),
     __neg__       = sql_colmeth("__neg__"),
-    __or__        = sql_colmeth("__or__"),
-    __pos__       = sql_colmeth("__pos__"),
-    __pow__       = sql_colmeth("__pow__"),
+    __or__        = req_bool(sql_colmeth("__or__")),
+    __pos__       = sql_not_impl(),
+    __pow__       = sql_not_impl(),
     __radd__      = sql_colmeth("__radd__"),
-    __rand__      = sql_colmeth("__rand__"),
-    __rdiv__      = sql_colmeth("__pos__"),
+    __rand__      = req_bool(sql_colmeth("__rand__")),
+    __rdiv__      = sql_colmeth("__rdiv__"),
     __rfloordiv__ = sql_colmeth("__pow__"),
     __rmod__      = sql_colmeth("__rmod__"),
     __rmul__      = sql_colmeth("__rmul__"),
-    __ror__       = sql_colmeth("__ror__"),   
+    __ror__       = req_bool(sql_colmeth("__ror__")),
     __round__     = sql_scalar("round"),
-    __rpow__      = sql_colmeth("__rpow__"),
+    __rpow__      = sql_not_impl(),
     __rsub__      = sql_colmeth("__rsub__"),
     __rtruediv__  = sql_colmeth("__rtruediv__"),
     #__rxor__      = sql_colmeth("__rxor__"),
@@ -107,7 +111,7 @@ base_scalar = dict(
     mul           = sql_colmeth("__mul__"),         
     multiply      = sql_colmeth("__mul__"),        
     ne            = sql_colmeth("__ne__"),         
-    pow           = sql_colmeth("__pow__"),        
+    pow           = sql_not_impl(),
     radd          = sql_colmeth("__radd__"),       
     rdiv          = sql_colmeth("__rdiv__"),       
     #rdivmod      = 
@@ -115,9 +119,9 @@ base_scalar = dict(
     rmod          = sql_colmeth("__rmod__"),       
     rmul          = sql_colmeth("__rmul__"),       
     round         = sql_scalar("round"),
-    rpow          = sql_colmeth("__rpow__"),     
+    rpow          = sql_not_impl(),     
     rsub          = sql_colmeth("__rsub__"),       
-    rtruediv      = sql_colmeth("__rtruediv__"),       
+    rtruediv      = sql_not_impl(),
     sub           = sql_colmeth("__sub__"),   
     subtract      = sql_colmeth("__sub__"),      
     truediv       = sql_colmeth("__truediv__"),        
@@ -147,7 +151,7 @@ base_scalar = dict(
       #"str.isalpha"       :,
       #"str.isdecimal"     :,
       #"str.isdigit"       :,
-      "str.islower"       : lambda col: sql.func.lower(col),
+      "str.islower"       : lambda col: col == sql.func.lower(col),
       #"str.isnumeric"     :,
       #"str.isspace"       :,
       #"str.istitle"       :,
@@ -237,7 +241,7 @@ base_scalar = dict(
 
     # Missing values ----
 
-    fillna      = lambda col: sql.functions.coalesce(col),
+    fillna      = lambda x, y: sql.functions.coalesce(x,y),
     isna        = sql_colmeth("is_", None),
     isnull      = sql_colmeth("is_", None),
     notna       = lambda col: ~col.is_(None),

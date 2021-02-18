@@ -87,7 +87,7 @@ def grouper_match(grp1, grp2):
     
 
 def broadcast_group_elements(x, y):
-    """Returns 3-tuple of same-length x and y data, plus a reference group by object.
+    """Returns 3-tuple of same-length x and y Series, plus a reference group by object.
 
     Note:
         * Raises error if x and y are not compatible group by objects.

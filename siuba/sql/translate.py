@@ -100,7 +100,19 @@ class CumlOver(Over, CustomOverClause):
 
 # Translator creation funcs ===================================================
 
-def annotate(f, **kwargs):
+def annotate(f = None, **kwargs):
+    # allow it to work as a decorator
+    if f is None:
+        return lambda f: annotate(f, **kwargs)
+
+    if hasattr(f, "operation"):
+        raise ValueError("function already has an operation attribute")
+
+    f.operation = kwargs
+
+    return f
+
+def wrap_annotate(f, **kwargs):
     from functools import wraps
 
     @wraps(f)
@@ -120,7 +132,7 @@ from siuba.siu import FunctionLookupBound
 def win_absent(name):
     # Return an error, that is picked up by the translator.
     # this allows us to report errors at translation, rather than call time.
-    return FunctionLookupBound("SQL dialect does not support {}.".format(name))
+    return FunctionLookupBound("SQL dialect does not support window function {}.".format(name))
 
 def win_over(name: str):
     sa_func = getattr(sql.func, name)
@@ -226,7 +238,7 @@ def sql_colmeth(meth, *outerargs):
     return f
 
 def sql_not_impl():
-    return NotImplementedError
+    return FunctionLookupBound("function not implemented")
 
 
 # Custom implementations ----

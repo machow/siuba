@@ -14,10 +14,6 @@ def enrich_spec_entry(entry):
             'expr_series': expr,
             'accessor': accessor[0],
             }
-    tmp['action'] = {
-            **entry['action'],
-            'data_arity': count_call_type(expr, MetaArg),
-            }
 
     return tmp
 

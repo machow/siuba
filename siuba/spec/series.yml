@@ -446,7 +446,7 @@ bfill:
     status: todo
   backends: {}
   category: missing_data
-  example: _.bfill(1)
+  example: _.bfill()
 bool:
   action:
     kind: agg
@@ -461,7 +461,7 @@ cat.add_categories:
     status: todo
   backends: {}
   category: categories
-  example: _.cat.add_categories()
+  example: _.cat.add_categories('zzz')
   priority: 1
 cat.as_ordered:
   action:
@@ -506,7 +506,7 @@ cat.remove_categories:
     status: todo
   backends: {}
   category: categories
-  example: _.cat.remove_categories()
+  example: '_.cat.remove_categories("abc")'
   priority: 1
 cat.remove_unused_categories:
   action:
@@ -522,7 +522,7 @@ cat.rename_categories:
     status: todo
   backends: {}
   category: categories
-  example: _.cat.rename_categories()
+  example: '_.cat.rename_categories({"abc": "zzz"})'
   priority: 1
 cat.reorder_categories:
   action:
@@ -530,7 +530,7 @@ cat.reorder_categories:
     status: todo
   backends: {}
   category: categories
-  example: _.cat.reorder_categories()
+  example: '_.cat.reorder_categories(["abc", "cde", "fg", "h"])'
   priority: 1
 cat.set_categories:
   action:
@@ -538,7 +538,7 @@ cat.set_categories:
     status: todo
   backends: {}
   category: categories
-  example: _.cat.set_categories()
+  example: "_.cat.set_categories(['a', 'b', 'c', 'd'])"
   priority: 1
 clip:
   action:
@@ -554,7 +554,7 @@ combine:
     status: todo
   backends: {}
   category: binary
-  example: _.combine(_,'max')
+  example: _.combine(_, max)
   priority: 1
 combine_first:
   action:
@@ -562,7 +562,7 @@ combine_first:
     status: todo
   backends: {}
   category: binary
-  example: _.combine_first(_,'max')
+  example: _.combine_first(_)
   priority: 1
 compound:
   action:
@@ -1221,7 +1221,7 @@ ffill:
     status: todo
   backends: {}
   category: missing_data
-  example: _.ffill(1)
+  example: _.ffill()
 fillna:
   action:
     kind: elwise
@@ -1542,7 +1542,7 @@ mask:
     status: todo
   backends: {}
   category: reindexing
-  example: _.mask()
+  example: _.mask(_ > 1)
   priority: 2
 max:
   action:
@@ -2737,7 +2737,7 @@ values:
     status: wontdo
   backends: {}
   category: attributes
-  example: _.value
+  example: _.values
 var:
   action:
     kind: agg
@@ -2757,7 +2757,7 @@ where:
     status: todo
   backends: {}
   category: reindexing
-  example: _.where(_)
+  example: '_.where(_ > 2)'
   priority: 2
 xs:
   action:

@@ -231,13 +231,20 @@ class LazyTbl:
             call, window = True, str_accessors = False,
             verb_name = None, arg_name = None,
             ):
-        if str_accessors and isinstance(call, str):
+        if isinstance(call, Call):
+            pass
+        elif str_accessors and isinstance(call, str):
             # verbs that can use strings as accessors, like group_by, or
             # arrange, need to convert those strings into a getitem call
             return str_to_get_item_call(call)
         elif isinstance(call, sql.elements.ColumnClause):
             return Lazy(call)
-        elif not isinstance(call, Call):
+        elif callable(call):
+            #TODO: should not happen here
+            from siuba.siu import MetaArg
+            return Call("__call__", call, MetaArg('_'))
+
+        else:
             # verbs that use literal strings, need to convert them to a call
             # that returns a sqlalchemy "literal" object
             return Lazy(sql.literal(call))

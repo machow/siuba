@@ -11,23 +11,22 @@ import pandas as pd
 import pkg_resources
 
 def get_action_kind(spec_entry):
-    action = spec_entry['action']
-    return action.get('kind', action.get('status')).title()
-
+    return spec_entry["kind"]
 
 def filter_entry(spec, f):
     out = []
     for k, v in spec.items():
-        kind = v["action"].get("kind", "unknown").title()
-        status = v["action"].get("status", "Supported").title()
+        raw_kind = v.get("kind")
+        kind = raw_kind.title() if raw_kind is not None else "Unknown"
+        status = v["backends"].get("pandas", {}).get("support", "Supported").title()
 
         if f(kind, status):
             out.append(k)
 
     return out
 
-SPEC_IMPLEMENTED = filter_entry(spec, lambda k, s: k in {"Agg", "Elwise", "Window", "Singleton"} and s == "Supported")
-SPEC_NOTIMPLEMENTED = filter_entry(spec, lambda k, s: s in {"Wontdo", "Todo", "Maydo"})
+SPEC_IMPLEMENTED = filter_entry(spec, lambda k, s: s == "Supported")
+SPEC_NOTIMPLEMENTED = filter_entry(spec, lambda k, s: s != "Supported")
 SPEC_AGG = filter_entry(spec, lambda k, s: k in {"Agg"} and s == "Supported")
 
 _ = Symbolic()
@@ -103,20 +102,19 @@ DATA = data = {
 }
 
 def get_spec_no_mutate(entry, backend):
-    return "no_mutate" in entry['backends'].get(backend, {}).get('flags', [])
+    return "no_mutate" in entry['backends'].get(backend.name, {}).get('flags', [])
     
-def get_spec_backend_status(entry, backend):
-    return entry['backends'].get(backend, {}).get('status')
+def get_spec_backend_is_supported(entry, backend):
+    return entry['backends'].get(backend.name, {}).get('is_supported')
 
 def get_spec_sql_type(entry, backend):
-    return entry['backends'].get(backend, {}).get('result_type')
+    return entry['backends'].get(backend.name, {}).get('result_type')
 
 def get_data(entry, data, backend = None):
 
-    req_bool = entry['action'].get('input_type') == 'bool'
-
-    # pandas is forgiving to bool inputs
-    if isinstance(backend, PandasBackend):
+    if backend:
+        req_bool = entry["backends"].get(backend.name, {}).get('input_type') == 'bool'
+    else:
         req_bool = False
 
     return data['bool'] if req_bool else data[entry['accessor']]
@@ -124,33 +122,40 @@ def get_data(entry, data, backend = None):
 
 def test_missing_implementation(entry, backend):
     # Check whether test should xfail, skip, or -------------------------------
-    backend_status = get_spec_backend_status(entry, backend.name)
+    supported = get_spec_backend_is_supported(entry, backend)
 
-    # case: Needs to be implmented
-    # TODO(table): uses xfail
-    if backend_status == "todo":
-        pytest.xfail("TODO: impelement this translation")
-    
-    # case: Can't be used in a mutate (e.g. a SQL ordered set aggregate function)
-    # TODO(table): no_mutate
-    if get_spec_no_mutate(entry, backend.name):
+    if not supported:
         pytest.skip("Spec'd failure")
 
-    # case: won't be implemented
-    if get_spec_backend_status(entry, backend.name) == "wontdo":
-        pytest.skip()
+    if get_spec_no_mutate(entry, backend):
+        pytest.skip("Spec'd failure")
+
+    ## case: Needs to be implmented
+    ## TODO(table): uses xfail
+    #if backend_status == "todo":
+    #    pytest.xfail("TODO: impelement this translation")
+    #
+    ## case: Can't be used in a mutate (e.g. a SQL ordered set aggregate function)
+    ## TODO(table): no_mutate
+
+    ## case: won't be implemented
+    #if get_spec_backend_status(entry, backend.name) == "wontdo":
+    #    pytest.skip()
 
 
 def get_df_expr(entry):
     str_expr = str(entry['expr_frame'])
-    call_expr = strip_symbolic(eval(str_expr, {'_': _}))
+    #call_expr = strip_symbolic(eval(str_expr, {'_': _}))
+    return str_expr, entry["expr_frame"]
 
     return str_expr, call_expr
 
 def cast_result_type(entry, backend, ser):
-    sql_type = get_spec_sql_type(entry, backend.name)
+    sql_type = get_spec_sql_type(entry, backend)
     if isinstance(backend, SqlBackend) and sql_type == 'float':
         return ser.astype('float')
+    elif isinstance(backend, SqlBackend) and sql_type == 'int':
+        return ser.astype('int')
     
     return ser
 
@@ -158,17 +163,20 @@ def cast_result_type(entry, backend, ser):
 
 
 def test_series_against_call(entry):
-    if entry['action']['kind'] == "window":
+    # TODO: this test originally was evaluating string representations created
+    # by calls. I've changed it to just executing the calls directly.
+    # not sure the original intent of the test?
+    if entry['kind'] == "window":
         pytest.skip()
 
     df = data[entry['accessor']]
     # TODO: once reading from yaml, no need to repr
     str_expr = str(entry['expr_series'])
 
-    call_expr = strip_symbolic(eval(str_expr, {'_': _}))
+    call_expr = entry['expr_series']#  strip_symbolic(eval(str_expr, {'_': _}))
     res = call_expr(df.x)
 
-    dst = eval(str_expr, {'_': df.x})
+    dst = call_expr(df.x)# eval(str_expr, {'_': df.x})
     
     assert res.__class__ is dst.__class__
     assert_src_array_equal(res, dst)
@@ -180,10 +188,10 @@ def test_frame_expr(entry):
     # TODO: once reading from yaml, no need to repr
     str_expr = str(entry['expr_frame'])
 
-    call_expr = strip_symbolic(eval(str_expr, {'_': _}))
+    call_expr = entry['expr_frame']
     res = call_expr(df)
 
-    dst = eval(str_expr, {'_': df})
+    dst = call_expr(df)
     
     assert res.__class__ is dst.__class__
     assert_src_array_equal(res, dst)
@@ -196,9 +204,6 @@ def test_pandas_grouped_frame_fast_not_implemented(notimpl_entry):
     # TODO: once reading from yaml, no need to repr
     str_expr = str(notimpl_entry['expr_frame'])
     call_expr = strip_symbolic(eval(str_expr, {'_': _}))
-
-    if notimpl_entry['action']['status'] in ["todo", "maydo", "wontdo"] and notimpl_entry["is_property"]:
-        pytest.xfail()
 
     with pytest.warns(UserWarning):
         try:
@@ -292,6 +297,7 @@ def test_frame_summarize(skip_backend, backend, agg_entry):
             )
 
     dst_g = crnt_data.groupby('g').apply(call_expr).reset_index().rename(columns = {0: 'result'})
+    dst_g["result"] = cast_result_type(entry, backend, dst_g['result'])
     assert_equal_query(
             df,
             group_by(_.g) >> summarize(result = call_expr),

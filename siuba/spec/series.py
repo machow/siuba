@@ -11,7 +11,10 @@ from .utils import enrich_spec_entry
 import yaml
 import pkg_resources
 
-fname_spec = pkg_resources.resource_filename("siuba.spec", "series.yml")
-with open(fname_spec, "r") as f:
-    raw_spec = yaml.load(f, Loader = yaml.SafeLoader)
-    spec = {k: enrich_spec_entry(entry) for k, entry in raw_spec.items()}
+#fname_spec = pkg_resources.resource_filename("siuba.spec", "series2.yml")
+#with open(fname_spec, "r") as f:
+#    raw_spec = yaml.load(f, Loader = yaml.SafeLoader)
+#    spec = {k: enrich_spec_entry(entry) for k, entry in raw_spec.items()}
+
+from .series2 import spec as raw_spec
+spec = {k: enrich_spec_entry(entry) for k, entry in raw_spec.items()} 

@@ -1,4 +1,5 @@
 from .groupby import DataFrameGroupBy, GroupByAgg, SeriesGroupBy, broadcast_group_elements, _regroup
+from siuba.siu import FunctionLookupBound
 import pandas as pd
 
 
@@ -42,8 +43,8 @@ def _maybe_broadcast(x, y):
 
 # Translations ----------------------------------------------------------------
 
-def not_implemented(name, is_property, accessor):
-    return NotImplementedError
+def not_implemented(name, *args, **kwargs):
+    return FunctionLookupBound(name)
 
 
 def method_agg_op(name, is_property, accessor):
@@ -69,13 +70,13 @@ def method_el_op(name, is_property, accessor):
 
 
 def method_el_op2(name, is_property, accessor):
-    def f(x, y):
+    def f(x, y, *args, **kwargs):
         _validate_data_args(x, y = y)
         left, right, groupby = _maybe_broadcast(x, y)
-        
+
         op_function = getattr(left, name)
 
-        res = op_function(right)
+        res = op_function(right, *args, **kwargs)
         return _regroup(res, groupby)
 
     f.__name__ = f.__qualname__ = name
@@ -88,6 +89,16 @@ def method_win_op(name, is_property, accessor):
         res = _apply_grouped_method(__ser, name, is_property, accessor, args, kwargs)
 
         return _regroup(res, __ser)
+
+    f.__name__ = f.__qualname__ = name
+    return f
+
+def method_win_op_agg_result(name, is_property, accessor):
+    def f(__ser, *args, **kwargs):
+        _validate_data_args(__ser)
+        res = _apply_grouped_method(__ser, name, is_property, accessor, args, kwargs)
+
+        return GroupByAgg.from_result(res, __ser)
 
     f.__name__ = f.__qualname__ = name
     return f
@@ -113,7 +124,28 @@ def method_agg_singleton(name, is_property, accessor):
         return GroupByAgg.from_result(res, __ser)
     return f
 
-from siuba.ops.utils import default
+
+def forward_method(dispatcher, constructor = None, cls = SeriesGroupBy):
+    op = dispatcher.operation
+    kind = op.kind.title() if op.kind is not None else None
+    key = (kind, op.arity)
+
+    constructor = GROUP_METHODS[key] if constructor is None else constructor
+
+    f_concrete = constructor(
+            name = op.name,
+            is_property = op.is_property,
+            accessor = op.accessor
+            )
+    
+    return dispatcher.register(cls, f_concrete)
+
+
+
+# TODO: which methods can be pulled off GroupedDFs?
+#       * all elwise in certain categories can be added (dt, str, etc..)
+#       * some aggs / windows can be punted to SeriesGroupBy
+#       * others require custom implementation
 
 GROUP_METHODS = { 
         ("Elwise", 1): method_el_op,
@@ -129,6 +161,8 @@ GROUP_METHODS = {
         ("Todo", 2): not_implemented,
         ("Maydo", 2): not_implemented,
         ("Wontdo", 2): not_implemented,
+        (None, 1): not_implemented,
+        (None, 2): not_implemented,
         }
 
 

@@ -591,8 +591,8 @@ class CallTreeLocal(CallListener):
             raise FunctionLookupError("Missing translation for function call: %s"% name)
 
         if isinstance(local_func, FunctionLookupBound):
-            #raise FunctionLookupError(local_func)
-            local_func()
+            raise FunctionLookupError(local_func.msg)
+            #local_func()
 
         #if isclass(local_func) and issubclass(local_func, Exception):
         #    raise local_func
@@ -643,7 +643,8 @@ class CallTreeLocal(CallListener):
             f_for_cls = func.dispatch(self.dispatch_cls)
 
             if isinstance(f_for_cls, FunctionLookupBound):
-                f_for_cls()
+                # TODO: this is a bit funky, since FLB raises when called
+                raise FunctionLookupError(f_for_cls.msg)
 
             if (self.result_cls is None
                 or is_dispatch_func_subtype(f_for_cls, self.dispatch_cls, self.result_cls)
