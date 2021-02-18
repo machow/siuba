@@ -3,6 +3,7 @@ from siuba.tests.helpers import data_frame
 import pandas as pd
 
 from siuba.experimental.pd_groups.translate import method_agg_op, method_el_op, method_el_op2
+from siuba.experimental.pd_groups.groupby import broadcast_agg
 #TODO: 
 #  - what if they have mandatory, non-data args?
 #  - support accessor methods like _.x.str.upper()
@@ -86,7 +87,7 @@ def test_agg_groupby_broadcasted_equal_to_transform(f_op, f_dst):
     assert type(res) is GroupByAgg
 
     dst = f_dst(g)
-    broadcasted = res._broadcast_agg_result()
+    broadcasted = broadcast_agg(res)
     assert_series_equal(broadcasted, dst, check_names = False)
 
 

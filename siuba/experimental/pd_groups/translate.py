@@ -1,10 +1,45 @@
-from .groupby import DataFrameGroupBy, GroupByAgg, SeriesGroupBy, broadcast_group_elements, _regroup
+"""Functions for creating fast versions of methods like .mean().
+
+Examples:
+    .. code-block:: python    
+
+       from siuba.data import mtcars
+       g_cyl = mtcars.groupby("cyl")
+
+       avg_hp_raw = g_cyl.hp.mean()
+
+       # imagine that avg_hp was not SeriesGroupBy, but a GroupByAgg object
+       avg_hp = GroupByAgg.from_result(avg_hp_raw, g_cyl.hp)
+
+       f_mean = method_agg_op("mean", is_property = False, accessor = None)
+       f_mean(g_cyl.hp)        # returns GroupByAgg
+
+       f_add = method_el_op2("__add__", is_property = False, accessor = None)
+       f_add(g_cyl.hp, g_cyl.hp)
+       f_add(f_mean(g_cyl.hp), g_cyl.hp)
+
+       # property methods ----
+       f_is_unique = method_el_op("is_unique", is_property = True, None)
+       f_is_unique(g_cyl.hp)
+
+       # accessor methods ----
+       import pandas as pd
+       gdf = pd.DataFrame({'g': ['a', 'b'], 'x': ['AA', 'BB']}).groupby('g')
+
+       f_str_lower = method_el_op("lower", False, "str")
+       f_str_lower(gdf.x)
+
+"""
+
+from .groupby import GroupByAgg, SeriesGroupBy, broadcast_group_elements, regroup
 import pandas as pd
 
 
 # utilities -------------------------------------------------------------------
 
 def _validate_data_args(x, **kwargs):
+    # Sanity checks that only SeriesGroupBy passed for ops
+    # could be removed once this sees more use
     if not isinstance(x, SeriesGroupBy):
         raise TypeError("First data argument must be a grouped Series object")
 
@@ -24,22 +59,6 @@ def _apply_grouped_method(ser, name, is_property, accessor, args, kwargs):
     return res
 
 
-def _maybe_broadcast(x, y):
-    """Same as broadcast_group_elements, but y doesn't have to be SeriesGroupBy
-
-    This is important when y is a literal (e.g. 1), since we don't want to raise
-    an error, or broadcast 1 to the length of x. Rather, we want to keep the literal,
-    and let the pandas series handle it in the operation.
-
-    """
-    if isinstance(y, SeriesGroupBy):
-        left, right, groupby = broadcast_group_elements(x, y)
-    else:
-        left, right, groupby = x.obj, y, x
-
-    return left, right, groupby
-
-
 # Translations ----------------------------------------------------------------
 
 def not_implemented(name, is_property, accessor):
@@ -47,7 +66,7 @@ def not_implemented(name, is_property, accessor):
 
 
 def method_agg_op(name, is_property, accessor):
-    def f(__ser, *args, **kwargs):
+    def f(__ser: SeriesGroupBy, *args, **kwargs) -> GroupByAgg:
         _validate_data_args(__ser)
         res = _apply_grouped_method(__ser, name, is_property, accessor, args, kwargs)
 
@@ -58,43 +77,43 @@ def method_agg_op(name, is_property, accessor):
 
 
 def method_el_op(name, is_property, accessor):
-    def f(__ser, *args, **kwargs):
+    def f(__ser: SeriesGroupBy, *args, **kwargs) -> SeriesGroupBy:
         _validate_data_args(__ser)
         res = _apply_grouped_method(__ser.obj, name, is_property, accessor, args, kwargs)
 
-        return _regroup(res, __ser)
+        return regroup(__ser, res)
 
     f.__name__ = f.__qualname__ = name
     return f
 
 
 def method_el_op2(name, is_property, accessor):
-    def f(x, y):
+    def f(x: SeriesGroupBy, y: SeriesGroupBy) -> SeriesGroupBy:
         _validate_data_args(x, y = y)
-        left, right, groupby = _maybe_broadcast(x, y)
+        left, right, ref_groupby = broadcast_group_elements(x, y)
         
         op_function = getattr(left, name)
 
         res = op_function(right)
-        return _regroup(res, groupby)
+        return regroup(ref_groupby, res)
 
     f.__name__ = f.__qualname__ = name
     return f
 
 
 def method_win_op(name, is_property, accessor):
-    def f(__ser, *args, **kwargs):
+    def f(__ser: SeriesGroupBy, *args, **kwargs) -> SeriesGroupBy:
         _validate_data_args(__ser)
         res = _apply_grouped_method(__ser, name, is_property, accessor, args, kwargs)
 
-        return _regroup(res, __ser)
+        return regroup(__ser, res)
 
     f.__name__ = f.__qualname__ = name
     return f
 
 
 def method_agg_singleton(name, is_property, accessor):
-    def f(__ser, *args, **kwargs):
+    def f(__ser: SeriesGroupBy, *args, **kwargs) -> SeriesGroupBy:
         _validate_data_args(__ser)
         if accessor is not None:
             op_function = getattr(getattr(__ser.obj, accessor, __ser.obj), name)

@@ -22,7 +22,7 @@ examples/%.ipynb:
 	jupytext --sync $@
 
 docs/api_extra/%.rst: siuba/dply/%.py $(AUTODOC_SCRIPT)
-	python3 docs/generate_autodoc.py . $< > $@
+	python3 $(AUTODOC_SCRIPT) . $< > $@
 
 docs-watch: $(AUTODOC_PAGES)
 	cd docs && sphinx-autobuild . ./_build/html
