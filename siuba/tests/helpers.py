@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine, types
 from siuba.sql import LazyTbl, collect
 from siuba.dply.verbs import ungroup
+from siuba.siu import FunctionLookupError
 from pandas.testing import assert_frame_equal
 import pandas as pd
 import os
@@ -170,7 +171,7 @@ def backend_notimpl(*names):
         @wraps(f)
         def wrapper(backend, *args, **kwargs):
             if backend.name in names:
-                with pytest.raises(NotImplementedError):
+                with pytest.raises((NotImplementedError, FunctionLookupError)):
                     f(backend, *args, **kwargs)
                 pytest.xfail("Not implemented!")
             else:
