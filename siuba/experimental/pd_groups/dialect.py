@@ -8,6 +8,8 @@ from .translate import (
         method_win_op_agg_result
         )
 
+from siuba.experimental.pd_groups.groupby import SeriesGroupBy, GroupByAgg, broadcast_agg, is_compatible
+
 
 # THE REAL DIALECT FILE LET'S DO THIS
 # ====================================
@@ -101,7 +103,7 @@ call_listener = CallTreeLocal(
 # Fast group by verbs =========================================================
 
 from siuba.siu import Call
-from siuba.dply.verbs import mutate, filter, summarize, singledispatch2, DataFrameGroupBy, _regroup
+from siuba.dply.verbs import mutate, filter, summarize, singledispatch2, DataFrameGroupBy
 from pandas.core.dtypes.inference import is_scalar
 import warnings
 
@@ -128,19 +130,18 @@ def grouped_eval(__data, expr, require_agg = False):
         #
         grouped_res = call(__data)
 
-        if isinstance(grouped_res, GroupByAgg):
-            # TODO: may want to validate its grouper
+        if isinstance(grouped_res, SeriesGroupBy):
+            if not is_compatible(grouped_res, __data):
+                raise ValueError("Incompatible groupers")
+
+            # TODO: may want to validate result is correct length / index?
+            #       e.g. a SeriesGroupBy could be compatible and not an agg
             if require_agg:
-                # need an agg, got an agg. we are done.
-                if not grouped_res._orig_grouper is __data.grouper:
-                    raise ValueError("Incompatible groupers")
-                return grouped_res
+                return grouped_res.obj
             else:
                 # broadcast from aggregate to original length (like transform)
-                return grouped_res._broadcast_agg_result()
-        elif isinstance(grouped_res, SeriesGroupBy) and not require_agg:
-            # TODO: may want to validate its grouper
-            return grouped_res.obj
+                return broadcast_agg(grouped_res)
+
         else:
             # can happen right now if user selects, e.g., a property of the
             # groupby object, like .dtype, which returns a single value
@@ -170,7 +171,19 @@ def _transform_args(args):
 
     return out
 
-@singledispatch2(DataFrameGroupBy)
+def _copy_dispatch(dispatcher, cls, func = None):
+    if func is None:
+        return lambda f: _copy_dispatch(dispatcher, cls, f)
+
+    # Note stripping symbolics may occur twice. Once in the original, and once
+    # in this dispatcher.
+    new_dispatch = singledispatch2(cls, func)
+    new_dispatch.register(object, dispatcher)
+
+    return new_dispatch
+
+
+@_copy_dispatch(mutate, DataFrameGroupBy)
 def fast_mutate(__data, **kwargs):
     """Warning: this function is experimental"""
 
@@ -193,18 +206,9 @@ def fast_mutate(__data, **kwargs):
     return out.groupby(groupings)
 
 
-@fast_mutate.register(object)
-def _fast_mutate_default(__data, **kwargs):
-    # TODO: had to register object second, since singledispatch2 sets object dispatch
-    #       to be a pipe (e.g. unknown types become a pipe by default)
-    # by default dispatch to regular mutate
-    f = mutate.registry[type(__data)]
-    return f(__data, **kwargs)
-
-
 # Fast filter ----
 
-@singledispatch2(DataFrameGroupBy)
+@_copy_dispatch(filter, DataFrameGroupBy)
 def fast_filter(__data, *args):
     """Warning: this function is experimental"""
 
@@ -222,7 +226,7 @@ def fast_filter(__data, *args):
         res = grouped_eval(__data, expr)
         out.append(res)
 
-    filter_df = filter.registry[__data.obj.__class__]
+    filter_df = filter.dispatch(__data.obj.__class__)
 
     df_result = filter_df(__data.obj, *out)
 
@@ -231,18 +235,9 @@ def fast_filter(__data, *args):
     return df_result.groupby(group_names)
 
 
-@fast_filter.register(object)
-def _fast_filter_default(__data, *args, **kwargs):
-    # TODO: had to register object second, since singledispatch2 sets object dispatch
-    #       to be a pipe (e.g. unknown types become a pipe by default)
-    # by default dispatch to regular mutate
-    f = filter.registry[type(__data)]
-    return f(__data, *args, **kwargs)
-
-
 # Fast summarize ----
 
-@singledispatch2(DataFrameGroupBy)
+@_copy_dispatch(summarize, DataFrameGroupBy)
 def fast_summarize(__data, **kwargs):
     """Warning: this function is experimental"""
 
@@ -262,24 +257,8 @@ def fast_summarize(__data, **kwargs):
         # special case: set scalars directly
         res = grouped_eval(__data, expr, require_agg = True)
 
-        if isinstance(res, GroupByAgg):
-            # TODO: would be faster to check that res has matching grouper, since
-            #       here it goes through the work of matching up indexes (which if
-            #       the groupers match are identical)
-            out[name] = res.obj
-
-        # otherwise, assign like a scalar
-        else:
-            out[name] = res
+        out[name] = res
 
     return out.reset_index(drop = True)
 
-
-@fast_summarize.register(object)
-def _fast_summarize_default(__data, **kwargs):
-    # TODO: had to register object second, since singledispatch2 sets object dispatch
-    #       to be a pipe (e.g. unknown types become a pipe by default)
-    # by default dispatch to regular mutate
-    f = summarize.registry[type(__data)]
-    return f(__data, **kwargs)
 

@@ -6,7 +6,7 @@ from pandas.core.groupby import SeriesGroupBy, GroupBy
 from pandas.core.frame import NDFrame
 from pandas import Series
 
-from siuba.experimental.pd_groups.groupby import GroupByAgg, _regroup
+from siuba.experimental.pd_groups.groupby import GroupByAgg, regroup
 from siuba.experimental.pd_groups.translate import method_agg_op
 
 __ALL__ = [
@@ -224,7 +224,7 @@ def _row_number_grouped(g: GroupBy) -> GroupBy:
     for g_key, inds in indices.items():
         out[inds] = np.arange(1, len(inds) + 1, dtype = int)
     
-    return _regroup(out, g)
+    return regroup(g, out)
 
 
 # ntile -----------------------------------------------------------------------
@@ -333,7 +333,7 @@ def lead(x, n = 1, default = None):
 def _lead_grouped(x, n = 1, default = None):
     res = x.shift(-1*n, fill_value = default)
 
-    return _regroup(res, x)
+    return regroup(x, res)
 
 
 # lag -------------------------------------------------------------------------
@@ -374,7 +374,7 @@ def lag(x, n = 1, default = None):
 def _lag_grouped(x, n = 1, default = None):
     res = x.shift(n, fill_value = default)
 
-    return _regroup(res, x)
+    return regroup(x, res)
 
 # n ---------------------------------------------------------------------------
 
