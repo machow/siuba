@@ -219,7 +219,7 @@ def sql_str_strip(name):
 def sql_func_capitalize(col):
     first_char = fn.upper(fn.left(col, 1)) 
     rest = fn.right(col, fn.length(col) - 1)
-    return first_char.op('||')(rest)
+    return sql.functions.concat(first_char, rest)
 
 
 # Others ----

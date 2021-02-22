@@ -34,24 +34,35 @@ jobs:
             requirements: numpy~=1.19.1 pandas~=1.1.0 SQLAlchemy~=1.3.18 psycopg2~=2.8.5
 
     # Service containers to run with `container-job`
-    services:
-      # Label used to access the service container
-      postgres:
-        image: postgres
-        env:
-          POSTGRES_PASSWORD: ""
-          POSTGRES_HOST_AUTH_METHOD: "trust"
-        # Set health checks to wait until postgres has started
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
+    #services:
+    #  # Label used to access the service container
+    #  postgres:
+    #    image: postgres
+    #    env:
+    #      POSTGRES_PASSWORD: ""
+    #      POSTGRES_HOST_AUTH_METHOD: "trust"
+    #    # Set health checks to wait until postgres has started
+    #    options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    #    ports:
+    #      - 5432:5432
+    #  mysql:
+    #    image: mysql
+    #    env:
+    #      MYSQL_ROOT_PASSWORD: ""
+    #      MYSQL_ALLOW_EMPTY_PASSWORD: 1
+    #      MYSQL_DATABASE: "public"
+    #    ports:
+    #      - 3306:3306
+    #    # by default, mysql rounds to 4 decimals, but tests require more precision
+    #    command: --div-precision-increment=30
+    #    options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=5
+
 
     steps:
       - uses: actions/checkout@v2
+      - name: Run docker-compose
+        run: |
+          docker-compose up --build -d
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v2
         with:

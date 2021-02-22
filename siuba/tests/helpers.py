@@ -1,4 +1,5 @@
-from sqlalchemy import create_engine, types
+import sqlalchemy as sqla
+
 from siuba.sql import LazyTbl, collect
 from siuba.dply.verbs import ungroup
 from siuba.siu import FunctionLookupError
@@ -22,14 +23,24 @@ def data_frame(*args, _index = None, **kwargs):
 BACKEND_CONFIG = {
         "postgresql": {
             "dialect": "postgresql",
+            "driver": "",
             "dbname": ["SB_TEST_PGDATABASE", "postgres"],
             "port": ["SB_TEST_PGPORT", "5432"],
             "user": ["SB_TEST_PGUSER", "postgres"],
             "password": ["SB_TEST_PGPASSWORD", ""],
             "host": ["SB_TEST_PGHOST", "localhost"],
             },
+        "mysql": {
+            "dialect": "mysql+pymysql",
+            "dbname": "public",
+            "port": 3306,
+            "user": "root",
+            "password": "",
+            "host": "127.0.0.1",
+            },
         "sqlite": {
             "dialect": "sqlite",
+            "driver": "",
             "dbname": ":memory:",
             "port": "0",
             "user": "",
@@ -71,7 +82,7 @@ class SqlBackend(Backend):
         params = {k: os.environ.get(*v) if isinstance(v, (list)) else v for k,v in cnfg.items()}
 
         self.name = name
-        self.engine = create_engine(self.sa_conn_fmt.format(**params))
+        self.engine = sqla.create_engine(self.sa_conn_fmt.format(**params))
         self.cache = {}
 
     def dispose(self):
@@ -138,29 +149,43 @@ def assert_equal_query(tbl, lazy_query, target, **kwargs):
         assert_frame_sort_equal(out, target, **kwargs)
 
 
-PREFIX_TO_TYPE = {
-        # for datetime, need to convert to pandas datetime column
-        #"dt": types.DateTime,
-        "int": types.Integer,
-        "float": types.Float,
-        "str": types.String
-        }
+#PREFIX_TO_TYPE = {
+#        # for datetime, need to convert to pandas datetime column
+#        #"dt": types.DateTime,
+#        "int": types.Integer,
+#        "float": types.Float,
+#        "str": types.String,
+#        }
 
-def auto_types(df):
-    dtype = {}
-    for k in df.columns:
-        pref, *_ = k.split('_')
-        if pref in PREFIX_TO_TYPE:
-            dtype[k] = PREFIX_TO_TYPE[pref]
-    return dtype
+#def auto_types(df):
+#    dtype = {}
+#    for k in df.columns:
+#        pref, *_ = k.split('_')
+#        if pref in PREFIX_TO_TYPE:
+#            dtype[k] = PREFIX_TO_TYPE[pref]
+#    return dtype
 
 
 def copy_to_sql(df, name, engine):
     if isinstance(engine, str):
-        engine = create_engine(engine)
+        engine = sqla.create_engine(engine)
 
-    df.to_sql(name, engine, dtype = auto_types(df), index = False, if_exists = "replace")
-    return LazyTbl(engine, name)
+    bool_cols = [k for k, v in df.iteritems() if v.dtype.kind == "b"]
+    columns = [sqla.Column(name, sqla.types.Boolean) for name in bool_cols]
+
+    df.to_sql(name, engine, index = False, if_exists = "replace")
+
+    # manually create table, so we can be explicit about boolean columns.
+    # this is necessary because MySQL reflection reports them as TinyInts,
+    # which mostly works, but returns ints from the query
+    table = sqla.Table(
+            name,
+            sqla.MetaData(bind = engine),
+            *columns,
+            autoload_with = engine
+            )
+    
+    return LazyTbl(engine, table)
 
 
 from functools import wraps

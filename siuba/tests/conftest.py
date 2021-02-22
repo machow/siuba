@@ -8,6 +8,7 @@ def pytest_addoption(parser):
 
 params_backend = [
     pytest.param(lambda: SqlBackend("postgresql"), id = "postgresql", marks=pytest.mark.postgresql),
+    pytest.param(lambda: SqlBackend("mysql"), id = "mysql", marks=pytest.mark.mysql),
     pytest.param(lambda: SqlBackend("sqlite"), id = "sqlite", marks=pytest.mark.sqlite),
     pytest.param(lambda: PandasBackend("pandas"), id = "pandas", marks=pytest.mark.pandas)
     ]

@@ -2,6 +2,7 @@
 # we (1) use full import paths, (2) define everything a new backend would need
 # here.
 from sqlalchemy import sql
+from sqlalchemy import types as sa_types
 from sqlalchemy.sql import func as fn
 
 from siuba import ops
@@ -18,7 +19,8 @@ from siuba.sql.translate import (
         sql_colmeth,
         sql_not_impl,
         create_sql_translators,
-        annotate
+        annotate,
+        RankOver
         )
 
 # TODO: move anything using this into base.py
@@ -55,6 +57,17 @@ from siuba.sql.translate import sql_func_astype
 #       cot = sql_scalar("cot"),
 # 
 
+def sql_func_floordiv(x, y):
+    return sql.cast(x / y, sa_types.Integer())
+
+def sql_func_rank(col):
+    # see https://stackoverflow.com/a/36823637/1144523
+    min_rank = RankOver(sql.func.rank(), order_by = col)
+    to_mean = (RankOver(sql.func.count(), partition_by = col) - 1) / 2.0
+
+    return min_rank + to_mean
+
+
 def req_bool(f):
     return annotate(f, input_type = "bool")
 
@@ -64,7 +77,7 @@ base_scalar = dict(
     __and__       = req_bool(sql_colmeth("__and__")),
     __div__       = sql_colmeth("__div__"),
     __eq__        = sql_colmeth("__eq__"),
-    __floordiv__  = sql_not_impl(),
+    __floordiv__  = sql_func_floordiv,
     __ge__        = sql_colmeth("__ge__"),
     __gt__        = sql_colmeth("__gt__"),
     __invert__    = req_bool(sql_colmeth("__invert__")),
@@ -80,7 +93,7 @@ base_scalar = dict(
     __radd__      = sql_colmeth("__radd__"),
     __rand__      = req_bool(sql_colmeth("__rand__")),
     __rdiv__      = sql_colmeth("__rdiv__"),
-    __rfloordiv__ = sql_colmeth("__pow__"),
+    __rfloordiv__ = lambda x, y: sql_func_floordiv(y, x),
     __rmod__      = sql_colmeth("__rmod__"),
     __rmul__      = sql_colmeth("__rmul__"),
     __ror__       = req_bool(sql_colmeth("__ror__")),
@@ -139,6 +152,7 @@ base_scalar = dict(
 
 
     **{
+      # TODO: check generality of trim functions, since MYSQL overrides
       "str.capitalize"    : sql_func_capitalize,
       #"str.center"        :,
       #"str.contains"      :,
@@ -261,13 +275,13 @@ base_win = dict(
     cummax                  = win_cumul("max"),
     cummin                  = win_cumul("min"),
     #cumprod                 = 
-    cumsum                  = win_cumul("sum"),
+    cumsum                  = annotate(win_cumul("sum"), result_type = "float"),
     diff                    = sql_func_diff,
     #is_monotonic            = 
     #is_monotonic_decreasing = 
     #is_monotonic_increasing = 
     #pct_change              = TODO(?)
-    rank                    = win_over("rank"),
+    rank                    = sql_func_rank,
 
     # computation (strict aggregates)
     #all = #TODO(pg): all = sql_aggregate("BOOL_AND", "all")
@@ -290,7 +304,7 @@ base_win = dict(
     #sem = 
     #skew = 
     #std =  # TODO(pg)
-    sum = win_agg("sum"),
+    sum = annotate(win_agg("sum"), result_type = "float"),
     #var = # TODO(pg)
 
 
@@ -354,7 +368,7 @@ base_agg = dict(
     #sem = 
     #skew = 
     #std =  # TODO(pg)
-    sum = sql_agg("sum"),
+    sum = annotate(sql_agg("sum"), result_type = "float"),
     #var = # TODO(pg)
 
     # index ----

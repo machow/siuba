@@ -55,12 +55,6 @@ def sql_func_truediv(x, y):
 def sql_func_floordiv(x, y):
     return sql.cast(x / y, sa_types.Integer())
 
-def sql_func_rank(col):
-    # see https://stackoverflow.com/a/36823637/1144523
-    min_rank = RankOver(sql.func.rank(), order_by = col)
-    to_mean = (RankOver(sql.func.count(), partition_by = col) - 1) / 2.0
-
-    return min_rank + to_mean
 
 scalar = SqlTranslations(
         base_scalar,
@@ -85,8 +79,6 @@ scalar = SqlTranslations(
         truediv = sql_func_truediv,
         __rtruediv__ = lambda x, y: sql_func_truediv(y, x),
 
-        __floordiv__ = sql_func_floordiv,
-        __rfloordiv__ = lambda x, y: sql_func_floordiv(y, x),
 
         round = sql_round,
         __round__ = sql_round,
@@ -113,9 +105,6 @@ window = SqlTranslations(
         # overrides ----
 
         # note that postgres does sum(bigint) -> numeric
-        sum = annotate(win_agg("sum"), result_type = "float"),
-        cumsum = annotate(win_cumul("sum"), result_type = "float"),
-        rank = sql_func_rank,
         size = win_agg("count"),     #TODO double check
         )
 
@@ -125,8 +114,6 @@ aggregate = SqlTranslations(
         any = sql_agg("bool_or"),
         std = sql_agg("stddev_samp"),
         var = sql_agg("var_samp"),
-
-        sum = annotate(sql_agg("sum"), result_type = "float"),
         )
 
 

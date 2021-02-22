@@ -8,7 +8,10 @@ from ..translate import (
         SqlColumn, SqlColumnAgg,
         win_cumul, AggOver, CumlOver, RankOver, warn_arg_default, win_absent
         )
+
 from ..dialects.sqlite import SqliteColumn
+from ..dialects.mysql import MysqlColumn
+
 from siuba.dply.vector import (
         #cumall, cumany, cummean,
         desc,
@@ -47,8 +50,9 @@ def _desc_sql(x) -> ClauseElement:
 # TODO: remove repetition in rank definitions
 
 def _sql_rank_over(rank_func, col, partition):
-    # partitioning ensures aggregates that use total length are correct
-    # e.g. percent rank, cume_dist and friends
+    # partitioning ensures aggregates that use total length are correct,
+    # e.g. percent rank, cume_dist and friends, by separating NULLs into their 
+    # own partition
     over_clause = RankOver(
             rank_func(),
             order_by = col,
@@ -57,40 +61,39 @@ def _sql_rank_over(rank_func, col, partition):
 
     return sql.case({col.isnot(None): over_clause})
 
-def _sql_rank(col, na_option, func_name, partition = False):
+def _sql_rank(func_name, partition = False):
     rank_func = getattr(sql.func, func_name)
 
-    if na_option == "keep":
-        return _sql_rank_over(rank_func, col, partition = partition)
+    def f(col, na_option = None) -> RankOver:
+        if na_option == "keep":
+            return _sql_rank_over(rank_func, col, partition = partition)
 
-    warn_arg_default(func_name, 'na_option', None, "keep")
+        warn_arg_default(func_name, 'na_option', None, "keep")
 
-    return RankOver(rank_func(), order_by = col)
+        return RankOver(rank_func(), order_by = col)
 
-
-@dense_rank.register(ClauseElement)
-def _dense_rank_sql(col, na_option = None) -> RankOver:
-    return _sql_rank(col, na_option, 'dense_rank')
+    return f
 
 
-@percent_rank.register(ClauseElement)
-def _percent_rank_sql(col, na_option = None) -> RankOver:
-    return _sql_rank(col, na_option, 'percent_rank')
-    
-
-@cume_dist.register(ClauseElement)
-def _cume_dist_sql(col, na_option = None) -> RankOver:
-    return _sql_rank(col, na_option, 'cume_dist', partition = True)
+dense_rank  .register(ClauseElement, _sql_rank("dense_rank"))
+percent_rank.register(ClauseElement, _sql_rank("percent_rank"))
+cume_dist   .register(ClauseElement, _sql_rank("cume_dist", partition = True))
+min_rank    .register(ClauseElement, _sql_rank("rank", partition = True))
 
 
-@min_rank.register(ClauseElement)
-def _min_rank_sql(col, na_option = None) -> RankOver:
-    return _sql_rank(col, na_option, 'rank', partition = True)
-
-dense_rank.register(SqliteColumn, win_absent("DENSE_RANK"))
+dense_rank  .register(SqliteColumn, win_absent("DENSE_RANK"))
 percent_rank.register(SqliteColumn, win_absent("PERCENT_RANK"))
-cume_dist.register(SqliteColumn, win_absent("CUME_DIST"))
-min_rank.register(SqliteColumn, win_absent("MIN_RANK"))
+cume_dist   .register(SqliteColumn, win_absent("CUME_DIST"))
+min_rank    .register(SqliteColumn, win_absent("MIN_RANK"))
+
+# partition everything, since MySQL puts NULLs first
+# see: https://stackoverflow.com/q/1498648/1144523
+dense_rank  .register(MysqlColumn, _sql_rank("dense_rank", partition = True))
+percent_rank.register(MysqlColumn, _sql_rank("percent_rank", partition = True))
+cume_dist   .register(MysqlColumn, _sql_rank("cume_dist", partition = True))
+min_rank    .register(MysqlColumn, _sql_rank("rank", partition = True))
+
+
 
 # row_number ------------------------------------------------------------------
 
@@ -230,12 +233,19 @@ def _nth_sql(x, n, order_by = None, default = None) -> ClauseElement:
     if default is not None:
         raise NotImplementedError("default argument not implemented")
 
-    if n < 0 and order_by is not None:
-        # e.g. -1 in python is 0, -2 is 1
+    if n < 0 and order_by is None:
+        raise NotImplementedError(
+                "must explicitly pass order_by when using last or nth with "
+                "n < 0 in SQL."
+                )
+
+    if n < 0:
+        # e.g. -1 in python is 0, -2 is 1.
         n = abs(n + 1)
         order_by = order_by.desc()
 
 
+    #  note the adjustment for 1-based index in SQL
     return RankOver(sql.func.nth_value(x, n + 1), order_by = order_by)
 
 

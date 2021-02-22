@@ -93,7 +93,7 @@ def rm_na_entries(mapping):
 
 from siuba import *
 
-sql_backend_names = ["postgresql", "redshift", "sqlite"]
+sql_backend_names = ["postgresql", "redshift", "sqlite", "mysql"]
     
 sql_methods = pd.concat(list(map(read_dialect, sql_backend_names)))
 
