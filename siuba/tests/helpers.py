@@ -1,7 +1,7 @@
 import sqlalchemy as sqla
 
-from siuba.sql import LazyTbl, collect
-from siuba.dply.verbs import ungroup
+from siuba.sql import LazyTbl
+from siuba.dply.verbs import ungroup, collect
 from siuba.siu import FunctionLookupError
 from pandas.testing import assert_frame_equal
 import pandas as pd

@@ -1,12 +1,27 @@
+"""
+Base dialect for translating column operations to SQL.
+
+A dialect requires three pieces:
+
+    1. Classes representing column data under normal and aggregate settings.
+       (e.g. SqlColumn, SqlColumnAgg).
+    2. Functions for creating the sqlalchemy clause corresponding to an 
+       operation.
+       (e.g. a function for taking the standard dev of a column).
+    3. A module-level variable named translator. This should be a class with
+       a translate method, that takes a column expression and returns a 
+       sqlalchemy clause. Ideally using translate.SqlTranslator.
+       (e.g. SqlTranslator.from_mapping(...))
+
+"""
+
 # NOTE: this file should be an example that could live outside siuba, so
 # we (1) use full import paths, (2) define everything a new backend would need
 # here.
 from sqlalchemy import sql
 from sqlalchemy import types as sa_types
 from sqlalchemy.sql import func as fn
-
-from siuba import ops
-from siuba.ops.utils import register
+from sqlalchemy.sql.elements import ColumnClause
 
 from siuba.sql.translate import (
         win_absent,
@@ -18,44 +33,32 @@ from siuba.sql.translate import (
         sql_scalar,
         sql_colmeth,
         sql_not_impl,
-        create_sql_translators,
         annotate,
-        RankOver
+        RankOver,
+        CumlOver,
+        SqlTranslator
         )
 
-# TODO: move anything using this into base.py
+
+# =============================================================================
+# Column data classes 
+# =============================================================================
+
 from siuba.sql.translate import SqlColumn, SqlColumnAgg
 
-from siuba.sql.translate import (
-        sql_extract, sql_func_days_in_month, sql_func_extract_dow_monday,
-        sql_is_first_of, sql_is_last_day_of
-        )
-# TODO: sql_func_floor_date
-
-from siuba.sql.translate import (
-        sql_func_capitalize,
-        sql_str_strip
-        )
-
-from siuba.sql.translate import (
-        sql_func_diff
-        )
-
-from siuba.sql.translate import sql_func_astype
-
 # =============================================================================
-# Elementwise and window functions
+# Custom translations
 # =============================================================================
-# TODO:
-#   * how to cast?
-#       abs = sql_scalar("abs"),
-#       acos = sql_scalar("acos"),
-#       asin = sql_scalar("asin"),
-#       atan = sql_scalar("atan"),
-#       atan2 = sql_scalar("atan2"),
-#       cos = sql_scalar("cos"),
-#       cot = sql_scalar("cot"),
-# 
+
+# Computation -----------------------------------------------------------------
+
+def sql_func_diff(col, periods = 1):
+    if periods > 0:
+        return CumlOver(col - sql.func.lag(col, periods))
+    elif periods < 0:
+        return CumlOver(col - sql.func.lead(col, abs(periods)))
+
+    raise ValueError("periods argument to sql diff cannot be 0")
 
 def sql_func_floordiv(x, y):
     return sql.cast(x / y, sa_types.Integer())
@@ -68,8 +71,87 @@ def sql_func_rank(col):
     return min_rank + to_mean
 
 
+# Datetime -------------------------------------------------------------------
+
+def sql_extract(name):
+    return lambda col: sql.func.extract(name, col)
+
+def sql_func_extract_dow_monday(col):
+    # make monday = 0 rather than sunday
+    monday0 = sql.cast(sql.func.extract('dow', col) + 6, sa_types.Integer) % 7
+    # cast to numeric, since that's what extract('dow') returns
+    return sql.cast(monday0, sa_types.Numeric)
+
+def sql_is_first_of(name, reference):
+    return lambda col: fn.date_trunc(name, col) == fn.date_trunc(reference, col)
+
+def sql_func_last_day_in_period(col, period):
+    return fn.date_trunc(period, col) + sql.text("interval '1 %s - 1 day'" % period)
+
+def sql_func_days_in_month(col):
+    return fn.extract('day', sql_func_last_day_in_period(col, 'month'))
+
+def sql_is_last_day_of(period):
+    def f(col):
+        last_day = sql_func_last_day_in_period(col, period)
+        return fn.date_trunc('day', col) == last_day
+
+    return f
+
+def sql_func_floor_date(col, unit):
+    # see https://www.postgresql.org/docs/9.1/functions-datetime.html#FUNCTIONS-DATETIME-TRUNC
+    # valid values: 
+    #   microseconds, milliseconds, second, minute, hour,
+    #   day, week, month, quarter, year, decade, century, millennium
+    # TODO: implement in siuba.dply.lubridate
+    return fn.date_trunc(unit, col)
+
+
+# Strings ---------------------------------------------------------------------
+
+def sql_str_strip(name):
+    
+    strip_func = getattr(fn, name)
+    def f(col, to_strip = " \t\n\v\f\r"):
+        return strip_func(col, to_strip)
+
+    return f
+
+def sql_func_capitalize(col):
+    first_char = fn.upper(fn.left(col, 1)) 
+    rest = fn.right(col, fn.length(col) - 1)
+    return sql.functions.concat(first_char, rest)
+
+
+# Misc implementations --------------------------------------------------------
+
+def sql_func_astype(col, _type):
+    mappings = {
+            str: sa_types.Text,
+            'str': sa_types.Text,
+            int: sa_types.Integer,
+            'int': sa_types.Integer,
+            float: sa_types.Numeric,
+            'float': sa_types.Numeric,
+            bool: sa_types.Boolean,
+            'bool': sa_types.Boolean
+            }
+    try:
+        sa_type = mappings[_type]
+    except KeyError:
+        raise ValueError("sql astype currently only supports type objects: str, int, float, bool")
+    return sql.cast(col, sa_type)
+
+
+# Annotations -----------------------------------------------------------------
+
 def req_bool(f):
     return annotate(f, input_type = "bool")
+
+
+# =============================================================================
+# Base translation mappings
+# =============================================================================
 
 base_scalar = dict(
     # infix ----
@@ -432,7 +514,7 @@ base_nowin = dict(
 
 funcs = dict(scalar = base_scalar, aggregate = base_agg, window = base_win)
 
-translator = create_sql_translators(
-        base_scalar, base_agg, base_win,
+translator = SqlTranslator.from_mappings(
+        base_scalar, base_win, base_agg,
         SqlColumn, SqlColumnAgg
         )

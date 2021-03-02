@@ -1,7 +1,7 @@
 # sqlvariant, allow defining 3 namespaces to override defaults
 from ..translate import (
-        SqlColumn, SqlColumnAgg, SqlTranslations, win_agg,
-        create_sql_translators, sql_not_impl
+        SqlColumn, SqlColumnAgg, extend_base, win_agg,
+        SqlTranslator, sql_not_impl
         )
 
 from .base import base_scalar, base_agg, base_win
@@ -10,8 +10,6 @@ import sqlalchemy.sql.sqltypes as sa_types
 
 from sqlalchemy import sql
 from sqlalchemy.sql import func as fn
-
-from sqlalchemy.dialects.mysql import DOUBLE
 
 # Custom dispatching in call trees ============================================
 
@@ -55,7 +53,7 @@ def sql_is_date_offset(period, is_start = True):
     return f
 
 def sql_func_truediv(x, y):
-    return sql.cast(x, DOUBLE()) / y
+    return sql.cast(x, sa_types.Numeric()) / y
 
 def sql_func_floordiv(x, y):
     return x.op("DIV")(y)
@@ -70,7 +68,7 @@ def sql_func_between(col, left, right, inclusive=True):
     expr.type = sa_types.Boolean()
     return expr
 
-scalar = SqlTranslations(
+scalar = extend_base(
         base_scalar,
 
         # copied from postgres. MYSQL does true division over ints by default,
@@ -113,19 +111,19 @@ scalar = SqlTranslations(
         }
         )
 
-aggregate = SqlTranslations(
+aggregate = extend_base(
         base_agg
         )
 
-window = SqlTranslations(
+window = extend_base(
         base_win,
         sd = win_agg("stddev")
         )
 
 funcs = dict(scalar = scalar, aggregate = aggregate, window = window)
 
-translator = create_sql_translators(
-        scalar, aggregate, window,
+translator = SqlTranslator.from_mappings(
+        scalar, window, aggregate,
         MysqlColumn, MysqlColumnAgg
         )
 

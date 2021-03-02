@@ -6,13 +6,19 @@ This module holds default translations from pandas syntax to sql for 3 kinds of 
 3. window - operations that do calculations across a window
             (e.g. array1.lag() or array1.expanding().mean())
 
+It is broken into 5 sections:
+
+* Warnings
+* Column classes
+* Custom over clauses
+* Translation function generators (e.g. sql_agg("stdev"))
+* SqlTranslator for translating symbolic expressions.
 
 """
 
 from sqlalchemy import sql
-from sqlalchemy.sql import sqltypes as types, func as fn
-from functools import singledispatch
-from .verbs import case_when, if_else
+
+from siuba.siu import FunctionLookupBound
 
 # warning for when sql defaults differ from pandas ============================
 import warnings
@@ -31,60 +37,64 @@ def warn_arg_default(func_name, arg_name, arg, correct):
             SiubaSqlRuntimeWarning
             )
 
-# Custom dispatching in call trees ============================================
-from sqlalchemy.sql.elements import ColumnClause
-from sqlalchemy.sql.base import ImmutableColumnCollection
 
-class SqlBase(sql.elements.ColumnClause): pass
+# Column data types ===========================================================
+
+from sqlalchemy.sql.elements import ColumnClause
+
+class SqlBase(ColumnClause): pass
 
 class SqlColumn(SqlBase): pass
 
 class SqlColumnAgg(SqlBase): pass
 
+
 # Custom over clause handling  ================================================
-
-# TODO: must make these take both tbl, col as args, since hard to find window funcs
-def sa_is_window(clause):
-    return isinstance(clause, sql.elements.Over) \
-            or isinstance(clause, sql.elements.WithinGroup)
-
-def sa_get_over_clauses(clause):
-    windows = []
-    append_win = lambda col: windows.append(col)
-
-    sql.util.visitors.traverse(clause, {}, {"over": append_win})
-
-    return windows
-
-def sa_modify_window(clause, group_by = None, order_by = None):
-    if group_by:
-        group_cols = [columns[name] for name in group_by]
-        partition_by = sql.elements.ClauseList(*group_cols)
-        clone = clause._clone()
-        clone.partition_by = partition_by
-
-        return clone
-
-    return clause
 
 from sqlalchemy.sql.elements import Over
 
-class CustomOverClause: pass
 
-class AggOver(Over, CustomOverClause):
+class CustomOverClause(Over):
+    """Base class for custom window clauses in SQL translation."""
+
+    def set_over(self, group_by, order_by):
+        raise NotImplementedError()
+
+    @classmethod
+    def func(cls, name):
+        raise NotImplementedError()
+
+
+class AggOver(CustomOverClause):
     def set_over(self, group_by, order_by = None):
         self.partition_by = group_by
         return self
 
+    @classmethod
+    def func(cls, name):
+        sa_func = getattr(sql.func, name)
+        def f(col, *args, **kwargs) -> AggOver:
+            return cls(sa_func(col, *args, **kwargs))
 
-class RankOver(Over, CustomOverClause): 
+        return f
+
+
+class RankOver(CustomOverClause): 
     def set_over(self, group_by, order_by = None):
         crnt_partition = getattr(self.partition_by, 'clauses', tuple())
         self.partition_by = sql.elements.ClauseList(*crnt_partition, *group_by.clauses)
         return self
 
+    @classmethod
+    def func(cls, name):
+        sa_func = getattr(sql.func, name)
+        def f(col) -> RankOver:
+            return cls(sa_func(), order_by = col)
 
-class CumlOver(Over, CustomOverClause):
+        return f
+
+
+class CumlOver(CustomOverClause):
     def set_over(self, group_by, order_by):
         self.partition_by = group_by
         self.order_by = order_by
@@ -97,8 +107,55 @@ class CumlOver(Over, CustomOverClause):
                     )
         return self
 
+    @classmethod
+    def func(cls, name):
+        sa_func = getattr(sql.func, name)
+        def f(col, *args, **kwargs) -> CumlOver:
+            return cls(sa_func(col, *args, **kwargs), rows = (None,0))
 
-# Translator creation funcs ===================================================
+        return f
+
+# convenience aliases for class methods above
+win_agg = AggOver.func
+win_over = RankOver.func
+win_cumul = CumlOver.func
+
+
+# Simple clause translation generators ========================================
+
+def sql_agg(name):
+    sa_func = getattr(sql.func, name)
+    return lambda col: sa_func(col)
+
+def sql_scalar(name):
+    sa_func = getattr(sql.func, name)
+    return lambda col, *args: sa_func(col, *args)
+
+def sql_colmeth(meth, *outerargs):
+    def f(col, *args) -> SqlColumn:
+        return getattr(col, meth)(*outerargs, *args)
+    return f
+
+def set_agg(name):
+    # Ordered and theoretical set aggregates
+    sa_func = getattr(sql.func, name)
+    return lambda col, *args: sa_func(*args).within_group(col)
+
+# Handling not implemented translations ----
+
+def sql_not_impl():
+    return FunctionLookupBound("function not implemented")
+
+def win_absent(name):
+    # Return an error, that is picked up by the translator.
+    # this allows us to report errors at translation, rather than call time.
+    return FunctionLookupBound("SQL dialect does not support window function {}.".format(name))
+
+# Annotations ----
+# these functions wrap translation generators, in order to provide metadata
+# for running, e.g., unit tests. This is important in cases where the SQL 
+# output does not match exactly what pandas does (for example, it returns a 
+# float, when pandas returns an int).
 
 def annotate(f = None, **kwargs):
     # allow it to work as a decorator
@@ -124,185 +181,44 @@ def wrap_annotate(f, **kwargs):
     return wrapper
 
 
-# Windows ----
+#  Translator =================================================================
 
-# TODO: move parts using siu to separate file (includes CallTreeLocal stuff below)
-from siuba.siu import FunctionLookupBound
-
-def win_absent(name):
-    # Return an error, that is picked up by the translator.
-    # this allows us to report errors at translation, rather than call time.
-    return FunctionLookupBound("SQL dialect does not support window function {}.".format(name))
-
-def win_over(name: str):
-    sa_func = getattr(sql.func, name)
-    def f(col) -> RankOver:
-        return RankOver(sa_func(), order_by = col)
-
-    return f
-
-def win_cumul(name):
-    sa_func = getattr(sql.func, name)
-    def f(col, *args, **kwargs) -> CumlOver:
-        return CumlOver(sa_func(col, *args, **kwargs), rows = (None,0))
-
-    return f
-
-def win_agg(name):
-    sa_func = getattr(sql.func, name)
-    def f(col, *args, **kwargs) -> AggOver:
-        return AggOver(sa_func(col, *args, **kwargs))
-
-    return f
-
-def sql_func_diff(col, periods = 1):
-    if periods > 0:
-        return CumlOver(col - sql.func.lag(col, periods))
-    elif periods < 0:
-        return CumlOver(col - sql.func.lead(col, abs(periods)))
-
-    raise ValueError("periods argument to sql diff cannot be 0")
-
-
-# Ordered and theoretical set aggregates ----
-
-def set_agg(name):
-    sa_func = getattr(sql.func, name)
-    return lambda col, *args: sa_func(*args).within_group(col)
-
-# Datetime ----
-
-def sql_extract(name):
-    return lambda col: sql.func.extract(name, col)
-
-def sql_func_extract_dow_monday(col):
-    # make monday = 0 rather than sunday
-    monday0 = sql.cast(sql.func.extract('dow', col) + 6, types.Integer) % 7
-    # cast to numeric, since that's what extract('dow') returns
-    return sql.cast(monday0, types.Numeric)
-
-def sql_is_first_of(name, reference):
-    return lambda col: fn.date_trunc(name, col) == fn.date_trunc(reference, col)
-
-def sql_func_last_day_in_period(col, period):
-    return fn.date_trunc(period, col) + sql.text("interval '1 %s - 1 day'" % period)
-
-def sql_func_days_in_month(col):
-    return fn.extract('day', sql_func_last_day_in_period(col, 'month'))
-
-def sql_is_last_day_of(period):
-    def f(col):
-        last_day = sql_func_last_day_in_period(col, period)
-        return fn.date_trunc('day', col) == last_day
-
-    return f
-
-def sql_func_floor_date(col, unit):
-    # see https://www.postgresql.org/docs/9.1/functions-datetime.html#FUNCTIONS-DATETIME-TRUNC
-    # valid values: 
-    #   microseconds, milliseconds, second, minute, hour,
-    #   day, week, month, quarter, year, decade, century, millennium
-    # TODO: implement in siuba.dply.lubridate
-    return fn.date_trunc(unit, col)
-
-
-# Strings ----
-
-def sql_str_strip(name):
-    
-    strip_func = getattr(fn, name)
-    def f(col, to_strip = " \t\n\v\f\r"):
-        return strip_func(col, to_strip)
-
-    return f
-
-def sql_func_capitalize(col):
-    first_char = fn.upper(fn.left(col, 1)) 
-    rest = fn.right(col, fn.length(col) - 1)
-    return sql.functions.concat(first_char, rest)
-
-
-# Others ----
-
-def sql_agg(name):
-    sa_func = getattr(sql.func, name)
-    return lambda col: sa_func(col)
-
-def sql_scalar(name):
-    sa_func = getattr(sql.func, name)
-    return lambda col, *args: sa_func(col, *args)
-
-def sql_colmeth(meth, *outerargs):
-    def f(col, *args) -> SqlColumn:
-        return getattr(col, meth)(*outerargs, *args)
-    return f
-
-def sql_not_impl():
-    return FunctionLookupBound("function not implemented")
-
-
-# Custom implementations ----
-
-def sql_func_astype(col, _type):
-    mappings = {
-            str: types.Text,
-            'str': types.Text,
-            int: types.Integer,
-            'int': types.Integer,
-            float: types.Numeric,
-            'float': types.Numeric,
-            bool: types.Boolean,
-            'bool': types.Boolean
-            }
-    try:
-        sa_type = mappings[_type]
-    except KeyError:
-        raise ValueError("sql astype currently only supports type objects: str, int, float, bool")
-    return sql.cast(col, sa_type)
-
-
-# MISC ===========================================================================
-# scalar, aggregate, window #no_win, agg_no_win
-
-# local to table
-# alias to LazyTbl.no_win.dense_rank...
-#          LazyTbl.agg.dense_rank...
-
-from collections.abc import MutableMapping
-import itertools
-
-class SqlTranslations(MutableMapping):
-    def __init__(self, d, **kwargs):
-        self.d = d
-        self.kwargs = kwargs
-
-    def __len__(self):
-        return len(set(self.d) + set(self.kwargs))
-
-    def __iter__(self):
-        old_keys = iter(self.d)
-        new_keys = (k for k in self.kwargs if k not in self.d)
-        return itertools.chain(old_keys, new_keys)
-
-    def __getitem__(self, x):
-        try:
-            return self.kwargs[x]
-        except KeyError:
-            return self.d[x]
-
-    def __setitem__(self, k, v):
-        self.d[k] = v
-
-    def __delitem__(self, k):
-        del self.d[k]
-    
-
-# 
+def extend_base(mapping, **kwargs):
+    return {**mapping, **kwargs}
 
 from siuba.ops.translate import create_pandas_translator
 
 # TODO: should inherit from a ITranslate class (w/ abstract translate method)
 class SqlTranslator:
+    """Translates symbolic column operations to sqlalchemy clauses.
+
+    Note that SqlTranslator's main job is to hold two actual translators--
+    one for windowed and one for aggregation contexts--and to call the
+    translate method to the correct one.
+
+
+    Example::
+
+       from siuba.sql.translate import (
+           SqlTranslator,
+           SqlColumn, SqlColumnAgg,
+           AggOver, sql_not_impl
+           )
+
+       base   = {"__add__": sql_colmeth("add")}
+       window = {"mean":    AggOver.func("mean")}
+       agg    = {"mean":    sql_not_impl("group by mean")}
+
+       trans = SqlTranslator.from_mappings(
+               base, window, agg,
+               SqlColumn, SqlColumnAgg
+               )
+
+       from siuba import _
+       trans.translate(_ + _.mean())
+       trans.translate(_ + _.mean(), window = False)
+   """
+
     def __init__(self, window, aggregate):
         self.window = window
         self.aggregate = aggregate
@@ -313,11 +229,12 @@ class SqlTranslator:
 
         return self.aggregate.translate(expr)
 
+    def from_mappings(base, window, aggregate, WinCls, AggCls):
+        trans_win = {**base, **window}
+        trans_agg = {**base, **aggregate}
 
-def create_sql_translators(base, agg, window, WinCls, AggCls):
-    trans_win = {**base, **window}
-    trans_agg = {**base, **agg}
-    return SqlTranslator(
-            window = create_pandas_translator(trans_win, WinCls, sql.elements.ClauseElement),
-            aggregate = create_pandas_translator(trans_agg, AggCls, sql.elements.ClauseElement)
-            )
+        return SqlTranslator(
+                window = create_pandas_translator(trans_win, WinCls, sql.elements.ClauseElement),
+                aggregate = create_pandas_translator(trans_agg, AggCls, sql.elements.ClauseElement)
+                )
+

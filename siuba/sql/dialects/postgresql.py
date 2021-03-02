@@ -1,13 +1,19 @@
-# sqlvariant, allow defining 3 namespaces to override defaults
+"""
+Translations for the postgresql dialect of SQL.
+"""
+
 from ..translate import (
-        SqlColumn, SqlColumnAgg, SqlTranslations, 
         win_agg, win_over, win_cumul, sql_scalar, sql_agg,
         RankOver,
         wrap_annotate, annotate,
-        create_sql_translators
+        extend_base,
+        SqlTranslator,
         )
 
-from .base import base_scalar, base_win, base_agg
+from .base import (
+        SqlColumn, SqlColumnAgg,
+        base_scalar, base_win, base_agg
+        )
 
 import sqlalchemy.sql.sqltypes as sa_types
 from sqlalchemy import sql
@@ -56,7 +62,7 @@ def sql_func_floordiv(x, y):
     return sql.cast(x / y, sa_types.Integer())
 
 
-scalar = SqlTranslations(
+scalar = extend_base(
         base_scalar,
 
         # TODO: remove log, not a pandas method
@@ -94,7 +100,7 @@ scalar = SqlTranslations(
              ]),
         )
 
-window = SqlTranslations(
+window = extend_base(
         base_win,
         any = annotate(win_agg("bool_or"), input_type = "bool"),
         all = annotate(win_agg("bool_and"), input_type = "bool"),
@@ -108,7 +114,7 @@ window = SqlTranslations(
         size = win_agg("count"),     #TODO double check
         )
 
-aggregate = SqlTranslations(
+aggregate = extend_base(
         base_agg,
         all = sql_agg("bool_and"),
         any = sql_agg("bool_or"),
@@ -120,7 +126,7 @@ aggregate = SqlTranslations(
 funcs = dict(scalar = scalar, aggregate = aggregate, window = window)
 
 # translate(config, CallTreeLocal, PostgresqlColumn, _.a + _.b)
-translator = create_sql_translators(
-        scalar, aggregate, window,
+translator = SqlTranslator.from_mappings(
+        scalar, window, aggregate,
         PostgresqlColumn, PostgresqlColumnAgg
         )

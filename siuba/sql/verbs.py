@@ -1,3 +1,13 @@
+"""
+Implements LazyTbl to represent tables of SQL data, and registers it on verbs.
+
+This module is responsible for the handling of the "table" side of things, while
+translate.py handles translating column operations.
+
+
+"""
+
+
 from siuba.dply.verbs import (
         singledispatch2,
         show_query, collect,
@@ -17,12 +27,13 @@ from siuba.dply.verbs import (
         distinct,
         if_else
         )
-from .translate import sa_get_over_clauses, CustomOverClause, SqlColumn, SqlColumnAgg
-from .utils import get_dialect_translator, get_sql_classes, _FixedSqlDatabase
+
+from .translate import CustomOverClause
+from .utils import get_dialect_translator, _FixedSqlDatabase
 
 from sqlalchemy import sql
 import sqlalchemy
-from siuba.siu import Call, CallTreeLocal, str_to_getitem_call, Lazy, FunctionLookupError
+from siuba.siu import Call, str_to_getitem_call, Lazy, FunctionLookupError
 # TODO: currently needed for select, but can we remove pandas?
 from pandas import Series
 
@@ -73,7 +84,7 @@ class WindowReplacer(CallListener):
         if not isinstance(col_expr, sql.elements.ClauseElement):
             return col_expr
 
-        over_clauses = [x for x in sa_get_over_clauses(col_expr) if isinstance(x, CustomOverClause)]
+        over_clauses = [x for x in self._get_over_clauses(col_expr) if isinstance(x, CustomOverClause)]
 
         # put groupings and orderings onto custom over clauses
         for over in over_clauses:
@@ -115,6 +126,15 @@ class WindowReplacer(CallListener):
 
 
         return name
+
+    @staticmethod
+    def _get_over_clauses(clause):
+        windows = []
+        append_win = lambda col: windows.append(col)
+
+        sql.util.visitors.traverse(clause, {}, {"over": append_win})
+
+        return windows
 
 
 def track_call_windows(call, columns, group_by, order_by, window_cte = None):
@@ -236,7 +256,7 @@ class LazyTbl:
         elif str_accessors and isinstance(call, str):
             # verbs that can use strings as accessors, like group_by, or
             # arrange, need to convert those strings into a getitem call
-            return str_to_get_item_call(call)
+            return str_to_getitem_call(call)
         elif isinstance(call, sql.elements.ColumnClause):
             return Lazy(call)
         elif callable(call):

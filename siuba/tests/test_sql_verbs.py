@@ -1,5 +1,6 @@
-from siuba.sql import group_by, mutate, LazyTbl, collect
+from siuba import group_by, mutate, collect
 from siuba.siu import _
+from siuba.sql import LazyTbl 
 from siuba.sql.dialects.base import translator
 
 
@@ -57,8 +58,8 @@ def test_lazy_tbl_manual_columns(db):
 
 # SqlFunctionLookupError ------------------------------------------------------
 
-from siuba import _
-from siuba.sql import arrange, filter, mutate, summarize, SqlFunctionLookupError
+from siuba import _, arrange, filter, mutate, summarize
+from siuba.sql import SqlFunctionLookupError
 from siuba.siu import strip_symbolic
 
 def test_lazy_tbl_shape_call_error(db):
