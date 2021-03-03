@@ -1,5 +1,5 @@
 from siuba.siu import Symbolic, strip_symbolic
-from siuba.spec.series import spec
+from siuba.ops.support import spec
 from .helpers import data_frame, assert_equal_query, backend_pandas, SqlBackend, PandasBackend
 import pytest
 # TODO: dot, corr, cov
