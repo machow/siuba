@@ -31,15 +31,9 @@ Column translation requires three pieces:
 3. **Translator:** A class that can take a symbolic expression (e.g. `_.x.mean()`) and return the correct sqlachemy clause.
 
 
-
-## Column Data
-
-
-There are two kinds of data classes, corresponding to whether the generated outermost query in the generated SQL will use a `GROUP BY` clause.
-
-These are shown below for an imaginary dialect called WowSQL.
-
 ```{python}
+# Column data =================================================================
+
 from siuba.sql.translate import SqlColumn, SqlColumnAgg
 
 # used if you want to add a scalar or window translation
@@ -49,11 +43,10 @@ class WowSqlColumn(SqlColumn): pass
 # used if you want to add a aggregate translation
 # (eg. something that gets used in a query with a GROUP BY clause)
 class WowSqlColumnAgg(WowSqlColumn, SqlColumn): pass
-```
 
-## Locals
 
-```{python}
+# Locals ======================================================================
+
 from siuba.sql.translate import (
         win_over,
         win_agg,
@@ -77,7 +70,26 @@ aggregation = {
     "rank": sql_not_impl(),
     "mean": sql_agg("mean"),
 }
+
+
+# Translator ==================================================================
+
+from siuba.sql.translate import SqlTranslator
+
+translator = SqlTranslator.from_mappings(
+    scalar, window, aggregation,
+    WowSqlColumn, WowSqlColumnAgg
+)
 ```
+
+## Column Data
+
+
+There are two kinds of data classes, corresponding to whether the generated outermost query in the generated SQL will use a `GROUP BY` clause.
+
+
+## Locals
+
 
 The entries of each local dictionary are functions that take a sqlalchemy.sql.ClauseElement--which is the parent class of many sqlalchemy elements--and returns a ClauseElement.
 
@@ -94,14 +106,6 @@ print(expr_rank)
 
 ## Translator
 
-```{python}
-from siuba.sql.translate import SqlTranslator
-
-translator = SqlTranslator.from_mappings(
-    scalar, window, aggregation,
-    WowSqlColumn, WowSqlColumnAgg
-)
-```
 
 Below, we set up a sqlalchemy select statement in order to demonstrate the translator in action.
 
