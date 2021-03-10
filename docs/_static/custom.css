@@ -91,3 +91,8 @@ table.align-default td, table.align-left td {
   border: 1px solid #dfe2e5 !important;
 }
 
+
+/* fix formatting of autodoc classes */
+dl {
+    margin-bottom: 15px !important;
+}

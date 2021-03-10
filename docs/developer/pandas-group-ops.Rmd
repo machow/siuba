@@ -12,7 +12,7 @@ jupyter:
     name: python3
 ---
 
-# Optimized grouped pandas operations
+# Optimized grouped pandas ops
 
 ```{python}
 import numpy as np

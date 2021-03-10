@@ -1,0 +1,311 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.4.2
+  kernelspec:
+    display_name: venv-siuba
+    language: python
+    name: venv-siuba
+---
+
+```{python nbsphinx=hidden}
+import pandas as pd
+pd.set_option("display.max_rows", 5)
+```
+
+# SQL backend
+
+
+## Step 1: Column Translation
+
+
+Column translation requires three pieces:
+
+1. **Locals:** Functions for creating the sqlalchemy clause corresponding to an 
+   operation.
+2. **Column Data:** Classes representing columns under normal and aggregate settings.   
+3. **Translator:** A class that can take a symbolic expression (e.g. `_.x.mean()`) and return the correct sqlachemy clause.
+
+
+
+## Column Data
+
+
+There are two kinds of data classes, corresponding to whether the generated outermost query in the generated SQL will use a `GROUP BY` clause.
+
+These are shown below for an imaginary dialect called WowSQL.
+
+```{python}
+from siuba.sql.translate import SqlColumn, SqlColumnAgg
+
+# used if you want to add a scalar or window translation
+# (eg. something that gets used in mutate)
+class WowSqlColumn(SqlColumn): pass
+
+# used if you want to add a aggregate translation
+# (eg. something that gets used in a query with a GROUP BY clause)
+class WowSqlColumnAgg(WowSqlColumn, SqlColumn): pass
+```
+
+## Locals
+
+```{python}
+from siuba.sql.translate import (
+        win_over,
+        win_agg,
+        sql_agg,
+        sql_scalar,
+        sql_colmeth,
+        sql_not_impl,
+        )
+
+scalar = {
+    "__add__": sql_colmeth("__add__"),
+    "round": sql_scalar("round"),
+}
+
+window = {
+    "rank": win_over("rank"),
+    "mean": win_agg("mean"),
+}
+
+aggregation = {
+    "rank": sql_not_impl(),
+    "mean": sql_agg("mean"),
+}
+```
+
+The entries of each local dictionary are functions that take a sqlalchemy.sql.ClauseElement--which is the parent class of many sqlalchemy elements--and returns a ClauseElement.
+
+```{python}
+from sqlalchemy import sql
+
+expr_rank = window["rank"](sql.column("a_col"))
+expr_rank
+```
+
+```{python}
+print(expr_rank)
+```
+
+## Translator
+
+```{python}
+from siuba.sql.translate import SqlTranslator
+
+translator = SqlTranslator.from_mappings(
+    scalar, window, aggregation,
+    WowSqlColumn, WowSqlColumnAgg
+)
+```
+
+Below, we set up a sqlalchemy select statement in order to demonstrate the translator in action.
+
+```{python}
+from siuba import _
+from sqlalchemy.sql import column, select
+
+sel = select([column('x'), column('y')])
+```
+
+Then we feed the columns to the translated call.
+
+```{python}
+call_add = translator.translate(_.x + _.y)
+call_add(sel.columns)
+```
+
+Note that behind the scenes, the translator goes down the call tree and swaps functions like `"__add__"` with the local translations.
+
+```{python}
+# the root node is __add__. shown as +.
+_.x + _.y
+```
+
+```{python}
+# We can see this in action by calling the translation directly.
+scalar["__add__"](sel.columns.x, sel.columns.y)
+```
+
+By default the translate method assumes the expression is using window functions, so operations like `.mean()` return SqlAlchemy Over clauses.
+
+```{python}
+f_translate = translator.translate(_.x.mean())
+expr = f_translate(sel.columns)
+
+expr
+```
+
+```{python}
+print(expr)
+```
+
+Keep in mind--since the translator doesn't know about grouping variables--it returns an empty over clause. This separation of concerns:
+
+* translator: handles simple column ops, including returning over clauses to be filled.
+* backend: handles broader contexts--like if the data has been grouped, arranged, or limited--by visiting the result of each translation.
+
+
+## User defined functions
+
+
+Remember those column data classes we made and passed to the translator? They allow users to register custom column operation functions!
+
+Below we show a custom round function, which calls the sqlalchemy that usually corresponds to `ROUND(<col>)`.
+
+```{python}
+from siuba.siu import _, symbolic_dispatch
+from sqlalchemy import sql
+
+@symbolic_dispatch(cls = WowSqlColumn)
+def round(col):
+    print("running round function")
+    
+    return sql.function.round(col)
+
+# Creates a special symbolic object
+round(_)
+```
+
+Note that a special feature of `symbolic_dispatch`, is that it let's you form complex expressions by passing `_` to your function call.
+
+```{python}
+# Symbolic objects let you express complex operations
+round(_) + 9999
+```
+
+## .
+
+
+## Step 2: Backend class
+
+
+So far we've only discussed how to translate symbolic expressions like `_.x + _.y` in the mutate call below.
+
+```python
+mutate(backend, _.x + _.y)
+```
+
+The last piece is implementing a backend that works with the mutate function itself. If you are just adding support for a new SQL dialect, you can use the LazyTbl class provided by `siuba.sql`. While the translations above work on columns of data, this class handles tables and queries over data (e.g. select statements).
+
+More specifically, LazyTbl has 2 jobs:
+
+1. Representing a specific table of data from the database.
+2. Creating SQL queries via table verbs. This includes using translators above, as well as broader SQL constructs (e.g. ordering, grouping / partitions, limiting rows, etc..).
+
+
+```{python}
+# Setup example data ----
+from sqlalchemy import create_engine
+from siuba.data import mtcars
+
+# # copy pandas DataFrame to sqlite
+engine = create_engine("sqlite:///:memory:")
+mtcars.to_sql("mtcars", engine, if_exists = "replace")
+```
+
+## Representing SQL tables
+
+```{python}
+from siuba.sql import LazyTbl
+
+tbl_cars = LazyTbl(engine, "mtcars")
+tbl_cars
+```
+
+Note that you can access a number of useful attributes.
+
+```{python}
+# the underlying translator
+f_add = tbl_cars.translator.translate(_.mpg + _.hp)
+f_add(tbl_cars.last_op.columns)
+```
+
+```{python}
+# the underlying sqlalchemy source table
+tbl_cars.tbl
+```
+
+```{python}
+# grouping info
+from siuba import group_by, _
+
+tbl2 = group_by(tbl_cars, rounded_mpg = _.mpg.round(10))
+tbl2.group_by
+```
+
+## Table verbs
+
+
+Backends register on a dispatcher called singledispatch2. This is shown below with an `assign` verb that is a limited implementation of mutate.
+
+```{python}
+from siuba.dply.verbs import singledispatch2
+from sqlalchemy.sql import select
+
+@singledispatch2(LazyTbl)
+def assign(__data, **kwargs):
+
+    new_cols = []
+    for k, expr in kwargs.items():
+
+        # .shape_call mostly data.translator under the hood
+        new_call = __data.shape_call(expr)
+        sql_expr = new_call(__data.last_op.columns)
+        
+        new_cols.append(sql_expr.label(k))
+    
+    # copy of data, where .last_op is the new select statement
+    new_data = __data.append_op(select(new_cols))
+    
+    return new_data
+
+
+# test out
+tbl_assigned = assign(tbl_cars, res = _.mpg + _.hp)
+
+tbl_assigned 
+    
+```
+
+Note that the `backend.last_op` property holds the current select statement, so the verb can adapt it, or wrap it in another select statement.
+
+```{python}
+print(tbl_assigned.last_op)
+```
+
+## Unit tests
+
+
+Siuba generates a table of all supported operations per backend, and tests against a simple example for each, to ensure they produce the same result as the pandas backend.
+
+However, some translations may deviate in the following ways:
+
+* returning a float rather than an int (or vice-versa).
+* an aggregation that works in `summarize`, but not in `mutate` verbs.
+
+In order to mark translations as deviating, you can use the annotation functions.
+
+```{python}
+from sqlalchemy import sql
+from siuba.sql.translate import annotate, wrap_annotate
+
+# puts an `operation` attribute on function, describing limitations
+f_and = annotate(lambda col: col & False, input_type = "bool")
+f_and(sql.column('a'))
+```
+
+```{python}
+f_and.operation
+```
+
+```{python}
+# creates a new function (wrapping the old one), and annotates that
+f_and2 = wrap_annotate(f_and, something_else = False)
+
+f_and2.operation
+```

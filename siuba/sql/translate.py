@@ -143,8 +143,9 @@ def set_agg(name):
 
 # Handling not implemented translations ----
 
-def sql_not_impl():
-    return FunctionLookupBound("function not implemented")
+def sql_not_impl(msg = ""):
+
+    return FunctionLookupBound(msg or "function not implemented")
 
 def win_absent(name):
     # Return an error, that is picked up by the translator.

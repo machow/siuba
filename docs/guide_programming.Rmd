@@ -20,7 +20,7 @@ pd.set_option("display.max_rows", 5)
 
 # Programming guide
 
-> ⚠️ If you want to get started analyzing data, see the [analysis guide](guide_analysis.html). This guide gives an overview of how to implement and extend most parts of siuba. It also discusses the rationale behind siuba's architecture.
+> ⚠️ If you want to get started analyzing data, see the [analysis guide](guide_analysis.Rmd). This guide gives an overview of how to implement and extend most parts of siuba. It also discusses the rationale behind siuba's architecture.
 
 
 ## Overview
