@@ -202,8 +202,7 @@ def test_pandas_grouped_frame_fast_not_implemented(notimpl_entry):
     gdf = data[notimpl_entry['accessor']].groupby('g')
 
     # TODO: once reading from yaml, no need to repr
-    str_expr = str(notimpl_entry['expr_frame'])
-    call_expr = strip_symbolic(eval(str_expr, {'_': _}))
+    call_expr = notimpl_entry['expr_frame']
 
     with pytest.warns(UserWarning):
         try:
