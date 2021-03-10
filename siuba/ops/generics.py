@@ -338,8 +338,8 @@ ops_cat = Namespace(
 
 # Combining ---
 ops_combine = Namespace(
-    combine       = operation('combine', 'elwise', 2),
-    combine_first = operation('combine_first', 'elwise', 2),
+    combine       = operation('combine', None, 2),
+    combine_first = operation('combine_first', None, 2),
     append        = operation('append', None, 2),
     replace       = operation('replace', 'elwise', 1),
     update        = operation('update', None, 1),
@@ -455,12 +455,8 @@ keys = operation('keys', None, 1)
 
 # This is a hacky way to get all the operations on a single namespace, since
 # SimpleNamepace does not allow iteration
-ALL_OPS = dict(
+PLAIN_OPS = dict(
         # TODO: modify CallTreeLocal to take modules for accessors
-        **{'str.' + k: v for k,v in dict(ops_str).items()},
-        **{'dt.' + k: v for k,v in dict(ops_dt).items()},
-        **{'cat.' + k: v for k,v in dict(ops_cat).items()},
-        **{'sparse.' + k: v for k,v in dict(ops_sparse).items()},
         **ops_infix,
         **ops_infix_methods,
         **ops_apply,
@@ -472,8 +468,17 @@ ALL_OPS = dict(
         **ops_convert,
         **ops_index,
         **ops_reshape,
-        keys = keys
+        keys = keys,
         )
+
+ACCESSOR_OPS = dict(
+        **{'str.' + k: v for k,v in dict(ops_str).items()},
+        **{'dt.' + k: v for k,v in dict(ops_dt).items()},
+        **{'cat.' + k: v for k,v in dict(ops_cat).items()},
+        **{'sparse.' + k: v for k,v in dict(ops_sparse).items()},
+        )
+
+ALL_OPS = {**PLAIN_OPS, **ACCESSOR_OPS}
 
 ALL_ACCESSORS = set()
 ALL_PROPERTIES = set()
