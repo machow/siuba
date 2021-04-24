@@ -72,7 +72,7 @@ cat.rename_categories: '_.cat.rename_categories({"abc": "zzz"})'
 cat.reorder_categories: _.cat.reorder_categories(["abc", "cde", "fg", "h"])
 cat.set_categories: _.cat.set_categories(['a', 'b', 'c', 'd'])
 clip: _.clip(2,5)
-combine: _.combine(_, max)
+combine: _.combine(_)
 combine_first: _.combine_first(_)
 compound: _.compound()
 convert_dtypes: _.convert_dtypes()
