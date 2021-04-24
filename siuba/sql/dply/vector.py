@@ -158,7 +158,8 @@ def _lead_sql(x, n = 1, default = None) -> ClauseElement:
         >>> print(lead(sql.column('a'), 2, 99))
         lead(a, :lead_1, :lead_2) OVER (ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
     """
-    f = win_cumul("lead")
+    
+    f = win_cumul("lead", rows=None)
     return f(x, n, default)
 
 @lag.register(ClauseElement)
@@ -168,7 +169,7 @@ def _lag_sql(x, n = 1, default = None) -> ClauseElement:
         >>> print(lag(sql.column('a'), 2, 99))
         lag(a, :lag_1, :lag_2) OVER (ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
     """
-    f = win_cumul("lag")
+    f = win_cumul("lag", rows=None)
     return f(x, n , default)
 
 

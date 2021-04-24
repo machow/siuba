@@ -30,6 +30,15 @@ BACKEND_CONFIG = {
             "password": ["SB_TEST_PGPASSWORD", ""],
             "host": ["SB_TEST_PGHOST", "localhost"],
             },
+        "bigquery": {
+            "dialect": "bigquery",
+            # bigquery uses dbname for dataset
+            "dbname": "ci",
+            "port": "",
+            "user": "",
+            "password": "",
+            "host": ["SB_TEST_BQPROJECT", "siuba-tests"],
+            },
         "mysql": {
             "dialect": "mysql+pymysql",
             "dbname": "public",
@@ -75,11 +84,18 @@ class PandasBackend(Backend):
 
 class SqlBackend(Backend):
     table_name_indx = 0
-    sa_conn_fmt = "{dialect}://{user}:{password}@{host}:{port}/{dbname}"
+
+    # if there is a :, sqlalchemy tries to parse the port number.
+    # since backends like bigquery do not specify a port, we'll insert it
+    # later on the port value passed in.
+    sa_conn_fmt = "{dialect}://{user}:{password}@{host}{port}/{dbname}"
 
     def __init__(self, name):
         cnfg = BACKEND_CONFIG[name]
         params = {k: os.environ.get(*v) if isinstance(v, (list)) else v for k,v in cnfg.items()}
+
+        if params["port"]:
+            params["port"] = ":%s" % params["port"]
 
         self.name = name
         self.engine = sqla.create_engine(self.sa_conn_fmt.format(**params))
@@ -95,6 +111,9 @@ class SqlBackend(Backend):
 
     def load_df(self, df = None, **kwargs):
         df = super().load_df(df, **kwargs)
+
+        table_name = self.unique_table_name()
+
         return copy_to_sql(df, self.unique_table_name(), self.engine)
 
     def load_cached_df(self, df):
@@ -172,6 +191,12 @@ def copy_to_sql(df, name, engine):
 
     bool_cols = [k for k, v in df.iteritems() if v.dtype.kind == "b"]
     columns = [sqla.Column(name, sqla.types.Boolean) for name in bool_cols]
+
+    # TODO: clean up dialect specific work (if it grows out of control)
+    #if engine.dialect.name == "bigquery":
+    #    project_id = engine.url.host
+    #    qual_name = f"{engine.url.database}.{name}"
+    #    df.to_gbq(qual_name, project_id, if_exists="replace") 
 
     df.to_sql(name, engine, index = False, if_exists = "replace")
 

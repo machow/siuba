@@ -66,6 +66,12 @@ class CustomOverClause(Over):
 
 
 class AggOver(CustomOverClause):
+    """Over clause for uses of functions min, max, avg, that return one value.
+
+    Note that this class does not set order by, which is how these functions
+    generally become their cumulative versions.
+    """
+
     def set_over(self, group_by, order_by = None):
         self.partition_by = group_by
         return self
@@ -80,6 +86,11 @@ class AggOver(CustomOverClause):
 
 
 class RankOver(CustomOverClause): 
+    """Over clause for ranking functions.
+
+    Note that in python we might call rank(col), but in SQL the ranking column
+    is defined using order by.
+    """
     def set_over(self, group_by, order_by = None):
         crnt_partition = getattr(self.partition_by, 'clauses', tuple())
         self.partition_by = sql.elements.ClauseList(*crnt_partition, *group_by.clauses)
@@ -95,6 +106,9 @@ class RankOver(CustomOverClause):
 
 
 class CumlOver(CustomOverClause):
+    """Over clause for cumulative versions of functions like sum, min, max.
+
+    """
     def set_over(self, group_by, order_by):
         self.partition_by = group_by
         self.order_by = order_by
@@ -108,10 +122,10 @@ class CumlOver(CustomOverClause):
         return self
 
     @classmethod
-    def func(cls, name):
+    def func(cls, name, rows=(None, 0)):
         sa_func = getattr(sql.func, name)
         def f(col, *args, **kwargs) -> CumlOver:
-            return cls(sa_func(col, *args, **kwargs), rows = (None,0))
+            return cls(sa_func(col, *args, **kwargs), rows = rows)
 
         return f
 

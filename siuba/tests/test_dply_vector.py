@@ -5,7 +5,7 @@ results.
 """
 import pytest
 
-from siuba import _, mutate, group_by, summarize, filter
+from siuba import _, arrange, mutate, group_by, summarize, filter
 import siuba.sql.dply
 from siuba.dply import vector as v
 from datetime import timedelta
@@ -80,7 +80,7 @@ def test_mutate_vector(backend, func, simple_data):
     
     assert_equal_query(
             df,
-            mutate(y = func),
+            arrange(_.idx) >> mutate(y = func),
             simple_data.assign(y = func),
             check_dtype = False
             )
@@ -88,7 +88,7 @@ def test_mutate_vector(backend, func, simple_data):
     # grouped
     assert_equal_query(
             df,
-            group_by(_.g) >> mutate(y = func),
+            arrange(_.idx) >> group_by(_.g) >> mutate(y = func),
             simple_data.groupby('g').apply(lambda d: d.assign(y = func)).reset_index(drop = True),
             check_dtype = False
             )

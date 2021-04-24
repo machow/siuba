@@ -233,6 +233,7 @@ class LazyTbl:
 
         # important states the query can be in (e.g. grouped)
         self.ops = [sql.Select([self.tbl])] if ops is None else ops
+        #self.ops = [self.tbl.select()] if ops is None else ops
 
         self.group_by = group_by
         self.order_by = order_by
@@ -318,6 +319,15 @@ class LazyTbl:
         schema, table_name = tbl.split('.') if '.' in tbl else [None, tbl]
 
         columns = map(sqlalchemy.Column, columns) if columns is not None else tuple()
+
+        # TODO: pybigquery uses schema to mean project_id, so we cannot use
+        # siuba's classic breakdown "{schema}.{table_name}". Basically
+        # pybigquery uses "{schema=project_id}.{dataset_dot_table_name}" in its internal
+        # logic. An important side effect is that bigquery errors for
+        # `dataset`.`table`, but not `dataset.table`.
+        if source and source.dialect.name == "bigquery":
+            table_name = tbl
+            schema = None
 
         return sqlalchemy.Table(
                 table_name,
