@@ -1,3 +1,5 @@
 include siuba/data/*.csv
 include siuba/spec/series.yml
 include siuba/ops/support/examples.yml
+include siuba/ops/support/categories.yml
+
