@@ -1,0 +1,24 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.4.2
+  kernelspec:
+    display_name: venv-siuba
+    language: python
+    name: venv-siuba
+---
+
+# Backends
+
+```{python}
+import pandas as pd
+pd.set_option("display.max_rows", 999)
+
+from siuba.ops.support.report import get_support_table
+
+get_support_table()
+```

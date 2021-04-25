@@ -92,7 +92,7 @@ nbsphinx_custom_formats = {
 
 # This is processed by Jinja2 and inserted before each notebook
 nbsphinx_epilog = r"""
-{% set docname = env.doc2path(env.docname, base='docs') %}
+{% set docname = env.doc2path(env.docname, base=True) %}
 
 
 .. only:: html
