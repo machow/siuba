@@ -139,10 +139,15 @@ df_spec = (full_methods
         )
 
 fname_spec = pkg_resources.resource_filename("siuba.ops.support", "examples.yml")
-with open(fname_spec, "r") as f:
-    orig_spec = yaml.safe_load(f)
+fname_cats = pkg_resources.resource_filename("siuba.ops.support", "categories.yml")
+
+orig_spec = yaml.safe_load(open(fname_spec, "r"))
+orig_cats = yaml.safe_load(open(fname_cats, "r"))
+
+
 
 df_spec["example"] = df_spec.full_name.apply(lambda x: orig_spec[x])
+df_spec["category"] = df_spec.full_name.apply(lambda x: orig_cats[x])
 
 # roundtrip through JSON to get rid of custom numpy types
 # probably a much better way to do this
