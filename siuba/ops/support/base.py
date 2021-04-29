@@ -8,7 +8,7 @@ from siuba.ops import ALL_OPS
 from siuba.siu import FunctionLookupBound
 from siuba.sql.utils import get_dialect_translator
 
-SQL_BACKENDS = ["postgresql", "redshift", "sqlite", "mysql"]
+SQL_BACKENDS = ["postgresql", "redshift", "sqlite", "mysql", "bigquery"]
 ALL_BACKENDS = SQL_BACKENDS + ["pandas"]
 
 methods = pd.DataFrame(
