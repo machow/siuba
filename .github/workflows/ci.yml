@@ -56,6 +56,14 @@ jobs:
         env:
           SB_TEST_PGPORT: 5432
           PYTEST_FLAGS: ${{ matrix.pytest_flags }}
+
+      # optional step for running bigquery tests ----
+      - name: Test bigquery
+        if: ${{ contains(github.ref, 'bigquery') || contains(github.ref, 'refs/tags')}}
+        run: |
+          pip install git+https://github.com/googleapis/python-bigquery-sqlalchemy.git pandas-gbq==0.15.0
+
+
   deploy:
     name: "Deploy to PyPI"
     runs-on: ubuntu-latest
