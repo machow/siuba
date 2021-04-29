@@ -71,6 +71,32 @@ jobs:
         run: |
           pip install git+https://github.com/googleapis/python-bigquery-sqlalchemy.git pandas-gbq==0.15.0
 
+  test-bigquery:
+    name: "Test BigQuery"
+    runs-on: ubuntu-latest
+    if: contains(github.ref, 'bigquery') || contains(github.ref, 'refs/tags')
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -r requirements-test.txt
+          python -m pip install git+https://github.com/googleapis/python-bigquery-sqlalchemy.git pandas-gbq==0.15.0
+          python -m pip install .
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@master
+        with:
+          project_id: siuba-tests
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
+      - name: Test with pytest
+        run: |
+          pytest siuba -m bigquery
 
   deploy:
     name: "Deploy to PyPI"
