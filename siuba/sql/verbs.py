@@ -162,7 +162,8 @@ def col_expr_requires_cte(call, sel, is_mutate = False):
     group_needs_cte = not is_mutate and len(sel._group_by_clause)
     
     return (   group_needs_cte
-            or len(sel._order_by_clause)
+            # TODO: detect when a new var in mutate conflicts w/ order by
+            #or len(sel._order_by_clause)
             or not sel_labs.isdisjoint(call_vars)
             )
 
@@ -292,6 +293,16 @@ class LazyTbl:
         """Return columns from current select, with grouping columns first."""
         ungrouped = [k for k in self.last_op.columns.keys() if k not in self.group_by]
         return list(self.group_by) + ungrouped
+
+    #def label_breaks_order_by(self, name):
+    #    """Returns True if a new column label would break the order by vars."""
+
+    #    # TODO: arrange currently allows literals, which breaks this. it seems
+    #    #       better to only allow calls in arrange.
+    #    order_by_vars = {c.op_vars(attr_calls=False) for c in self.order_by}
+
+
+
 
     @property
     def last_op(self):
@@ -591,6 +602,11 @@ def _transmute(__data, **kwargs):
 
 @arrange.register(LazyTbl)
 def _arrange(__data, *args):
+    # Note that SQL databases often do not subquery order by clauses. Arrange
+    # sets order_by on the backend, so it can set order by in over elements,
+    # and handle when new columns are named the same as order by vars.
+    # see: https://dba.stackexchange.com/q/82930
+
     last_op = __data.last_op
     cols = lift_inner_cols(last_op)
 

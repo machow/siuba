@@ -4,7 +4,7 @@ Note: this test file was heavily influenced by its dbplyr counterpart.
 https://github.com/tidyverse/dbplyr/blob/master/tests/testthat/test-verb-mutate.R
 """
     
-from siuba import _, mutate, select, group_by, summarize, filter
+from siuba import _, mutate, select, group_by, summarize, filter, arrange
 from siuba.dply.vector import row_number
 
 import pytest
@@ -77,12 +77,12 @@ def test_mutate_reassign_all_cols_keeps_rowsize(dfs):
 @backend_sql
 @backend_notimpl("sqlite")
 def test_mutate_window_funcs(backend):
-    data = data_frame(x = range(1, 5), g = [1,1,2,2])
+    data = data_frame(idx = range(0, 4), x = range(1, 5), g = [1,1,2,2])
     dfs = backend.load_df(data)
     assert_equal_query(
             dfs,
-            group_by(_.g) >> mutate(row_num = row_number(_).astype(float)),
-            data.assign(row_num = [1.0, 2, 1, 2])
+            arrange(_.idx) >> group_by(_.g) >> mutate(row_num = row_number(_).astype(float)),
+            data.assign(row_num = [1., 2, 1, 2])
             )
 
 
@@ -99,15 +99,16 @@ def test_mutate_using_agg_expr(backend):
 @backend_sql # TODO: pandas outputs a int column
 @backend_notimpl("sqlite")
 def test_mutate_using_cuml_agg(backend):
-    data = data_frame(x = range(1, 5), g = [1,1,2,2])
+    data = data_frame(idx = range(0, 4), x = range(1, 5), g = [1,1,2,2])
     dfs = backend.load_df(data)
 
     # cuml window without arrange before generates warning
     with pytest.warns(None):
         assert_equal_query(
                 dfs,
-                group_by(_.g) >> mutate(y = _.x.cumsum()),
-                data.assign(y = [1.0, 3, 3, 7])
+                arrange(_.idx) >> group_by(_.g) >> mutate(y = _.x.cumsum()),
+                data.assign(y = [1, 3, 3, 7]),
+                check_dtype=False       # bigquery returns int, postgres float
                 )
 
 def test_mutate_overwrites_prev(backend):

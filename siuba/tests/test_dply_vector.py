@@ -129,7 +129,7 @@ def test_filter_vector(backend, func, simple_data):
 
     assert_equal_query(
             df,
-            filter(func),
+            arrange(_.idx) >> filter(func),
             filter(simple_data, func),
             # ignore dtypes, since sql -> an empty data frame has object columns
             check_dtype = False
@@ -138,7 +138,7 @@ def test_filter_vector(backend, func, simple_data):
     # grouped (vs slow_filter)
     assert_equal_query(
             df,
-            group_by(_.g) >> filter(func),
+            arrange(_.idx) >> group_by(_.g) >> filter(func),
             simple_data >> group_by(_.g) >> filter(func),
             check_dtype = False
             )

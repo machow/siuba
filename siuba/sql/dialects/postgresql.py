@@ -58,9 +58,6 @@ def sql_func_contains(col, pat, case = True, flags = 0, na = None, regex = True)
 def sql_func_truediv(x, y):
     return sql.cast(x, sa_types.Float()) / y
 
-def sql_func_floordiv(x, y):
-    return sql.cast(x / y, sa_types.Integer())
-
 
 scalar = extend_base(
         base_scalar,

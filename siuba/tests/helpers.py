@@ -158,9 +158,11 @@ def assert_frame_sort_equal(a, b, **kwargs):
     assert_frame_equal(sorted_a, sorted_b, **kwargs)
 
 def assert_equal_query(tbl, lazy_query, target, **kwargs):
+    from pandas.core.groupby import DataFrameGroupBy
+
     out = collect(lazy_query(tbl))
 
-    if isinstance(tbl, pd.DataFrame):
+    if isinstance(tbl, (pd.DataFrame, DataFrameGroupBy)):
         df_a = ungroup(out).reset_index(drop = True)
         df_b = ungroup(target).reset_index(drop = True)
         assert_frame_equal(df_a, df_b, **kwargs)
@@ -193,12 +195,15 @@ def copy_to_sql(df, name, engine):
     columns = [sqla.Column(name, sqla.types.Boolean) for name in bool_cols]
 
     # TODO: clean up dialect specific work (if it grows out of control)
-    #if engine.dialect.name == "bigquery":
-    #    project_id = engine.url.host
-    #    qual_name = f"{engine.url.database}.{name}"
-    #    df.to_gbq(qual_name, project_id, if_exists="replace") 
+    if engine.dialect.name == "bigquery" and df.isna().any().any():
+        # TODO: to_gbq makes all datetimes UTC, so does not round trip well, 
+        # but is able to handle None -> NULL....
+        project_id = engine.url.host
+        qual_name = f"{engine.url.database}.{name}"
+        df.to_gbq(qual_name, project_id, if_exists="replace") 
 
-    df.to_sql(name, engine, index = False, if_exists = "replace")
+    else:
+        df.to_sql(name, engine, index = False, if_exists = "replace")
 
     # manually create table, so we can be explicit about boolean columns.
     # this is necessary because MySQL reflection reports them as TinyInts,

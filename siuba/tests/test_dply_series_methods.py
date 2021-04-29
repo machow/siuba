@@ -4,7 +4,7 @@ from .helpers import data_frame, assert_equal_query, backend_pandas, SqlBackend,
 import pytest
 # TODO: dot, corr, cov
 
-from siuba import filter, mutate, summarize, group_by
+from siuba import filter, mutate, summarize, group_by, arrange
 from pandas.testing import assert_frame_equal, assert_series_equal
 import numpy as np
 import pandas as pd
@@ -60,32 +60,38 @@ def assert_src_array_equal(src, dst):
     
 # Data ========================================================================
 data_dt = data_frame(
+    id = [1, 2, 3, 4],
     g = ['a', 'a', 'b', 'b'],
     x = pd.to_datetime(["2019-01-01 01:01:01", "2020-04-08 02:02:02", "2021-07-15 03:03:03", "2022-10-22 04:04:04"])
     )
 
 data_str = data_frame(
+    id = [1, 2, 3, 4],
     g = ['a', 'a', 'b', 'b'],
     x = ['abc', 'cde', 'fg', 'h']
     )
 
 data_bool = data_frame(
+    id = [1, 2, 3, 4],
     g = ['a', 'a', 'b', 'b'],
     x = [True, False, True, False],
     y = [True, True, False, False]
         )
 
 data_cat = data_frame(
+    id = [1, 2, 3, 4],
     g = ['a', 'a', 'b', 'b'],
     x = pd.Categorical(['abc', 'cde', 'fg', 'h'])
     )
 
 data_sparse = data_frame(
+    id = [1, 2, 3, 4],
     g = ['a', 'a', 'b', 'b'],
     x = pd.Series([1, 2, 3, 4], dtype = "Sparse")
     )
 
 data_default = data_frame(
+    id = [1, 2, 3, 4, 5, 6],
     g = ['a', 'a', 'a', 'b', 'b', 'b'],
     x = [10, 11, 11, 13, 13, 13],
     y = [1,2,3,4,5,6]
@@ -120,7 +126,7 @@ def get_data(entry, data, backend = None):
     return data['bool'] if req_bool else data[entry['accessor']]
 
 
-def test_missing_implementation(entry, backend):
+def do_test_missing_implementation(entry, backend):
     # Check whether test should xfail, skip, or -------------------------------
     supported = get_spec_backend_is_supported(entry, backend)
 
@@ -217,12 +223,12 @@ def test_pandas_grouped_frame_fast_not_implemented(notimpl_entry):
 #@backend_pandas
 @pytest.mark.skip_backend('sqlite')
 def test_frame_mutate(skip_backend, backend, entry):
-    test_missing_implementation(entry, backend)
+    do_test_missing_implementation(entry, backend)
 
     # Prepare input data ------------------------------------------------------
     # case: inputs must be boolean
     crnt_data = get_data(entry, DATA, backend)
-    df = backend.load_df(crnt_data)
+    df = backend.load_cached_df(crnt_data)
 
     # Execute mutate ----------------------------------------------------------
     str_expr, call_expr = get_df_expr(entry)
@@ -233,7 +239,7 @@ def test_frame_mutate(skip_backend, backend, entry):
 
     assert_equal_query(
             df,
-            mutate(result = call_expr),
+            arrange(_.id) >> mutate(result = call_expr),
             dst
             )
 
@@ -242,7 +248,7 @@ def test_frame_mutate(skip_backend, backend, entry):
     g_dst['result'] = cast_result_type(entry, backend, g_dst['result'])
     assert_equal_query(
             df,
-            group_by(_.g) >> mutate(result = call_expr),
+            arrange(_.id) >> group_by(_.g) >> mutate(result = call_expr),
             g_dst
             )
 
@@ -271,12 +277,12 @@ def test_pandas_grouped_frame_fast_mutate(entry):
 @pytest.mark.skip_backend('sqlite')
 def test_frame_summarize(skip_backend, backend, agg_entry):
     entry = agg_entry
-    test_missing_implementation(entry, backend)
+    do_test_missing_implementation(entry, backend)
 
     # Prepare input data ------------------------------------------------------
     # case: inputs must be boolean
     crnt_data = get_data(entry, DATA, backend)
-    df = backend.load_df(crnt_data)
+    df = backend.load_cached_df(crnt_data)
 
     # Execute mutate ----------------------------------------------------------
     str_expr, call_expr = get_df_expr(entry)
@@ -329,7 +335,7 @@ def test_pandas_grouped_frame_fast_summarize(agg_entry):
 def test_frame_set_aggregates_postgresql():
     # TODO: probably shouldn't be creating backend here
     backend = SqlBackend("postgresql")
-    dfs = backend.load_df(data[None])
+    dfs = backend.load_cached_df(data[None])
     
     expr = _.x.quantile(.75)
     assert_equal_query(

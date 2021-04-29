@@ -42,7 +42,8 @@ def test_filter_via_group_by(backend):
 
     assert_equal_query(
             dfs,
-            group_by(_.g) >> filter(row_number(_) < 3),
+            # arrange is required to ensure order in sql dbs
+            arrange(_.x) >> group_by(_.g) >> filter(row_number(_) < 3),
             data_frame(x = [1,2,6,7], g = [1,1,2,2])
             )
 

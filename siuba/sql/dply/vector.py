@@ -11,6 +11,7 @@ from ..translate import (
 
 from ..dialects.sqlite import SqliteColumn
 from ..dialects.mysql import MysqlColumn
+from ..dialects.bigquery import BigqueryColumn
 
 from siuba.dply.vector import (
         #cumall, cumany, cummean,
@@ -49,24 +50,24 @@ def _desc_sql(x) -> ClauseElement:
 #       consistency
 # TODO: remove repetition in rank definitions
 
-def _sql_rank_over(rank_func, col, partition):
+def _sql_rank_over(rank_func, col, partition, nulls_last):
     # partitioning ensures aggregates that use total length are correct,
     # e.g. percent rank, cume_dist and friends, by separating NULLs into their 
     # own partition
     over_clause = RankOver(
             rank_func(),
-            order_by = col,
+            order_by = col if not nulls_last else col.nullslast(),
             partition_by = col.isnot(None) if partition else None
             )
 
     return sql.case({col.isnot(None): over_clause})
 
-def _sql_rank(func_name, partition = False):
+def _sql_rank(func_name, partition = False, nulls_last = False):
     rank_func = getattr(sql.func, func_name)
 
     def f(col, na_option = None) -> RankOver:
         if na_option == "keep":
-            return _sql_rank_over(rank_func, col, partition = partition)
+            return _sql_rank_over(rank_func, col, partition, nulls_last)
 
         warn_arg_default(func_name, 'na_option', None, "keep")
 
@@ -92,6 +93,11 @@ dense_rank  .register(MysqlColumn, _sql_rank("dense_rank", partition = True))
 percent_rank.register(MysqlColumn, _sql_rank("percent_rank", partition = True))
 cume_dist   .register(MysqlColumn, _sql_rank("cume_dist", partition = True))
 min_rank    .register(MysqlColumn, _sql_rank("rank", partition = True))
+
+# partition everything, since MySQL puts NULLs first
+# see: https://stackoverflow.com/q/1498648/1144523
+dense_rank  .register(BigqueryColumn, _sql_rank("dense_rank", nulls_last = True))
+percent_rank.register(BigqueryColumn, _sql_rank("percent_rank", nulls_last = True))
 
 
 
@@ -156,7 +162,7 @@ def _lead_sql(x, n = 1, default = None) -> ClauseElement:
     """
     Example:
         >>> print(lead(sql.column('a'), 2, 99))
-        lead(a, :lead_1, :lead_2) OVER (ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+        lead(a, :lead_1, :lead_2) OVER ()
     """
     
     f = win_cumul("lead", rows=None)
@@ -167,7 +173,7 @@ def _lag_sql(x, n = 1, default = None) -> ClauseElement:
     """
     Example:
         >>> print(lag(sql.column('a'), 2, 99))
-        lag(a, :lag_1, :lag_2) OVER (ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+        lag(a, :lag_1, :lag_2) OVER ()
     """
     f = win_cumul("lag", rows=None)
     return f(x, n , default)
@@ -247,7 +253,11 @@ def _nth_sql(x, n, order_by = None, default = None) -> ClauseElement:
 
 
     #  note the adjustment for 1-based index in SQL
-    return RankOver(sql.func.nth_value(x, n + 1), order_by = order_by)
+    return CumlOver(
+            sql.func.nth_value(x, n + 1),
+            order_by = order_by,
+            rows = (None, None)
+            )
 
 
 @nth.register(SqlColumnAgg)

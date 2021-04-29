@@ -97,8 +97,9 @@ def test_join_suffixes_dupe_names(df1):
 
 # Test arbitrary conditions with sql_on ---------------------------------------
 
+@pytest.mark.skip_backend("bigquery")           # bigquery requires at least 1 equality on cond
 @backend_sql
-def test_left_join_arg_sql_on(backend, df1, df2):
+def test_left_join_arg_sql_on(backend, skip_backend, df1, df2):
     cond = lambda lhs, rhs: lhs.ii > rhs.ii
 
     # collect sql result
@@ -116,8 +117,9 @@ def test_left_join_arg_sql_on(backend, df1, df2):
     #       not sure why it's happening, look into in SqlAlchemy?
     assert_frame_sort_equal(out.sort_index(axis = 1), target)
 
+@pytest.mark.skip_backend("bigquery")
 @backend_sql
-def test_anti_join_arg_sql_on(backend, df1, df2):
+def test_anti_join_arg_sql_on(backend, skip_backend, df1, df2):
     cond = lambda lhs, rhs: lhs.ii > rhs.ii
 
     # collect sql result

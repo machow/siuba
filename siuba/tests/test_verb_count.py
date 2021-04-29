@@ -49,7 +49,7 @@ def test_count_with_kwarg_expression(df):
             pd.DataFrame({"y": [0], "n": [4]})
             )
 
-@backend_notimpl("sqlite", "postgresql", "mysql")     # see (#104)
+@backend_notimpl("sqlite", "postgresql", "mysql", "bigquery")     # see (#104)
 def test_count_wt(backend, df):
     assert_equal_query(
             df,
@@ -65,7 +65,7 @@ def test_count_no_groups(df):
             pd.DataFrame({'n': [4]})
             )
 
-@backend_notimpl("sqlite", "postgresql", "mysql")   # see (#104)
+@backend_notimpl("sqlite", "postgresql", "mysql", "bigquery")   # see (#104)
 def test_count_no_groups_wt(backend, df):
     assert_equal_query(
             df,

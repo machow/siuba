@@ -108,17 +108,27 @@ class RankOver(CustomOverClause):
 class CumlOver(CustomOverClause):
     """Over clause for cumulative versions of functions like sum, min, max.
 
+    Note that this class is also currently used for aggregates that might require
+    ordering, like nth, first, etc..
+
     """
     def set_over(self, group_by, order_by):
         self.partition_by = group_by
-        self.order_by = order_by
 
-        if not len(order_by):
-            warnings.warn(
-                    "No order by columns explicitly set in window function. SQL engine"
-                    "does not guarantee a row ordering. Recommend using an arrange beforehand.",
-                    RuntimeWarning
-                    )
+
+        # do not override order by if it was set by the user. this might happen
+        # in functions like nth, which gives the option to set it.
+        if self.order_by is None or not len(self.order_by):
+            if not len(order_by):
+                warnings.warn(
+                        "No order by columns explicitly set in window function. SQL engine"
+                        "does not guarantee a row ordering. Recommend using an arrange beforehand.",
+                        RuntimeWarning
+                        )
+
+            self.order_by = order_by
+
+
         return self
 
     @classmethod
