@@ -86,7 +86,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
           python -m pip install -r requirements-test.txt
-          python -m pip install git+https://github.com/googleapis/python-bigquery-sqlalchemy.git pandas-gbq==0.15.0
+          python -m pip install git+https://github.com/machow/pybigquery.git pandas-gbq==0.15.0
           python -m pip install .
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@master
@@ -97,6 +97,8 @@ jobs:
       - name: Test with pytest
         run: |
           pytest siuba -m bigquery
+        env:
+          SB_TEST_BQDATABASE: "ci_github"
 
   deploy:
     name: "Deploy to PyPI"

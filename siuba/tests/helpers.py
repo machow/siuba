@@ -33,7 +33,7 @@ BACKEND_CONFIG = {
         "bigquery": {
             "dialect": "bigquery",
             # bigquery uses dbname for dataset
-            "dbname": "ci",
+            "dbname": ["SB_TEST_BQDATABASE", "ci"],
             "port": "",
             "user": "",
             "password": "",
