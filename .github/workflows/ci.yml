@@ -32,6 +32,7 @@ jobs:
           - name: "2020-mid dependencies"
             python-version: 3.8
             requirements: numpy~=1.19.1 pandas~=1.1.0 SQLAlchemy~=1.3.18 psycopg2~=2.8.5 PyMySQL==1.0.2
+            latest: true
 
     steps:
       - uses: actions/checkout@v2
@@ -58,8 +59,15 @@ jobs:
           PYTEST_FLAGS: ${{ matrix.pytest_flags }}
 
       # optional step for running bigquery tests ----
+      - name: Set up Cloud SDK
+        if: ${{(contains(github.ref, 'bigquery') || contains(github.ref, 'refs/tags')) && matrix.latest}}
+        uses: google-github-actions/setup-gcloud@master
+        with:
+          project_id: siuba-tests
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
       - name: Test bigquery
-        if: ${{ contains(github.ref, 'bigquery') || contains(github.ref, 'refs/tags')}}
+        if: ${{(contains(github.ref, 'bigquery') || contains(github.ref, 'refs/tags')) && matrix.latest}}
         run: |
           pip install git+https://github.com/googleapis/python-bigquery-sqlalchemy.git pandas-gbq==0.15.0
 
