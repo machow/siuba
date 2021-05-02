@@ -22,6 +22,9 @@ def test_collect(df):
     assert isinstance(df >> collect(), pd.DataFrame)
     assert isinstance(collect(), Pipeable)
 
+
+# Pipeable --------------------------------------------------------------------
+
 def test_pipe_symbolic_attr():
     class A: a = 1
 
