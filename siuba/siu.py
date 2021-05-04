@@ -374,7 +374,12 @@ class DictCall(Call):
 # Slice Calls -----------------------------------------------------------------
 # note the metaclass SliceOp below, which registers SliceOpExt
 
-class SliceOpExt(Call):
+class _SliceOpExt(Call):
+    """Represent arguments for extended slice syntax.
+
+    E.g. expressions like _[_:, 'a', 1:2, ] use a tuple of many slices.
+    """
+
     def __init__(self, func, *args, **kwargs):
         self.func = "__siu_slice__"
 
@@ -395,10 +400,7 @@ class SliceOpExt(Call):
     def map_subcalls(self, f, args=tuple(), kwargs=None):
         if kwargs is None: kwargs = {}
 
-        # expressions like _[_:, 'a', 1:2, ] return a tuple of many slices,
-        # so we need to evaluate each one. note also that the expression
-        # _['a', ] returns a tuple as well.
-
+        # evaluate each argument, which can be a slice
         args = tuple(self._apply_slice_entry(f, obj, args, kwargs) for obj in self.args)
 
         return args, {}
@@ -459,7 +461,7 @@ class SliceOpExt(Call):
         return ":".join(repr(x) if x is not None else "" for x in pieces)
 
 
-class SliceOpIndex(SliceOpExt):
+class _SliceOpIndex(_SliceOpExt):
     """Special case of slicing, where getitem receives a single slice object."""
 
     def __init__(self, *args, **kwargs):
@@ -486,15 +488,15 @@ class SliceOp(ABC):
         elif isinstance(args[0], tuple):
             # general case, where calling returns a tuple of indexers.
             # e.g. _['a', ], or _[1:, :, :, :]
-            return SliceOpExt(func, *args[0])
+            return _SliceOpExt(func, *args[0])
 
         else:
             # special case, where calling returns a single indexer, rather than
             # a tuple of indexers (e.g. _['a'], or _[1:])
-            return SliceOpIndex(func, args[0])
+            return _SliceOpIndex(func, args[0])
 
 
-SliceOp.register(SliceOpExt)
+SliceOp.register(_SliceOpExt)
 
 
 # Special kinds of call arguments ----

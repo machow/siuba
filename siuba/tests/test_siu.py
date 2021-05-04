@@ -131,7 +131,7 @@ def test_explain_failures(_, expr):
 # SliceOp ----
 
 def test_sym_slice():
-    from siuba.siu import SliceOpIndex
+    from siuba.siu import _SliceOpIndex
 
     _ = Symbolic()
 
@@ -140,14 +140,14 @@ def test_sym_slice():
     assert isinstance(meta, MetaArg)
     assert isinstance(slice_ops, Call)
     assert isinstance(slice_ops, SliceOp)       # abc metaclass
-    assert slice_ops.__class__ is SliceOpIndex
+    assert slice_ops.__class__ is _SliceOpIndex
 
 
     indexer = slice_ops(1)
     assert indexer is False
 
 def test_sym_slice_multiple():
-    from siuba.siu import SliceOpExt
+    from siuba.siu import _SliceOpExt
 
     _ = Symbolic()
 
@@ -158,7 +158,7 @@ def test_sym_slice_multiple():
     assert len(slice_ops.args) == 3
     assert isinstance(slice_ops.args[0], Call)
     assert isinstance(slice_ops, SliceOp)       # abc metaclass
-    assert slice_ops.__class__ is SliceOpExt
+    assert slice_ops.__class__ is _SliceOpExt
 
     indexer = slice_ops(1)
     assert indexer[0] is False
