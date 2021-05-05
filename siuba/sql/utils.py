@@ -70,11 +70,9 @@ def _sql_select(columns, *args, **kwargs):
 
 
 def _sql_column_collection(data, columns):
-    from sqlalchemy.sql import ColumnCollection
+    from sqlalchemy.sql.base import ColumnCollection, ImmutableColumnCollection
 
     if is_sqla_13():
-        cols = ColumnCollection(data, columns)
-    else:
-        cols = ColumnCollection(list(data.items()))
+        return ImmutableColumnCollection(data, columns)
 
-    return cols.as_immutable()
+    return ColumnCollection(list(data.items())).as_immutable()
