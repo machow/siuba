@@ -18,7 +18,7 @@ from siuba.dply.verbs import (
         if_else
         )
 from .translate import sa_get_over_clauses, CustomOverClause, SqlColumn, SqlColumnAgg
-from .utils import get_dialect_funcs, get_sql_classes, _FixedSqlDatabase
+from .utils import get_dialect_funcs, get_sql_classes, _FixedSqlDatabase, _sql_select, _sql_column_collection
 
 from sqlalchemy import sql
 import sqlalchemy
@@ -127,7 +127,7 @@ def lift_inner_cols(tbl):
     cols = list(tbl.inner_columns)
     data = {col.key: col for col in cols}
 
-    return sql.base.ImmutableColumnCollection(data, cols)
+    return _sql_column_collection(data, cols)
 
 def col_expr_requires_cte(call, sel, is_mutate = False):
     """Return whether a variable assignment needs a CTE"""
@@ -216,7 +216,7 @@ class LazyTbl:
         self.tbl = self._create_table(tbl, columns, self.source)
 
         # important states the query can be in (e.g. grouped)
-        self.ops = [sql.Select([self.tbl])] if ops is None else ops
+        self.ops = [self.tbl.select()] if ops is None else ops
 
         self.group_by = group_by
         self.order_by = order_by
@@ -331,7 +331,7 @@ class LazyTbl:
 
     def _get_preview(self):
         # need to make prev op a cte, so we don't override any previous limit
-        new_sel = sql.select([self.last_op.alias()]).limit(5)
+        new_sel = self.last_op.alias().select().limit(5)
         tbl_small = self.append_op(new_sel)
         return collect(tbl_small)
 
@@ -464,7 +464,7 @@ def _filter(__data, *args):
     # Note: currently always produces 2 additional select statements,
     #       1 for window/aggs, and 1 for the where clause
     sel = __data.last_op.alias()                   # original select
-    win_sel = sql.select([sel], from_obj = sel)
+    win_sel = sel.select()
 
     conds = []
     windows = []
@@ -507,7 +507,7 @@ def _filter(__data, *args):
         orig_cols = [sel]
     
     # create second cte ----
-    filt_sel = sql.select(orig_cols, whereclause = bool_clause)
+    filt_sel = _sql_select(orig_cols).where(bool_clause)
     return __data.append_op(filt_sel)
 
 
@@ -551,7 +551,7 @@ def _mutate_select(sel, colname, func, labs, __data):
         # anything else requires a subquery
         cte = sel.alias(None)
         columns = cte.columns
-        sel = sql.select([cte], from_obj = cte)
+        sel = cte.select()
 
     # evaluate call expr on columns, making sure to use group vars
     new_col, windows = __data.track_call_windows(func, columns)
@@ -658,7 +658,7 @@ def _count(__data, *args, sort = False, wt = None, **kwargs):
     # holds selected columns and tally (n)
     sel_inner_cte = sel_inner.alias()
     inner_cols = sel_inner_cte.columns
-    sel_outer = sql.select(from_obj = sel_inner_cte)
+    sel_outer = sql.select().select_from(sel_inner_cte)
 
     # apply any group vars from a group_by verb call first
     prev_group_cols = [inner_cols[k] for k in tbl_inner.group_by]
@@ -687,7 +687,7 @@ def _summarize(__data, **kwargs):
     # what if windowed mutate or filter has been done? 
     #   - filter is fine, since it uses a CTE
     #   - need to detect any window functions...
-    sel = __data.last_op._clone()
+    old_sel = __data.last_op._clone()
 
     new_calls = {}
     for k, expr in kwargs.items():
@@ -696,23 +696,27 @@ def _summarize(__data, **kwargs):
                 verb_name = "Summarize", arg_name = k
                 )
 
-    needs_cte = [col_expr_requires_cte(call, sel) for call in new_calls.values()]
-    group_on_labels = set(__data.group_by) & get_inner_labels(sel)
+    needs_cte = [col_expr_requires_cte(call, old_sel) for call in new_calls.values()]
+    group_on_labels = set(__data.group_by) & get_inner_labels(old_sel)
 
     # create select statement ----
+
     if any(needs_cte) or len(group_on_labels):
         # need a cte, due to alias cols or existing group by
         # current select stmt has group by clause, so need to make it subquery
-        cte = sel.alias()
+        cte = old_sel.alias()
         columns = cte.columns
-        sel = sql.select(from_obj = cte)
+        sel = sql.select().select_from(cte)
     else:
         # otherwise, can alter the existing select statement
-        columns = lift_inner_cols(sel)
-        old_froms = sel.froms
-
-        sel = sel.with_only_columns([])
-        sel.append_from(*old_froms)
+        columns = lift_inner_cols(old_sel)
+        sel = sql.select()
+        
+        # backwards compatible with sqlalchemy 1.3, which expects a list of froms,
+        # or just a single from clause
+        old_froms = old_sel.froms
+        for from_ in old_froms:
+            sel = sel.select_from(from_)
 
     # add group by columns ----
     group_cols = [columns[k] for k in __data.group_by]
@@ -892,7 +896,7 @@ def _join(left, right, on = None, *args, how = "inner", sql_on = None):
             how = how
             )
 
-    sel = sql.select(labeled_cols, from_obj = join)
+    sel = _sql_select(labeled_cols).select_from(join)
     return left.append_op(sel, order_by = tuple())
 
 
@@ -910,18 +914,14 @@ def _semi_join(left, right = None, on = None, *args, sql_on = None):
     bool_clause = _create_join_conds(left_sel, right_sel, on)
 
     # create inner join ----
-    exists_clause = sql.select(
-            [sql.literal(1)],
-            from_obj = right_sel,
-            whereclause = bool_clause
-            )
+    exists_clause = _sql_select([sql.literal(1)]) \
+            .select_from(right_sel) \
+            .where(bool_clause)
 
     # only keep left hand select's columns ----
-    sel = sql.select(
-            left_sel.columns,
-            from_obj = left_sel,
-            whereclause = sql.exists(exists_clause)
-            )
+    sel = _sql_select(left_sel.columns) \
+            .select_from(left_sel) \
+            .where(sql.exists(exists_clause))
 
     return left.append_op(sel, order_by = tuple())
 
@@ -940,8 +940,9 @@ def _anti_join(left, right = None, on = None, *args, sql_on = None):
     bool_clause = _create_join_conds(left_sel, right_sel, on)
 
     # create inner join ----
-    not_exists = ~sql.exists([1], from_obj = right_sel).where(bool_clause)
-    sel = sql.select(left_sel.columns, from_obj = left_sel).where(not_exists)
+    #not_exists = ~sql.exists([1], from_obj = right_sel).where(bool_clause)
+    not_exists = ~_sql_select([1]).select_from(right_sel).where(bool_clause).exists()
+    sel = left_sel.select().where(not_exists)
     
     return left.append_op(sel, order_by = tuple())
        
@@ -1058,7 +1059,7 @@ def _distinct(__data, *args, _keep_all = False, **kwargs):
         # fallback to cte
         cte = inner_sel.alias()
         distinct_cols = [cte.columns[k] for k in cols]
-        sel = sql.select(distinct_cols, from_obj = cte).distinct()
+        sel = _sql_select(distinct_cols).select_from(cte).distinct()
 
     return __data.append_op(sel)
 
