@@ -654,25 +654,23 @@ def _count(__data, *args, sort = False, wt = None, **kwargs):
     sel_inner = tbl_inner.last_op
     group_cols = arg_names + list(kwargs)
 
-    # outer select ----
+    # create outer select ----
     # holds selected columns and tally (n)
     sel_inner_cte = sel_inner.alias()
     inner_cols = sel_inner_cte.columns
-    sel_outer = sql.select().select_from(sel_inner_cte)
 
     # apply any group vars from a group_by verb call first
-    prev_group_cols = [inner_cols[k] for k in tbl_inner.group_by]
-    if prev_group_cols:
-        sel_outer.append_group_by(*prev_group_cols)
-        sel_outer.append_column(*prev_group_cols)
+    tbl_group_cols = [inner_cols[k] for k in tbl_inner.group_by]
+    count_group_cols = [inner_cols[k] for k in group_cols]
 
-    # now any defined in the count verb call
-    for k in group_cols:
-        sel_outer.append_group_by(inner_cols[k])
-        sel_outer.append_column(inner_cols[k])
-
+    # combine with any defined in the count verb call
+    outer_group_cols = ordered_union(tbl_group_cols, count_group_cols)
+    # holds the actual count (e.g. n)
     count_col = sql.functions.count().label(res_name)
-    sel_outer.append_column(count_col)
+
+    sel_outer = _sql_select([*outer_group_cols, count_col]) \
+            .select_from(sel_inner_cte) \
+            .group_by(*outer_group_cols)
 
     # count is like summarize, so removes order_by
     return tbl_inner.append_op(
