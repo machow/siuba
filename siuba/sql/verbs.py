@@ -18,7 +18,7 @@ from siuba.dply.verbs import (
         if_else
         )
 from .translate import sa_get_over_clauses, CustomOverClause, SqlColumn, SqlColumnAgg
-from .utils import get_dialect_funcs, get_sql_classes, _FixedSqlDatabase, _sql_select, _sql_column_collection
+from .utils import get_dialect_funcs, get_sql_classes, _FixedSqlDatabase, _sql_select, _sql_column_collection, _sql_add_columns
 
 from sqlalchemy import sql
 import sqlalchemy
@@ -98,7 +98,7 @@ class WindowReplacer(CallListener):
             # operations will refer to the window column on window_cte. Note that
             # the operations will use the actual column, so may need to use the
             # ClauseAdaptor to make it a reference to the label
-            self.window_cte = self.window_cte.column(label)
+            self.window_cte = _sql_add_columns(self.window_cte, [label])
             win_col = lift_inner_cols(self.window_cte).values()[-1]
             self.windows.append(win_col)
 
@@ -495,10 +495,7 @@ def _filter(__data, *args):
     # first cte, windows ----
     if len(windows):
         
-        for col in windows:
-            win_sel = win_sel.column(col)
         win_alias = win_sel.alias()
-
 
         # because track_call_windows in the loop above used select.append_column
         # multiple times, sqlalchemy doesn't know our window columns are the ones
@@ -570,7 +567,7 @@ def _mutate_select(sel, colname, func, labs, __data):
         replaced[colname] = new_col.label(colname)
         return sel.with_only_columns(list(replaced.values()))
 
-    return sel.column(new_col.label(colname))
+    return _sql_add_columns(sel, [new_col.label(colname)])
 
 
 @transmute.register(LazyTbl)
@@ -726,13 +723,11 @@ def _summarize(__data, **kwargs):
 
     # add group by columns ----
     group_cols = [columns[k] for k in __data.group_by]
-    sel.append_group_by(*group_cols)
-    for col in group_cols:
-        sel.append_column(col)
 
     # add each aggregate column ----
     # TODO: can't do summarize(b = mean(a), c = b + mean(a))
     #       since difficult for c to refer to agg and unagg cols in SQL
+    expr_cols = []
     for k, expr in new_calls.items():
         missing_cols = get_missing_columns(expr, columns)
         if missing_cols:
@@ -743,10 +738,12 @@ def _summarize(__data, **kwargs):
                     )
 
         col = expr(columns).label(k)
+        expr_cols.append(col)
+        
 
-        sel.append_column(col)
-
-    new_data = __data.append_op(sel, group_by = tuple(), order_by = tuple())
+    all_cols = [*group_cols, *expr_cols]
+    final_sel = _sql_add_columns(sel, all_cols).group_by(*group_cols)
+    new_data = __data.append_op(final_sel, group_by = tuple(), order_by = tuple())
     return new_data
 
 

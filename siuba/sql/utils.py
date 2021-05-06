@@ -79,3 +79,12 @@ def _sql_column_collection(data, columns):
         return ImmutableColumnCollection(data, columns)
 
     return ColumnCollection(list(data.items())).as_immutable()
+
+
+def _sql_add_columns(select, columns):
+    if is_sqla_12() or is_sqla_13():
+        for column in columns:
+            select = select.column(column)
+        return select
+
+    return select.add_columns(*columns)
