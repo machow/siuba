@@ -545,7 +545,7 @@ def _mutate_select(sel, colname, func, labs, __data):
     function handles whether to add a column to the existing select statement,
     or to use it as a subquery.
     """
-    replace_col = colname in sel.columns
+    replace_col = colname in lift_inner_cols(sel)
     # Call objects let us check whether column expr used a derived column
     # e.g. SELECT a as b, b + 1 as c raises an error in SQL, so need subquery
     if not col_expr_requires_cte(func, sel, is_mutate = True):
@@ -1053,7 +1053,7 @@ def _distinct(__data, *args, _keep_all = False, **kwargs):
 
     # use all columns by default
     if not cols:
-        cols = list(inner_sel.columns.keys())
+        cols = lift_inner_cols(inner_sel).keys()
 
     if not len(inner_sel._order_by_clause):
         # select distinct has to include any columns in the order by clause,
