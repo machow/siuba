@@ -91,7 +91,7 @@ class WindowReplacer(CallListener):
             # custom name, or parameters like "%(...)s" may nest and break psycopg2
             # with columns you can set a key to fix this, but it doesn't seem to 
             # be an option with labels
-            name = self._get_unique_name('win', self.window_cte.columns)
+            name = self._get_unique_name('win', lift_inner_cols(self.window_cte))
             label = col_expr.label(name)
 
             # put into CTE, and return its resulting column, so that subsequent
@@ -427,12 +427,13 @@ def _collect(__data, as_df = True):
     #    compile_kwargs = {"literal_binds": True}
     #)
 
-    if as_df:
-        sql_db = _FixedSqlDatabase(__data.source)
+    with __data.source.connect() as conn:
+        if as_df:
+            sql_db = _FixedSqlDatabase(conn)
 
-        return sql_db.read_sql(__data.last_op)
+            return sql_db.read_sql(__data.last_op)
 
-    return __data.source.execute(compiled).fetchall()
+        return conn.execute(__data.last_op)
 
 
 @select.register(LazyTbl)
