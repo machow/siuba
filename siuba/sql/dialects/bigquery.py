@@ -46,6 +46,27 @@ def sql_is_last_day_of(period):
 
     return f
 
+
+# string ----
+
+def sql_str_replace(col, pat, repl, n=-1, case=None, flags=0, regex=True):
+    if n != -1 or case is not None or flags != 0:
+        raise NotImplementedError("only pat and repl arguments supported in sql")
+
+    if regex:
+        return fn.regexp_replace(col, pat, repl)
+
+    return fn.replace(col, pat, repl)
+
+def sql_str_contains(col, pat, case=None, flags=0, na=None, regex=True):
+    if case is not None or flags != 0:
+        raise NotImplementedError("only pat and repl arguments supported in sql")
+
+    if regex:
+        return fn.regexp_contains(col, pat)
+
+    return col.contains(pat)
+
 # error messages ----
 
 QUANTILE_ERROR = ("taking the median or quantile with percentile_cont can only be done in a mutate, "
@@ -99,11 +120,15 @@ scalar = extend_base(
       "dt.is_quarter_start": sql_is_first_of("DAY", "QUARTER"),
       "dt.is_year_end":      sql_is_last_day_of("YEAR"),
       "dt.is_year_start":    sql_is_first_of("DAY", "YEAR"),
+      "dt.month_name":       lambda col: fn.format_date("%B", col),
       "dt.week":             sql_extract("ISOWEEK"),
       "dt.weekday":          lambda col: fn.extract("DAYOFWEEK", col) - 2,
       "dt.weekofyear":       sql_extract("ISOWEEK")
     },
-
+    **{
+      "str.contains": sql_str_contains,
+      "str.replace": sql_str_replace,
+    }
     )
 
 aggregate = extend_base(
@@ -111,6 +136,7 @@ aggregate = extend_base(
     # NOTE: bigquery has an all() func, but it's not an aggregate
     any      = sql_any(),
     all      = sql_all(),
+    count    = lambda col: fn.count(col),
     median   = sql_not_impl(QUANTILE_ERROR),
     nunique  = lambda col: fn.count(fn.distinct(col)),
     quantile = sql_not_impl(QUANTILE_ERROR),
@@ -124,6 +150,7 @@ window = extend_base(
     base_win,
     any      = sql_any(window = True),
     all      = sql_all(window = True),
+    count    = lambda col: AggOver(fn.count(col)),
     cumsum   = win_cumul("sum"),
     median   = lambda col: RankOver(sql_median(col)),
     nunique  = lambda col: AggOver(fn.count(fn.distinct(col))),
