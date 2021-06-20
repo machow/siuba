@@ -1,6 +1,8 @@
 import itertools
 import operator
 
+from abc import ABC
+
 # TODO: symbolic formatting: __add__ -> "+"
 
 BINARY_LEVELS = {
@@ -185,12 +187,17 @@ class Call:
                     )
 
     def __call__(self, x):
-        inst, *rest = (self.evaluate_calls(arg, x) for arg in self.args)
-        kwargs = {k: self.evaluate_calls(v, x) for k, v in self.kwargs.items()}
+        args, kwargs = self.map_subcalls(self.evaluate_calls, args = (x,))
+        inst, *rest = args
+
+        #inst, *rest = (self.evaluate_calls(arg, x) for arg in self.args)
+        #kwargs = {k: self.evaluate_calls(v, x) for k, v in self.kwargs.items()}
         
         # TODO: temporary workaround, for when only __get_attribute__ is defined
         if self.func == "__getattr__":
             return getattr(inst, *rest)
+        elif self.func == "__getitem__":
+            return operator.getitem(inst, *rest)
         elif self.func == "__call__":
             return getattr(inst, self.func)(*rest, **kwargs)
 
@@ -208,9 +215,11 @@ class Call:
         args, kwargs = self.map_subcalls(lambda child: child.copy())
         return self.__class__(self.func, *args, **kwargs)
 
-    def map_subcalls(self, f):
-        new_args = tuple(f(arg) if isinstance(arg, Call) else arg for arg in self.args)
-        new_kwargs = {k: f(v) if isinstance(v, Call) else v for k,v in self.kwargs.items()}
+    def map_subcalls(self, f, args = tuple(), kwargs = None):
+        if kwargs is None: kwargs = {}
+
+        new_args = tuple(f(arg, *args, **kwargs) if isinstance(arg, Call) else arg for arg in self.args)
+        new_kwargs = {k: f(v, *args, **kwargs) if isinstance(v, Call) else v for k,v in self.kwargs.items()}
 
         return new_args, new_kwargs
 
@@ -343,36 +352,152 @@ class DictCall(Call):
         super().__init__(f, *args, **kwargs)
         self.args = (dict, dict(self.args[1]))
 
-    def map_subcalls(self, f):
+    def map_subcalls(self, f, args = tuple(), kwargs = None):
+        if kwargs is None: kwargs = {}
+
         d = self.args[1]
 
+        # TODO: don't use a giant comprehension
         new_d = {
-                f(k) if isinstance(k, Call) else k: f(v) if isinstance(v, Call) else v
-                        for k,v in d.items()
-                        }
+            f(k, *args, **kwargs) if isinstance(k, Call) else k     # key part
+            : f(v, *args, **kwargs) if isinstance(v, Call) else v   # val part
+            for k,v in d.items()
+            }
 
         return (self.args[0], new_d), {}
 
     def __call__(self, x):
+        # TODO: note that it will not descend into dict to evaluate calls
         return self.args[1]
 
-class SliceOp(Call):
+
+# Slice Calls -----------------------------------------------------------------
+# note the metaclass SliceOp below, which registers SliceOpExt
+
+class _SliceOpExt(Call):
+    """Represent arguments for extended slice syntax.
+
+    E.g. expressions like _[_:, 'a', 1:2, ] use a tuple of many slices.
+    """
+
     def __init__(self, func, *args, **kwargs):
         self.func = "__siu_slice__"
-        self.args = args
 
         if kwargs:
             raise ValueError("a slice cannot accept keyword arguments")
 
+        self.args = args
         self.kwargs = {}
 
     def __repr__(self):
-        return ":".join(repr(x) for x in self.args if x is not None)
+        return ", ".join(map(self._repr_slice, self.args))
 
     def __call__(self, x):
-        args = [self.evaluate_calls(arg, x) for arg in self.args]
-        
+        args, kwargs = self.map_subcalls(self.evaluate_calls, args = (x,))
+
+        return args
+
+    def map_subcalls(self, f, args=tuple(), kwargs=None):
+        if kwargs is None: kwargs = {}
+
+        # evaluate each argument, which can be a slice
+        args = tuple(self._apply_slice_entry(f, obj, args, kwargs) for obj in self.args)
+
+        return args, {}
+
+    def op_vars(self, *args, **kwargs):
+        def visit_op_vars(node, *args, **kwargs):
+            if not isinstance(node, Call):
+                return set()
+
+            return node.op_vars(*args, **kwargs)
+
+        results = set()
+        for child in self.args:
+            # TODO: refactor Call classes to use singledispatch, so we can call
+            # op_vars directly on a slice object
+            if isinstance(child, slice):
+                for piece in (child.start, child.stop, child.step):
+                    results.update(visit_op_vars(piece, *args, **kwargs))
+
+            else:
+                results.update(visit_op_vars(child, *args, **kwargs))
+
+        return results
+
+    @staticmethod
+    def _apply_slice_entry(f, slice_, args, kwargs):
+        if not isinstance(slice_, slice):
+            # a slice argument can be simple literal. e.g. _['a']
+            return f(slice_, *args, **kwargs) if isinstance(slice_, Call) else slice_
+
+        slice_args = (slice_.start, slice_.stop, slice_.step)
+        args = [
+            f(entry, *args, **kwargs) if isinstance(entry, Call) else entry
+            for entry in slice_args
+            ]
+
         return slice(*args)
+
+    @staticmethod
+    def _unslice(slice_):
+        if isinstance(slice_, slice):
+            return (slice_.start, slice_.stop, slice_.step)
+
+        return slice_
+
+    @classmethod
+    def _repr_slice(cls, slice_):
+        if isinstance(slice_, slice):
+            pieces = cls._unslice(slice_)
+
+            # if the last piece is not specified, e.g. :1, then we want to represent
+            # it like that, and not the equivalent :1:.
+            if pieces[-1] is None:
+                pieces = pieces[:-1]
+        else:
+            pieces = (slice_,)
+
+        return ":".join(repr(x) if x is not None else "" for x in pieces)
+
+
+class _SliceOpIndex(_SliceOpExt):
+    """Special case of slicing, where getitem receives a single slice object."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def __call__(self, *args, **kwargs):
+        res = super().__call__(*args, **kwargs)
+        return res[0]
+
+
+class SliceOp(ABC):
+    """Factory class for creating slice calls. 
+
+    Note that it has SliceOpIndex, and SliceOpExt registered as subclasses, so
+    that this class can be used rather than the specific implementations.
+    """
+
+    def __new__(cls, func, *args, **kwargs):
+        # must be constructed in the same way as __getitem__ sees the indexer.
+        # that is, a single argument (that can be a tuple)
+        if len(args) != 1:
+            raise ValueError("SliceOpIndex allows 1 argument, but received %s" % len(args))
+
+        elif isinstance(args[0], tuple):
+            # general case, where calling returns a tuple of indexers.
+            # e.g. _['a', ], or _[1:, :, :, :]
+            return _SliceOpExt(func, *args[0])
+
+        else:
+            # special case, where calling returns a single indexer, rather than
+            # a tuple of indexers (e.g. _['a'], or _[1:])
+            return _SliceOpIndex(func, args[0])
+
+
+SliceOp.register(_SliceOpExt)
+
 
 # Special kinds of call arguments ----
 # These functions insure that when using siu expressions generated by _,
@@ -728,11 +853,21 @@ def create_sym_call(source, *args, **kwargs):
 
 
 def slice_to_call(x):
-    if isinstance(x, slice):
-        args = map(strip_symbolic, (x.start, x.stop, x.step))
-        return SliceOp("__siu_slice__", *args)
-    
-    return strip_symbolic(x)
+
+    # TODO: uses similar code to SliceOp. make a walk_slice function?
+    def f_strip(s):
+        if isinstance(s, slice):
+            return slice(*map(strip_symbolic, (s.start, s.stop, s.step)))
+
+        return strip_symbolic(s)
+
+
+    if isinstance(x, tuple):
+        arg = tuple(map(f_strip, x))
+    else:
+        arg = f_strip(x)
+
+    return SliceOp("__siu_slice__", arg)
 
 
 def str_to_getitem_call(x):

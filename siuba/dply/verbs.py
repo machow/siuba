@@ -66,6 +66,10 @@ def _repr_grouped_df_html_(self):
 # TODO: should be a subclass of Call?
 class Pipeable:
     def __init__(self, f = None, calls = None):
+        # symbolics like _.some_attr need to be stripped down to a call, because
+        # calling _.some_attr() returns another symbolic.
+        f = strip_symbolic(f)
+
         if f is not None:
             if calls is not None: raise Exception()
             self.calls = [f]

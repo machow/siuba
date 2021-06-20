@@ -1,4 +1,4 @@
-from siuba.siu import strip_symbolic, FunctionLookupError, Symbolic, MetaArg
+from siuba.siu import strip_symbolic, FunctionLookupError, Symbolic, MetaArg, Call
 import pytest
 
 BINARY_OPS = [
@@ -109,6 +109,7 @@ def test_symbol_rhs_exec(_, op):
     "_['a']",
     "_.a",
     "_['a':'b']",
+    "_['a':'b', 'c']",
     """_["'a'":'b']""",
     "_.a.mean(1,b = 2)",
     ])
@@ -125,6 +126,68 @@ def test_explain_failures(_, expr):
     assert explain(sym) != expr
 
 
+# Special Call subclasses =====================================================
+
+# SliceOp ----
+
+def test_sym_slice():
+    from siuba.siu import _SliceOpIndex
+
+    _ = Symbolic()
+
+    sym = _[_ < 1]
+    meta, slice_ops = strip_symbolic(sym).args
+    assert isinstance(meta, MetaArg)
+    assert isinstance(slice_ops, Call)
+    assert isinstance(slice_ops, SliceOp)       # abc metaclass
+    assert slice_ops.__class__ is _SliceOpIndex
+
+
+    indexer = slice_ops(1)
+    assert indexer is False
+
+def test_sym_slice_multiple():
+    from siuba.siu import _SliceOpExt
+
+    _ = Symbolic()
+
+    sym = _[_ < 1, :, :]
+
+    meta, slice_ops = strip_symbolic(sym).args
+    assert isinstance(meta, MetaArg)
+    assert len(slice_ops.args) == 3
+    assert isinstance(slice_ops.args[0], Call)
+    assert isinstance(slice_ops, SliceOp)       # abc metaclass
+    assert slice_ops.__class__ is _SliceOpExt
+
+    indexer = slice_ops(1)
+    assert indexer[0] is False
+    assert indexer[1] == slice(None)
+    
+@pytest.mark.parametrize("expr, target", [
+    ("_[1]", 1),
+    ("_[1:]", slice(1, None)),
+    ("_[:2]", slice(None, 2)),
+    ("_[1:2]", slice(1, 2)),
+    ("_[1:2:3]", slice(1, 2, 3)),
+    ("_[slice(1,2,3)]", slice(1, 2, 3)),
+    ("_[1, 'a']", (1, 'a')),
+    ("_[(1, 'a')]", (1, 'a')),
+    ("_[1, ]", (1,)),
+    ("_[:, :, :]", (slice(None, None, None),)*3),
+    ("_[_['a'], _['b']]", (1, 2)),
+    ("_[_['a']:_['b']]", slice(1, 2)),
+    ("_[_['a']:_['b'], :]", (slice(1, 2), slice(None))),
+    ])
+def test_slice_call_returns(_, expr, target):
+    data = {'a': 1, 'b': 2}
+
+    sym = eval(expr, {"_": _})
+    index_op, slice_call = strip_symbolic(sym).args
+
+    res = slice_call(data)
+    assert res == target
+
 # Node copying ================================================================
 
 from siuba.siu import Call, BinaryOp, SliceOp, MetaArg, FuncArg, DictCall
@@ -132,7 +195,8 @@ from siuba.siu import Call, BinaryOp, SliceOp, MetaArg, FuncArg, DictCall
 @pytest.mark.parametrize('node', [
     Call("__call__", lambda x, y = 2: x + y, 1, y = 2),
     BinaryOp("__add__", 1, 2),
-    SliceOp("__siu_slice__", 0, 1),
+    SliceOp("__siu_slice__", slice(0, 1)),
+    SliceOp("__siu_slice__", (slice(0, 1), slice(2, 3))),
     MetaArg("_"),
     FuncArg("__custom_func__", lambda x: x),
     FuncArg(lambda x: x),
