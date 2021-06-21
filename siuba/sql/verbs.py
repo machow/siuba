@@ -28,7 +28,7 @@ from siuba.dply.verbs import (
         if_else
         )
 
-from .translate import sa_get_over_clauses, CustomOverClause, SqlColumn, SqlColumnAgg
+from .translate import CustomOverClause, SqlColumn, SqlColumnAgg
 from .utils import get_dialect_translator, _FixedSqlDatabase, _sql_select, _sql_column_collection, _sql_add_columns
 
 from sqlalchemy import sql
