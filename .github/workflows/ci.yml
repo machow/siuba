@@ -84,7 +84,7 @@ jobs:
         with:
           python-version: "3.8"
       - name: "Build Package"
-        runs:
+        run:
           python setup.py build sdist
       - uses: pypa/gh-action-pypi-publish@master
         with:
