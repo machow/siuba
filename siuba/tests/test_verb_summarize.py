@@ -51,7 +51,7 @@ def test_summarize_after_mutate_cuml_win(backend, df_float):
 @backend_sql
 def test_summarize_keeps_group_vars(backend, gdf):
     q = gdf >> summarize(n = n(_))
-    assert list(q.last_op.c.keys()) == ["g", "n"]
+    assert list(q.last_op.alias().columns.keys()) == ["g", "n"]
 
 
 @pytest.mark.parametrize("query, output", [

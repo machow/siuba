@@ -51,3 +51,44 @@ class _FixedSqlDatabase(_pd_sql.SQLDatabase):
     def execute(self, *args, **kwargs):
         return self.connectable.execute(*args, **kwargs)
 
+
+# Backwards compatibility for sqlalchemy 1.3 ----------------------------------
+
+import re
+import sqlalchemy
+
+RE_VERSION=r"(?P<major>\d+)\.(?P<minor>\d+).(?P<patch>\d+)"  
+SQLA_VERSION=tuple(map(int, re.match(RE_VERSION, sqlalchemy.__version__).groups()))
+
+def is_sqla_12():
+    return SQLA_VERSION[:-1] == (1, 2)
+
+def is_sqla_13():
+    return SQLA_VERSION[:-1] == (1, 3)
+
+
+def _sql_select(columns, *args, **kwargs):
+    from sqlalchemy import sql
+    if is_sqla_12() or is_sqla_13():
+        # use old syntax, where columns are passed as a list
+        return sql.select(columns, *args, **kwargs)
+
+    return sql.select(*columns, *args, **kwargs)
+
+
+def _sql_column_collection(data, columns):
+    from sqlalchemy.sql.base import ColumnCollection, ImmutableColumnCollection
+
+    if is_sqla_12() or is_sqla_13():
+        return ImmutableColumnCollection(data, columns)
+
+    return ColumnCollection(list(data.items())).as_immutable()
+
+
+def _sql_add_columns(select, columns):
+    if is_sqla_12() or is_sqla_13():
+        for column in columns:
+            select = select.column(column)
+        return select
+
+    return select.add_columns(*columns)
