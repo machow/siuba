@@ -92,3 +92,10 @@ def _sql_add_columns(select, columns):
         return select
 
     return select.add_columns(*columns)
+
+
+def _sql_with_only_columns(select, columns):
+    if is_sqla_12() or is_sqla_13():
+        return select.with_only_columns(columns)
+
+    return select.with_only_columns(*columns)

@@ -29,7 +29,7 @@ from siuba.dply.verbs import (
         )
 
 from .translate import CustomOverClause, SqlColumn, SqlColumnAgg
-from .utils import get_dialect_translator, _FixedSqlDatabase, _sql_select, _sql_column_collection, _sql_add_columns
+from .utils import get_dialect_translator, _FixedSqlDatabase, _sql_select, _sql_column_collection, _sql_add_columns, _sql_with_only_columns
 
 from sqlalchemy import sql
 import sqlalchemy
@@ -737,13 +737,14 @@ def _summarize(__data, **kwargs):
     else:
         # otherwise, can alter the existing select statement
         columns = lift_inner_cols(old_sel)
-        sel = sql.select()
+        sel = old_sel
+
+        # explicitly add original from clause tables, since we will be limiting
+        # the columns this select uses, which causes sqlalchemy to remove
+        # unreferenced tables
+        for _from in sel.froms:
+            sel = sel.select_from(_from)
         
-        # backwards compatible with sqlalchemy 1.3, which expects a list of froms,
-        # or just a single from clause
-        old_froms = old_sel.froms
-        for from_ in old_froms:
-            sel = sel.select_from(from_)
 
     # add group by columns ----
     group_cols = [columns[k] for k in __data.group_by]
@@ -766,7 +767,7 @@ def _summarize(__data, **kwargs):
         
 
     all_cols = [*group_cols, *expr_cols]
-    final_sel = _sql_add_columns(sel, all_cols).group_by(*group_cols)
+    final_sel = _sql_with_only_columns(sel, all_cols).group_by(*group_cols)
     new_data = __data.append_op(final_sel, group_by = tuple(), order_by = tuple())
     return new_data
 

@@ -4,7 +4,7 @@ Note: this test file was heavily influenced by its dbplyr counterpart.
 https://github.com/tidyverse/dbplyr/blob/master/tests/testthat/test-verb-filter.R
 """
     
-from siuba import _, filter, group_by, arrange
+from siuba import _, filter, group_by, arrange, summarize
 from siuba.dply.vector import row_number, desc
 import pandas as pd
 
@@ -90,5 +90,28 @@ def test_filter_via_group_by_desc_arrange(backend):
             dfs,
             group_by(_.g) >> arrange(desc(_.x)) >> filter(_.x.cumsum() > 3),
             data_frame(x = [2, 1, 4, 3, 2], g = [1, 1, 2, 2, 2])
+            )
+
+def test_filter_before_summarize(backend):
+    dfs = backend.load_df(x = [1,2,3], g = ["a", "b", "b"])
+
+    assert_equal_query(
+            dfs,
+            filter(_.x > 2) >> summarize(z=_.x.mean()),
+            data_frame(z = [3]),
+            # sql backends vary in the type .mean() returns
+            check_dtype=False
+            )
+
+@backend_notimpl("sqlite")
+def test_filter_before_summarize_grouped(backend):
+    dfs = backend.load_df(x = [1,2,3], g = ["a", "a", "b"])
+
+    assert_equal_query(
+            dfs,
+            group_by(_.g) >> filter(_.x.mean() > 2) >> summarize(z=_.x.mean()),
+            data_frame(g = ["b"], z = [3]),
+            # sql backends vary in the type .mean() returns
+            check_dtype=False
             )
 

@@ -5,7 +5,7 @@ import numpy as np
 
 from pandas.core.groupby import DataFrameGroupBy
 from pandas.core.dtypes.inference import is_scalar
-from siuba.siu import Symbolic, Call, strip_symbolic, MetaArg, BinaryOp, create_sym_call, Lazy
+from siuba.siu import Symbolic, Call, strip_symbolic, MetaArg, BinaryOp, _SliceOpIndex, create_sym_call, Lazy
 
 DPLY_FUNCTIONS = (
         # Dply ----
@@ -125,10 +125,15 @@ def simple_varname(call):
     if (isinstance(call, Call)
         and call.func in {"__getitem__", "__getattr__"}
         and isinstance(call.args[0], MetaArg)
-        and isinstance(call.args[1], str)
+        and isinstance(call.args[1], (str, _SliceOpIndex))
         ):
         # return variable name
-        return call.args[1]
+        name = call.args[1]
+
+        if isinstance(name, str):
+            return name
+        elif isinstance(name, _SliceOpIndex):
+            return name.args[0]
 
     return None
 
