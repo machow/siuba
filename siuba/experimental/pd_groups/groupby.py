@@ -1,41 +1,4 @@
-"""Aggregate class, generic methods for fast pandas grouped operations.
-
-Examples:
-    .. code-block:: python    
-
-       from siuba.data import mtcars
-       g_cyl = mtcars.groupby("cyl")
-
-       avg_hp_raw = g_cyl.hp.mean()
-
-       # imagine that avg_hp was not SeriesGroupBy, but a GroupByAgg object
-       avg_hp = GroupByAgg.from_result(avg_hp_raw, g_cyl.hp)
-
-       # avg_hp plus hp ----
-       x, y, grp = broadcast_group_elements(avg_hp, g_cyl.hp)
-       res1 = regroup(grp, x + y) 
-
-       # avg_hp plus avg_hp ----
-       x, y, grp = broadcast_group_elements(avg_hp, avg_hp)
-       res2 = regroup(grp, x + y)
-
-       # avg_hp rounded ----
-       res3 = regroup(grp, avg_hp.mean())
-       broadcast_agg(res3)                # ungroup, same len as original data
-
-       # detecting incompatible groupby objects ----
-       # this works, since avg_hp is an aggregate of g_cyl
-       is_compatible(g_cyl, avg_hp)
-
-
-Notes:
-    * regroup ensures an operation's output is the same as the input grouped data.
-      (since the return type is often hard-coded in pandas).
-    * broadcast_agg gets the underlying Series, broadcasted to original length.
-    * this module makes fast operations possible; modules like transform.py
-      create functions for performing each operation (e.g. a fast mean function).
-
-
+"""GroupByAgg class and generic methods for fast pandas grouped operations.
 """
 
 import inspect
@@ -51,6 +14,52 @@ from pandas.core import algorithms
 # Custom SeriesGroupBy class ==================================================
 
 class GroupByAgg(SeriesGroupBy):
+    """Class for representing the result of a grouped Series aggregation.
+
+    Imagine that you are trying to add two grouped Series, where one might be
+    an aggregate:
+
+    >>> from siuba.data import mtcars
+    >>> g_cyl = mtcars.groupby("cyl")
+             
+    >>> avg_hp_raw = g_cyl.hp.mean()
+    >>> # how can we do: g_cyl.hp - avg_hp_raw ?
+
+    This class is designed to allows operations like minute (``-``) to work under 3 cases:
+
+    * original - aggregate: broadcast to original length; return SeriesGroupBy.
+    * aggregate - aggregate: no need to broadcast; return GroupByAgg.
+    * unary method over aggregate: no need to broadcast; return GroupByAgg.
+
+    Due to complexities in how pandas creates grouped objects, the easiest way
+    to create this class is to use its ``from_result`` class method:
+
+    >>> avg_hp = GroupByAgg.from_result(avg_hp_raw, g_cyl.hp)
+    
+    Below are examples of the first two cases:
+
+    >>> # avg_hp plus hp ----
+    >>> x, y, grp = broadcast_group_elements(avg_hp, g_cyl.hp)
+    >>> res1 = regroup(grp, x + y)           # SeriesGroupBy
+    
+    >>> # avg_hp plus avg_hp ----
+    >>> x, y, grp = broadcast_group_elements(avg_hp, avg_hp)
+    >>> res2 = regroup(grp, x + y)    # GroupByAgg
+
+    You can use `is_compatible` to check whether broadcasting will work:
+    
+    >>> is_compatible(g_cyl.hp, avg_hp)
+    True
+    
+    Lastly, this is a subclass of SeriesGroupBy, where each row is its
+    own group, so unary methods can be performed without issue.:
+
+    >>> res3 = regroup(grp, avg_hp.fillna(1))  # GroupByAgg
+    >>> ser = broadcast_agg(res3)           # ungroup, same len as original data
+
+    """
+
+
     def __init__(self, *args, orig_grouper, orig_obj, **kwargs):
         self._orig_grouper = orig_grouper
         self._orig_obj = orig_obj
@@ -58,6 +67,9 @@ class GroupByAgg(SeriesGroupBy):
     
     @classmethod
     def from_result(cls, result: Series, src_groupby: SeriesGroupBy):
+        """GroupByAgg class constructor.
+        """
+
         if not isinstance(result, Series):
             raise TypeError("requires pandas Series")
 
@@ -88,7 +100,17 @@ def broadcast_agg(groupby, result, obj):
     raise NotImplementedError()
 
 @broadcast_agg.register(GroupByAgg)
-def _(groupby):
+def _broadcast_agg_gba(groupby):
+    """
+    >>> import pandas as pd
+    >>> gdf = pd.DataFrame({"g": ['a','a','b'], "x": [4,5,6]}).groupby("g")
+    >>> agg = GroupByAgg.from_result(gdf.x.mean(), gdf.x)
+
+    >>> len(broadcast_agg(agg))
+    3
+
+    """
+
     src = groupby._orig_obj
     ids, _, ngroup = groupby._orig_grouper.group_info
     out = algorithms.take_1d(groupby.obj._values, ids)
@@ -96,7 +118,7 @@ def _(groupby):
     return Series(out, index=src.index, name=src.name)
 
 @broadcast_agg.register(SeriesGroupBy)
-def _(groupby):
+def _broadcast_agg_sgb(groupby):
     return groupby.obj
 
 
@@ -137,10 +159,10 @@ def all_isinstance(cls, *args):
 
 # Broadcasting Groupby elements -----------------------------------------------
 
-def grouper_match(grp1: GroupByAgg, grp2):
+def grouper_match(grp1: SeriesGroupBy, grp2):
     # No need to broadcast against a scalar (pandas will handle) ----
     if is_scalar(grp2):
-        return grp1.obj, grp2, grp1
+        return grp1.obj, grp2
     
     # Broadcasting requires: non-agg groupby with same original grouper ----
     if not isinstance(grp2, SeriesGroupBy):
@@ -149,11 +171,11 @@ def grouper_match(grp1: GroupByAgg, grp2):
     if not is_compatible(grp1, grp2):
         raise ValueError("groups must have matching groupers")
 
-    return broadcast_agg(grp1), grp2.obj, grp2
+    return broadcast_agg(grp1), broadcast_agg(grp2)
     
 
 def broadcast_group_elements(x, y):
-    """Returns 3-tuple of same-length x data, y data, and a GroupBy (for regroup).
+    """Returns 3-tuple of same-length x, y Series, plus a reference group by object.
 
     Note:
         * Raises error if x and y are not compatible group by objects.
@@ -165,17 +187,18 @@ def broadcast_group_elements(x, y):
         return x.obj, y.obj, x
     
     # Only one is an aggregation, may broadcast along other ----
-    elif isinstance(x, GroupByAgg):
-        return grouper_match(x, y)
+    elif isinstance(x, SeriesGroupBy):
+        res_x, res_y = grouper_match(x, y)
+        return res_x, res_y, x
     
-    elif isinstance(y, GroupByAgg):
+    elif isinstance(y, SeriesGroupBy):
         # same as above, but with args / results flipped
-        res_y, res_x, grp = grouper_match(y, x)
-        return res_x, res_y, grp
+        res_y, res_x, grouper_match(y, x)
+        return res_x, res_y, y
     
     # Both are non-agg groupby, just need underlying objects ----
-    elif all_isinstance(SeriesGroupBy, x, y) and is_compatible(x, y):
-        return x.obj, y.obj, x
+    #elif all_isinstance(SeriesGroupBy, x, y) and is_compatible(x, y):
+    #    return x.obj, y.obj, x
     
 
     raise ValueError("need scalar, or groupby objects with matching groupers")

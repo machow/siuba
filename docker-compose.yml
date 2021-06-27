@@ -2,6 +2,18 @@ version: '3.1'
 
 services:
 
+  db_mysql:
+    image: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ""
+      MYSQL_ALLOW_EMPTY_PASSWORD: 1
+      MYSQL_DATABASE: "public"
+    ports:
+      - 3306:3306
+    # by default, mysql rounds to 4 decimals, but tests require more precision
+    command: --div-precision-increment=30
+
   db:
     image: postgres
     restart: always

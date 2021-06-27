@@ -2,8 +2,6 @@ Extras
 ============
 
 
-.. module:: siuba.dply.verbs
-
 .. toctree::
     :maxdepth: 2
     :hidden:

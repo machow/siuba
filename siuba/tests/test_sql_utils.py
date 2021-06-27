@@ -1,4 +1,4 @@
-from siuba.sql.utils import get_dialect_funcs
+from siuba.sql.utils import get_dialect_translator
 import pytest
 
 @pytest.mark.parametrize('name', [
@@ -6,5 +6,5 @@ import pytest
     'postgresql',
     'sqlite'
     ])
-def test_get_dialect_funcs(name):
-    get_dialect_funcs(name)
+def test_get_dialect_translator(name):
+    get_dialect_translator(name)

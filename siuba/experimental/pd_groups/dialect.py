@@ -1,44 +1,102 @@
-from siuba.spec.series import spec
 from siuba.siu import CallTreeLocal, FunctionLookupError
+from .groupby import SeriesGroupBy
 
-from siuba.experimental.pd_groups.translate import SeriesGroupBy, GroupByAgg, GROUP_METHODS
-from siuba.experimental.pd_groups.groupby import broadcast_agg, is_compatible
+from .translate import (
+        forward_method,
+        not_implemented,
+        method_agg_op,
+        method_win_op_agg_result
+        )
 
-
-# TODO: make into CallTreeLocal factory function
-
-out = {}
-call_props = set()
-for name, entry in spec.items():
-    #if entry['result']['type']: continue
-    kind = entry['action'].get('kind') or entry['action'].get('status')
-    key = (kind.title(), entry['action']['data_arity'])
-
-    # add properties like df.dtype, so we know they are method calls
-    if entry['is_property'] and not entry['accessor']:
-        call_props.add(name)
+from siuba.experimental.pd_groups.groupby import SeriesGroupBy, GroupByAgg, broadcast_agg, is_compatible
 
 
-    meth = GROUP_METHODS[key](
-            name = name.split('.')[-1],
-            is_property = entry['is_property'],
-            accessor = entry['accessor']
-            )
+# THE REAL DIALECT FILE LET'S DO THIS
+# ====================================
 
-    # TODO: returning this exception class from group methods is weird, but I 
-    #       think also used in tests
-    if meth is NotImplementedError:
-        continue
+from siuba.ops import ALL_OPS
+from siuba import ops
 
-    out[name] = meth
+# register concrete implementations for all ops -------------------------------
+# note that this may include versions that would error (e.g. tries to look
+# up a Series method that doesn't exist). Custom implementations to fix
+# are registered over these further down
+for  dispatcher in ALL_OPS.values():#vars(ops).values():
+    #try:
+    forward_method(dispatcher)
+    #except KeyError:
+    #    pass
+
+
+# custom implementations ------------------------------------------------------
+
+def register_method(ns, op_name, f, is_property = False, accessor = None):
+    generic = ns[op_name]
+    return generic.register(SeriesGroupBy, f(op_name, is_property, accessor))
+
+# add to new op spec
+# create new call tree
+
+# aggregate ----
+
+NOT_IMPLEMENTED_AGG = [
+        "bool", "dot", "empty", "equals", "hasnans", "is_unique", "kurt",
+        "kurtosis", "memory_usage", "nbytes", "product"
+        ]
+
+for f_name in NOT_IMPLEMENTED_AGG:
+    ALL_OPS[f_name].register(SeriesGroupBy, not_implemented(f_name))
+
+# size is a property on ungrouped, but not grouped pandas data.
+# since siuba follows the ungrouped API, it's used as _.x.size, and
+# just needs its implementation registered as a *non*-property.
+ops.size.register(SeriesGroupBy, method_agg_op("size", is_property = False, accessor = None))
+
+
+# window ----
+NOT_IMPLEMENTED_WIN = [
+        "asof", "at", "autocorr", "cat.remove_unused_categories", 
+        "convert_dtypes", "drop_duplicates", "duplicated", "get",
+        "iat", "iloc", "infer_objects", "is_monotonic",
+        ]
+
+for f_name in NOT_IMPLEMENTED_WIN:
+    ALL_OPS[f_name].register(SeriesGroupBy, not_implemented(f_name))
+
+
+# a few functions apply window operations, but return an agg-like result
+forward_method(ops.is_monotonic_decreasing, method_win_op_agg_result)
+forward_method(ops.is_monotonic_increasing, method_win_op_agg_result)
+
+
+# NOTE TODO: these methods could be implemented, but depend on the type of 
+# time index they're operating on
+NOT_IMPLEMENTED_DT = [
+    "dt.qyear", "dt.to_pytimedelta", "dt.to_timestamp", "dt.total_seconds", "dt.tz_convert",
+    "to_period","dt.to_pydatetime"
+    ]
+
+for f_name in NOT_IMPLEMENTED_DT:
+    ALL_OPS[f_name].register(SeriesGroupBy, not_implemented(f_name))
+
+
+
+
+
+# ====================================
+
+from .translate import GroupByAgg, SeriesGroupBy
+
+# TODO: use pandas call tree creator
+from siuba.ops.generics import ALL_PROPERTIES, ALL_ACCESSORS
 
 call_listener = CallTreeLocal(
-        out,
-        call_sub_attr = ('str', 'dt', 'cat', 'sparse'),
+        ALL_OPS,
+        call_sub_attr = ALL_ACCESSORS,
         chain_sub_attr = True,
         dispatch_cls = GroupByAgg,
         result_cls = SeriesGroupBy,
-        call_props = call_props
+        call_props = ALL_PROPERTIES
         )
 
 

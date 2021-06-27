@@ -45,12 +45,12 @@ cars
 
 > 🚧 Coming soon. In the meantime, check out these docs with many examples in the User API.
 
-* [filter](api_table_core/01_filter)
-* [arrange](api_table_core/02_arrange)
-* [select](api_table_core/03_select)
-* [mutate](api_table_core/05_mutate)
-* [summarize](api_table_core/07_summarize)
-* [group_by](api_table_core/08_group_by)
+* [filter](api_table_core/01_filter.Rmd)
+* [arrange](api_table_core/02_arrange.Rmd)
+* [select](api_table_core/03_select.Rmd)
+* [mutate](api_table_core/05_mutate.Rmd)
+* [summarize](api_table_core/07_summarize.Rmd)
+* [group_by](api_table_core/08_group_by.Rmd)
 
 
 ## Dates and times
@@ -82,7 +82,41 @@ cars
 
 > 🚧 Coming soon. See the siuba's User API entry for nest and unnest.
 
-* [nest and unnest](api_tidy/01_nest)
+* [nest and unnest](api_tidy/01_nest.Rmd)
+
+
+## Custom functions
+
+
+Custom functions are created using `symbolic_dispatch`.
+
+```{python}
+import pandas as pd
+from siuba.siu import symbolic_dispatch
+
+
+@symbolic_dispatch(cls = pd.Series)
+def add(x, y):
+    return x + y
+
+
+from siuba import _, mutate
+
+df = pd.DataFrame({
+        "x": [1, 2, 3],
+        "y": [4, 5, 6],
+        })
+
+df >> mutate(res = add(_.x, _.y) + 100)
+```
+
+Note that one important feature of symbolic dispatch is its unique handling of
+the `_`. In this case, it returns a Symbolic object, which lets you use it in
+complex expressions.
+
+```{python}
+add(_.x, _.y) + 100
+```
 
 
 ## Debugging

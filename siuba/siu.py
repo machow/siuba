@@ -70,8 +70,9 @@ UNARY_OPS = {
 # TODO: can it just be put in binary ops? Special handling in Symbolic class?
 ALL_OPS = {**BINARY_OPS, **UNARY_OPS}
 
-#for k, v in BINARY_OPS.copy().items():
-#    BINARY_OPS[k.replace("__", "__r", 1)] = v
+BINARY_RIGHT_OPS = {}
+for k, v in BINARY_OPS.items():
+    BINARY_RIGHT_OPS[k.replace("__", "__r", 1)] = k
 
 for k, v in BINARY_LEVELS.copy().items():
     BINARY_LEVELS[k.replace("__", "__r", 1)] = v
@@ -302,15 +303,17 @@ class UnaryOp(Call):
 
 
 class BinaryOp(Call):
+
     def __repr__(self):
-        level = BINARY_LEVELS[self.func]
+        return self._repr(reverse = False)
+
+
+    def _repr(self, reverse = False):
+        func_name = self.get_func_name()
+
+        level = BINARY_LEVELS[func_name]
         spaces = "" if level == 0 else " "
-        #if level < 4:
-        #    spaces = " "*level
-        #    fmt = "{args[0]}{spaces}{func}{spaces}{args[1]}"
-        #else:
-        #    spaces = " "
-        #    fmt = "({args[0]}{spaces}{func}{spaces}{args[1]})"
+
         args = self.args
         arg0 = "({args[0]})" if self.needs_paren(args[0]) else "{args[0]}"
         arg1 = "({args[1]})" if self.needs_paren(args[1]) else "{args[1]}"
@@ -325,23 +328,46 @@ class BinaryOp(Call):
         fmt = arg0 + "{spaces}{func}{spaces}" + arg1 + suffix
 
 
-        func = BINARY_OPS[self.func]
+        func = BINARY_OPS[func_name]
         if self.func == "__getattr__":
             # use bare string. eg _.a
             fmt_args = [repr(args[0]), args[1]]
         else:
             fmt_args = list(map(repr, args))
+        
+        if reverse:
+            fmt_args = list(reversed(fmt_args))
 
         return fmt.format(func = func, args = fmt_args, spaces = spaces)
 
+    def get_func_name(self):
+        return BINARY_RIGHT_OPS.get(self.func, self.func)
+        
+
     def needs_paren(self, x):
         if isinstance(x, BinaryOp):
-            sub_lvl = BINARY_LEVELS[x.func]
-            level = BINARY_LEVELS[self.func]
+            sub_lvl = BINARY_LEVELS[x.get_func_name()]
+            level = BINARY_LEVELS[self.get_func_name()]
             if sub_lvl != 0 and sub_lvl > level:
                 return True
 
         return False
+
+class BinaryRightOp(BinaryOp):
+
+    def __call__(self, x):
+        inst, *rest = (self.evaluate_calls(arg, x) for arg in self.args)
+        kwargs = {k: self.evaluate_calls(v, x) for k, v in self.kwargs.items()}
+        
+        # in normal case, get method to call, and then call it
+        func_name = BINARY_RIGHT_OPS[self.func]
+        f_op = getattr(operator, func_name)
+
+        # TODO: in practice rest only has 1 item, but this is not enforced..
+        return f_op(*rest, inst, **kwargs)
+
+    def __repr__(self):
+        return self._repr(reverse = True)
 
 
 class DictCall(Call):
@@ -543,6 +569,13 @@ from .error import ShortException
 
 class FunctionLookupError(ShortException): pass
 
+class FunctionLookupBound:
+    def __init__(self, msg):
+        self.msg = msg
+
+    def __call__(self):
+        raise NotImplementedError(self.msg)
+
 
 class CallVisitor:
     """
@@ -653,6 +686,24 @@ class CallTreeLocal(CallListener):
         self.result_cls = result_cls
         self.call_props = set(call_props or [])
 
+    def translate(self, expr):
+        """Return the translation of an expression.
+
+        This method is meant to be a high-level entrypoint.
+
+        """
+
+        # note that by contract, don't need to strip symbolic
+        return self.enter(strip_symbolic(expr))
+
+    def dispatch_local(self, name):
+        func = self.local[name]
+
+        if hasattr(func, "dispatch") and self.result_cls is not None:
+            return func.dispatch(self.result_cls)
+
+        return func
+
     def create_local_call(self, name, prev_obj, cls, func_args = None, func_kwargs = None):
         # need call attr name (arg[0].args[1]) 
         # need call arg and kwargs
@@ -660,12 +711,16 @@ class CallTreeLocal(CallListener):
         func_kwargs = {} if func_kwargs is None else func_kwargs
 
         try:
-            local_func = self.local[name]
+            local_func = self.dispatch_local(name)
         except KeyError as err:
             raise FunctionLookupError("Missing translation for function call: %s"% name)
 
-        if isclass(local_func) and issubclass(local_func, Exception):
-            raise local_func
+        if isinstance(local_func, FunctionLookupBound):
+            raise FunctionLookupError(local_func.msg)
+            #local_func()
+
+        #if isclass(local_func) and issubclass(local_func, Exception):
+        #    raise local_func
 
         return cls(
                 "__call__",
@@ -711,6 +766,11 @@ class CallTreeLocal(CallListener):
             ):
             # allow custom functions that dispatch on dispatch_cls
             f_for_cls = func.dispatch(self.dispatch_cls)
+
+            if isinstance(f_for_cls, FunctionLookupBound):
+                # TODO: this is a bit funky, since FLB raises when called
+                raise FunctionLookupError(f_for_cls.msg)
+
             if (self.result_cls is None
                 or is_dispatch_func_subtype(f_for_cls, self.dispatch_cls, self.result_cls)
                 ):
@@ -903,6 +963,24 @@ def _dispatch_not_impl(func_name):
     return f
 
 def symbolic_dispatch(f = None, cls = object):
+    """Return a generic dispatch function with symbolic data implementations.
+
+    The function dispatches (Call or Symbolic) -> FuncArg.
+
+    Examples:
+      ::
+
+        @symbolic_dispatch(int)
+        def add1(x): return x + 1
+        
+        @add1.register(str)
+        def _add1_str: return int(x) + 1
+        
+        
+        @symbolic_dispatch
+        def my_func(x): raise NotImplementedError("no default method")
+
+    """
     if f is None:
         return lambda f: symbolic_dispatch(f, cls)
 
@@ -926,15 +1004,16 @@ def symbolic_dispatch(f = None, cls = object):
 
     return dispatch_func
 
+
     
 # Do some gnarly method setting -----------------------------------------------
 
-def create_binary_op(op_name, left_assoc = True):
+def create_binary_op(op_name, left_op = True):
     def _binary_op(self, x):
-        if left_assoc:
+        if left_op:
             node = BinaryOp(op_name, strip_symbolic(self), strip_symbolic(x))
         else:
-            node = BinaryOp(op_name, strip_symbolic(x), strip_symbolic(self))
+            node = BinaryRightOp(op_name, strip_symbolic(self), strip_symbolic(x))
 
         return Symbolic(node, ready_to_call = True)
     return _binary_op
@@ -951,7 +1030,7 @@ for k, v in BINARY_OPS.items():
     if k in {"__getattr__", "__getitem__"}: continue
     rop = k.replace("__", "__r", 1)
     setattr(Symbolic, k, create_binary_op(k))
-    setattr(Symbolic, rop, create_binary_op(k, left_assoc = False))
+    setattr(Symbolic, rop, create_binary_op(rop, left_op = False))
 
 for k, v in UNARY_OPS.items():
     if k != "__invert__":

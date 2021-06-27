@@ -1,6 +1,8 @@
-from sqlalchemy import create_engine, types
-from siuba.sql import LazyTbl, collect
-from siuba.dply.verbs import ungroup
+import sqlalchemy as sqla
+
+from siuba.sql import LazyTbl
+from siuba.dply.verbs import ungroup, collect
+from siuba.siu import FunctionLookupError
 from pandas.testing import assert_frame_equal
 import pandas as pd
 import os
@@ -21,14 +23,33 @@ def data_frame(*args, _index = None, **kwargs):
 BACKEND_CONFIG = {
         "postgresql": {
             "dialect": "postgresql",
+            "driver": "",
             "dbname": ["SB_TEST_PGDATABASE", "postgres"],
             "port": ["SB_TEST_PGPORT", "5432"],
             "user": ["SB_TEST_PGUSER", "postgres"],
             "password": ["SB_TEST_PGPASSWORD", ""],
             "host": ["SB_TEST_PGHOST", "localhost"],
             },
+        "bigquery": {
+            "dialect": "bigquery",
+            # bigquery uses dbname for dataset
+            "dbname": ["SB_TEST_BQDATABASE", "ci"],
+            "port": "",
+            "user": "",
+            "password": "",
+            "host": ["SB_TEST_BQPROJECT", "siuba-tests"],
+            },
+        "mysql": {
+            "dialect": "mysql+pymysql",
+            "dbname": "public",
+            "port": 3306,
+            "user": "root",
+            "password": "",
+            "host": "127.0.0.1",
+            },
         "sqlite": {
             "dialect": "sqlite",
+            "driver": "",
             "dbname": ":memory:",
             "port": "0",
             "user": "",
@@ -63,14 +84,21 @@ class PandasBackend(Backend):
 
 class SqlBackend(Backend):
     table_name_indx = 0
-    sa_conn_fmt = "{dialect}://{user}:{password}@{host}:{port}/{dbname}"
+
+    # if there is a :, sqlalchemy tries to parse the port number.
+    # since backends like bigquery do not specify a port, we'll insert it
+    # later on the port value passed in.
+    sa_conn_fmt = "{dialect}://{user}:{password}@{host}{port}/{dbname}"
 
     def __init__(self, name):
         cnfg = BACKEND_CONFIG[name]
         params = {k: os.environ.get(*v) if isinstance(v, (list)) else v for k,v in cnfg.items()}
 
+        if params["port"]:
+            params["port"] = ":%s" % params["port"]
+
         self.name = name
-        self.engine = create_engine(self.sa_conn_fmt.format(**params))
+        self.engine = sqla.create_engine(self.sa_conn_fmt.format(**params))
         self.cache = {}
 
     def dispose(self):
@@ -83,6 +111,9 @@ class SqlBackend(Backend):
 
     def load_df(self, df = None, **kwargs):
         df = super().load_df(df, **kwargs)
+
+        table_name = self.unique_table_name()
+
         return copy_to_sql(df, self.unique_table_name(), self.engine)
 
     def load_cached_df(self, df):
@@ -127,9 +158,11 @@ def assert_frame_sort_equal(a, b, **kwargs):
     assert_frame_equal(sorted_a, sorted_b, **kwargs)
 
 def assert_equal_query(tbl, lazy_query, target, **kwargs):
+    from pandas.core.groupby import DataFrameGroupBy
+
     out = collect(lazy_query(tbl))
 
-    if isinstance(tbl, pd.DataFrame):
+    if isinstance(tbl, (pd.DataFrame, DataFrameGroupBy)):
         df_a = ungroup(out).reset_index(drop = True)
         df_b = ungroup(target).reset_index(drop = True)
         assert_frame_equal(df_a, df_b, **kwargs)
@@ -137,29 +170,52 @@ def assert_equal_query(tbl, lazy_query, target, **kwargs):
         assert_frame_sort_equal(out, target, **kwargs)
 
 
-PREFIX_TO_TYPE = {
-        # for datetime, need to convert to pandas datetime column
-        #"dt": types.DateTime,
-        "int": types.Integer,
-        "float": types.Float,
-        "str": types.String
-        }
+#PREFIX_TO_TYPE = {
+#        # for datetime, need to convert to pandas datetime column
+#        #"dt": types.DateTime,
+#        "int": types.Integer,
+#        "float": types.Float,
+#        "str": types.String,
+#        }
 
-def auto_types(df):
-    dtype = {}
-    for k in df.columns:
-        pref, *_ = k.split('_')
-        if pref in PREFIX_TO_TYPE:
-            dtype[k] = PREFIX_TO_TYPE[pref]
-    return dtype
+#def auto_types(df):
+#    dtype = {}
+#    for k in df.columns:
+#        pref, *_ = k.split('_')
+#        if pref in PREFIX_TO_TYPE:
+#            dtype[k] = PREFIX_TO_TYPE[pref]
+#    return dtype
 
 
 def copy_to_sql(df, name, engine):
     if isinstance(engine, str):
-        engine = create_engine(engine)
+        engine = sqla.create_engine(engine)
 
-    df.to_sql(name, engine, dtype = auto_types(df), index = False, if_exists = "replace")
-    return LazyTbl(engine, name)
+    bool_cols = [k for k, v in df.iteritems() if v.dtype.kind == "b"]
+    columns = [sqla.Column(name, sqla.types.Boolean) for name in bool_cols]
+
+    # TODO: clean up dialect specific work (if it grows out of control)
+    if engine.dialect.name == "bigquery" and df.isna().any().any():
+        # TODO: to_gbq makes all datetimes UTC, so does not round trip well, 
+        # but is able to handle None -> NULL....
+        project_id = engine.url.host
+        qual_name = f"{engine.url.database}.{name}"
+        df.to_gbq(qual_name, project_id, if_exists="replace") 
+
+    else:
+        df.to_sql(name, engine, index = False, if_exists = "replace")
+
+    # manually create table, so we can be explicit about boolean columns.
+    # this is necessary because MySQL reflection reports them as TinyInts,
+    # which mostly works, but returns ints from the query
+    table = sqla.Table(
+            name,
+            sqla.MetaData(bind = engine),
+            *columns,
+            autoload_with = engine
+            )
+    
+    return LazyTbl(engine, table)
 
 
 from functools import wraps
@@ -170,7 +226,7 @@ def backend_notimpl(*names):
         @wraps(f)
         def wrapper(backend, *args, **kwargs):
             if backend.name in names:
-                with pytest.raises(NotImplementedError):
+                with pytest.raises((NotImplementedError, FunctionLookupError)):
                     f(backend, *args, **kwargs)
                 pytest.xfail("Not implemented!")
             else:

@@ -185,5 +185,5 @@ from plotnine import ggplot, aes, geom_point
 
 ## Next steps
 
-* Interested in wrangling data right away? Check out the [data analysis guide](guide_analysis.html).
-* Curious how to program and extend siuba? Check out the [programming guide](guide_programming.html).
+* Interested in wrangling data right away? Check out the [data analysis guide](guide_analysis.Rmd).
+* Curious how to program and extend siuba? Check out the [programming guide](guide_programming.Rmd).

@@ -54,6 +54,7 @@ psycopg2==2.8.5
 ptyprocess==0.6.0
 py==1.8.1
 Pygments==2.5.2
+PyMySQL==1.0.2
 pyparsing==2.4.6
 pyrsistent==0.15.7
 pytest==5.3.5

@@ -4,8 +4,8 @@ Note: this test file was heavily influenced by its dbplyr counterpart.
 https://github.com/tidyverse/dbplyr/blob/master/tests/testthat/test-verb-distinct.R
 """
     
-from siuba.sql import LazyTbl, collect
-from siuba import _, distinct, group_by, summarize, arrange, mutate
+from siuba.sql import LazyTbl
+from siuba import _, distinct, group_by, summarize, arrange, mutate, collect
 from .helpers import assert_equal_query, backend_sql
 import pandas as pd
 import os

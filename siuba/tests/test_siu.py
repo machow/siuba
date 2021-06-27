@@ -94,6 +94,14 @@ def test_explain_binary(_, op):
     assert explain(sym) == right
 
 @pytest.mark.parametrize('op', BINARY_OPS)
+def test_explain_rhs_binary(_, op):
+    right = "1 {op} _".format(op = op)
+
+    sym = eval(right, {"_": _})
+
+    assert explain(sym) == right
+
+@pytest.mark.parametrize('op', BINARY_OPS)
 def test_symbol_rhs_exec(_, op):
     if op == "@":
         pytest.skip("TODO: test with class where @ is implemented?")

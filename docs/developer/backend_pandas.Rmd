@@ -1,0 +1,142 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.4.2
+  kernelspec:
+    display_name: Python 3
+    language: python
+    name: python3
+---
+
+```{python nbsphinx=hidden}
+import pandas as pd
+pd.set_option("display.max_rows", 5)
+```
+
+# Pandas backend
+
+The pandas backend has two key responsibilities:
+
+1. Implementing functions that enable complex and fast expressions over grouped data.
+2. Implementing verb behavior over pandas' DataFrameGroupBy (e.g. a grouped mutate).
+
+While it might seem like a lot of work, this mostly involves using a few simple strategies
+to take advantage of logic already existing in the pandas library.
+
+The strategy can be described as follows:
+
+* operations over grouped objects return grouped objects.
+  - e.g. `add(SeriesGroupBy, SeriesGroupBy) -> SeriesGroupBy`.
+* operations that do aggregation return a subclass of SeriesGroupBy called GroupByAgg. This represents the case where each row is its own group. It also holds information about the original data, so it can be broadcast back to the original length.
+
+As a final note, while the SQL backend uses a custom backend class (LazyTbl), the backend for table verbs in this case is just the pandas' DataFrameGroupBy class itself.
+
+
+## Column op translation
+
+
+[![](https://mermaid.ink/img/eyJjb2RlIjoiY2xhc3NEaWFncmFtXG4gICAgY2xhc3MgSVNpbmdsZURpc3BhdGNoIHtcbiAgICAgICtkaXNwYXRjaCgpXG4gICAgICArcmVnaXN0ZXIoKVxuICAgICAgK3JlZ2lzdHJ5XG4gICAgICArX19jYWxsX18oKVxuICAgIH1cblxuICAgIGNsYXNzIElPcGVyYXRpb24ge1xuICAgICAgK09wZXJhdGlvbkVudHJ5IG9wZXJhdGlvblxuICAgIH1cblxuICAgIGNsYXNzIE9wZXJhdGlvbkVudHJ5IHtcbiAgICAgIG5hbWVcbiAgICAgIGtpbmRcbiAgICAgIGFyaXR5XG4gICAgICBpc19wcm9wZXJ0eVxuICAgICAgYWNjZXNzb3JcbiAgICB9XG5cbiAgICBJT3BlcmF0aW9uIDx8LS0gT3BlcmF0aW9uXG4gICAgSVNpbmdsZURpc3BhdGNoIDx8LS0gT3BlcmF0aW9uXG5cbiIsIm1lcm1haWQiOnsidGhlbWUiOiJkZWZhdWx0In0sInVwZGF0ZUVkaXRvciI6ZmFsc2V9)](https://mermaid-js.github.io/mermaid-live-editor/#/edit/eyJjb2RlIjoiY2xhc3NEaWFncmFtXG4gICAgY2xhc3MgSVNpbmdsZURpc3BhdGNoIHtcbiAgICAgICtkaXNwYXRjaCgpXG4gICAgICArcmVnaXN0ZXIoKVxuICAgICAgK3JlZ2lzdHJ5XG4gICAgICArX19jYWxsX18oKVxuICAgIH1cblxuICAgIGNsYXNzIElPcGVyYXRpb24ge1xuICAgICAgK09wZXJhdGlvbkVudHJ5IG9wZXJhdGlvblxuICAgIH1cblxuICAgIGNsYXNzIE9wZXJhdGlvbkVudHJ5IHtcbiAgICAgIG5hbWVcbiAgICAgIGtpbmRcbiAgICAgIGFyaXR5XG4gICAgICBpc19wcm9wZXJ0eVxuICAgICAgYWNjZXNzb3JcbiAgICB9XG5cbiAgICBJT3BlcmF0aW9uIDx8LS0gT3BlcmF0aW9uXG4gICAgSVNpbmdsZURpc3BhdGNoIDx8LS0gT3BlcmF0aW9uXG5cbiIsIm1lcm1haWQiOnsidGhlbWUiOiJkZWZhdWx0In0sInVwZGF0ZUVkaXRvciI6ZmFsc2V9)
+
+```{python}
+from siuba.ops import mean
+from siuba.data import mtcars
+
+# equivalent to mtcars.hp.mean()
+mean(mtcars.hp)
+```
+
+```{python}
+import pandas as pd
+from siuba.ops.utils import operation
+
+mean2 = operation("mean", "Agg", 1)
+
+# Series implementation just calls the Series' mean method
+mean2.register(
+    pd.Series,
+    lambda self, *args, **kwargs: self.mean(*args, **kwargs)
+)
+```
+
+```{python}
+mean2(mtcars.hp)
+```
+
+```{python}
+mean2.operation.name
+```
+
+The purpose of the `.operation` data is to make it easy to generate new translations for functions. For example, if we want to translate pandas' `ser.str.upper()` method, then it helps to know it uses the `str` accessor.
+
+
+### Using an existing translation
+
+```{python}
+from siuba.experimental.pd_groups.translate import method_el_op
+
+df = pd.DataFrame({
+    "x": ["a", "b", "c"],
+    "g": [0, 0, 1]
+})
+
+# notice method_ag_op uses some details from .operation
+upper = method_el_op("upper", is_property = False, accessor = "str")
+lower = method_el_op("lower", is_property = False, accessor = "str")
+
+g_df = df.groupby("g")
+
+res = upper(g_df.x)
+
+# note: .obj is how you "ungroup" a SeriesGroupBy
+res.obj
+```
+
+```{python}
+# convert to uppercase and back to lowercase
+# equivalent to df.x.str.upper().str.lower()
+res2 = lower(upper(g_df.x))
+res2.obj
+```
+
+```{python}
+isinstance(res, pd.core.groupby.SeriesGroupBy)
+```
+
+```{python}
+lower(upper(g_df.x))
+```
+
+See the internals of functions like `method_el_op` for details.
+
+
+## New verb implementations
+
+
+
+Like with other backends, verbs use single dispatch to register new backend implementations.
+
+
+```{python}
+from pandas import DataFrame
+from pandas.core.groupby import DataFrameGroupBy
+from siuba.dply.verbs import singledispatch2
+
+@singledispatch2(DataFrame)
+def my_verb(__data):
+    print("Running default.")
+    
+# register grouped implementation ----
+@my_verb.register(DataFrameGroupBy)
+def _my_verb_gdf(__data):
+    print("Running grouped!")
+
+
+# test it out ----
+from siuba.data import mtcars
+
+my_verb(mtcars.groupby("cyl"))
+```

@@ -1,3 +1,13 @@
+"""
+Implements LazyTbl to represent tables of SQL data, and registers it on verbs.
+
+This module is responsible for the handling of the "table" side of things, while
+translate.py handles translating column operations.
+
+
+"""
+
+
 from siuba.dply.verbs import (
         singledispatch2,
         show_query, collect,
@@ -17,12 +27,13 @@ from siuba.dply.verbs import (
         distinct,
         if_else
         )
-from .translate import sa_get_over_clauses, CustomOverClause, SqlColumn, SqlColumnAgg
-from .utils import get_dialect_funcs, get_sql_classes, _FixedSqlDatabase, _sql_select, _sql_column_collection, _sql_add_columns
+
+from .translate import CustomOverClause, SqlColumn, SqlColumnAgg
+from .utils import get_dialect_translator, _FixedSqlDatabase, _sql_select, _sql_column_collection, _sql_add_columns, _sql_with_only_columns
 
 from sqlalchemy import sql
 import sqlalchemy
-from siuba.siu import Call, CallTreeLocal, str_to_getitem_call, Lazy, FunctionLookupError
+from siuba.siu import Call, str_to_getitem_call, Lazy, FunctionLookupError
 # TODO: currently needed for select, but can we remove pandas?
 from pandas import Series
 
@@ -73,7 +84,7 @@ class WindowReplacer(CallListener):
         if not isinstance(col_expr, sql.elements.ClauseElement):
             return col_expr
 
-        over_clauses = [x for x in sa_get_over_clauses(col_expr) if isinstance(x, CustomOverClause)]
+        over_clauses = [x for x in self._get_over_clauses(col_expr) if isinstance(x, CustomOverClause)]
 
         # put groupings and orderings onto custom over clauses
         for over in over_clauses:
@@ -119,6 +130,15 @@ class WindowReplacer(CallListener):
 
         return name
 
+    @staticmethod
+    def _get_over_clauses(clause):
+        windows = []
+        append_win = lambda col: windows.append(col)
+
+        sql.util.visitors.traverse(clause, {}, {"over": append_win})
+
+        return windows
+
 
 def track_call_windows(call, columns, group_by, order_by, window_cte = None):
     listener = WindowReplacer(columns, group_by, order_by, window_cte)
@@ -145,7 +165,8 @@ def col_expr_requires_cte(call, sel, is_mutate = False):
     group_needs_cte = not is_mutate and len(sel._group_by_clause)
     
     return (   group_needs_cte
-            or len(sel._order_by_clause)
+            # TODO: detect when a new var in mutate conflicts w/ order by
+            #or len(sel._order_by_clause)
             or not sel_labs.isdisjoint(call_vars)
             )
 
@@ -181,10 +202,8 @@ def ordered_union(x, y):
 class LazyTbl:
     def __init__(
             self, source, tbl, columns = None,
-            ops = None, group_by = tuple(), order_by = tuple(), funcs = None,
-            rm_attr = ('str', 'dt'), call_sub_attr = ('dt', 'str'),
-            dispatch_cls = None,
-            result_cls = sql.elements.ClauseElement
+            ops = None, group_by = tuple(), order_by = tuple(),
+            translator = None
             ):
         """Create a representation of a SQL table.
 
@@ -212,9 +231,7 @@ class LazyTbl:
         self.source = sqlalchemy.create_engine(source) if isinstance(source, str) else source
 
         dialect = self.source.dialect.name
-        self.funcs = get_dialect_funcs(dialect) if funcs is None else funcs
-        self.dispatch_cls = get_sql_classes(dialect) if dispatch_cls is None else dispatch_cls
-        self.result_cls = result_cls
+        self.translator = get_dialect_translator(dialect)
 
         self.tbl = self._create_table(tbl, columns, self.source)
 
@@ -223,12 +240,6 @@ class LazyTbl:
 
         self.group_by = group_by
         self.order_by = order_by
-
-        # customizations to allow interop with pandas (e.g. handle dt methods)
-        self.rm_attr = rm_attr
-        self.call_sub_attr = call_sub_attr
-
-        self.result_cls = result_cls
 
 
     def append_op(self, op, **kwargs):
@@ -244,39 +255,27 @@ class LazyTbl:
             call, window = True, str_accessors = False,
             verb_name = None, arg_name = None,
             ):
-        # TODO: error if mutate receives a literal value?
-        # TODO: dispatch_cls currently unused
-        if str_accessors and isinstance(call, str):
+        if isinstance(call, Call):
+            pass
+        elif str_accessors and isinstance(call, str):
             # verbs that can use strings as accessors, like group_by, or
             # arrange, need to convert those strings into a getitem call
-            return str_to_get_item_call(call)
+            return str_to_getitem_call(call)
         elif isinstance(call, sql.elements.ColumnClause):
             return Lazy(call)
-        elif not isinstance(call, Call):
+        elif callable(call):
+            #TODO: should not happen here
+            from siuba.siu import MetaArg
+            return Call("__call__", call, MetaArg('_'))
+
+        else:
             # verbs that use literal strings, need to convert them to a call
             # that returns a sqlalchemy "literal" object
             return Lazy(sql.literal(call))
 
-        # set up locals funcs dict
-        f_dict1 = self.funcs['scalar']
-        f_dict2 = self.funcs['window' if window else 'aggregate']
-
-        funcs = {**f_dict1, **f_dict2}
-
-        # determine dispatch class
-        cls_name = 'window' if window else 'aggregate'
-        dispatch_cls = self.dispatch_cls[cls_name]
-
-        call_shaper = CallTreeLocal(
-                funcs,
-                call_sub_attr = self.call_sub_attr,
-                dispatch_cls = dispatch_cls,
-                result_cls = self.result_cls
-                )
-
         # raise informative error message if missing translation
         try:
-            return call_shaper.enter(call)
+            return self.translator.translate(call, window = window)
         except FunctionLookupError as err:
             raise SqlFunctionLookupError.from_verb(
                     verb_name or "Unknown",
@@ -296,6 +295,16 @@ class LazyTbl:
         """Return columns from current select, with grouping columns first."""
         ungrouped = [k for k in self.last_op.columns.keys() if k not in self.group_by]
         return list(self.group_by) + ungrouped
+
+    #def label_breaks_order_by(self, name):
+    #    """Returns True if a new column label would break the order by vars."""
+
+    #    # TODO: arrange currently allows literals, which breaks this. it seems
+    #    #       better to only allow calls in arrange.
+    #    order_by_vars = {c.op_vars(attr_calls=False) for c in self.order_by}
+
+
+
 
     @property
     def last_op(self):
@@ -323,6 +332,15 @@ class LazyTbl:
         schema, table_name = tbl.split('.') if '.' in tbl else [None, tbl]
 
         columns = map(sqlalchemy.Column, columns) if columns is not None else tuple()
+
+        # TODO: pybigquery uses schema to mean project_id, so we cannot use
+        # siuba's classic breakdown "{schema}.{table_name}". Basically
+        # pybigquery uses "{schema=project_id}.{dataset_dot_table_name}" in its internal
+        # logic. An important side effect is that bigquery errors for
+        # `dataset`.`table`, but not `dataset.table`.
+        if source and source.dialect.name == "bigquery":
+            table_name = tbl
+            schema = None
 
         return sqlalchemy.Table(
                 table_name,
@@ -589,6 +607,11 @@ def _transmute(__data, **kwargs):
 
 @arrange.register(LazyTbl)
 def _arrange(__data, *args):
+    # Note that SQL databases often do not subquery order by clauses. Arrange
+    # sets order_by on the backend, so it can set order by in over elements,
+    # and handle when new columns are named the same as order by vars.
+    # see: https://dba.stackexchange.com/q/82930
+
     last_op = __data.last_op
     cols = lift_inner_cols(last_op)
 
@@ -714,13 +737,14 @@ def _summarize(__data, **kwargs):
     else:
         # otherwise, can alter the existing select statement
         columns = lift_inner_cols(old_sel)
-        sel = sql.select()
+        sel = old_sel
+
+        # explicitly add original from clause tables, since we will be limiting
+        # the columns this select uses, which causes sqlalchemy to remove
+        # unreferenced tables
+        for _from in sel.froms:
+            sel = sel.select_from(_from)
         
-        # backwards compatible with sqlalchemy 1.3, which expects a list of froms,
-        # or just a single from clause
-        old_froms = old_sel.froms
-        for from_ in old_froms:
-            sel = sel.select_from(from_)
 
     # add group by columns ----
     group_cols = [columns[k] for k in __data.group_by]
@@ -743,7 +767,7 @@ def _summarize(__data, **kwargs):
         
 
     all_cols = [*group_cols, *expr_cols]
-    final_sel = _sql_add_columns(sel, all_cols).group_by(*group_cols)
+    final_sel = _sql_with_only_columns(sel, all_cols).group_by(*group_cols)
     new_data = __data.append_op(final_sel, group_by = tuple(), order_by = tuple())
     return new_data
 

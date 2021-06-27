@@ -1,26 +1,33 @@
 from siuba.siu import Symbolic, strip_symbolic
-from siuba.spec.series import spec
+from siuba.ops.support import spec
 from .helpers import data_frame, assert_equal_query, backend_pandas, SqlBackend, PandasBackend
 import pytest
 # TODO: dot, corr, cov
 
-from siuba import filter, mutate, summarize, group_by
+from siuba import filter, mutate, summarize, group_by, arrange
 from pandas.testing import assert_frame_equal, assert_series_equal
 import numpy as np
 import pandas as pd
 import pkg_resources
 
 def get_action_kind(spec_entry):
-    action = spec_entry['action']
-    return action.get('kind', action.get('status')).title()
+    return spec_entry["kind"]
 
+def filter_entry(spec, f):
+    out = []
+    for k, v in spec.items():
+        raw_kind = v.get("kind")
+        kind = raw_kind.title() if raw_kind is not None else "Unknown"
+        status = v["backends"].get("pandas", {}).get("support", "Supported").title()
 
-def filter_on_result(spec, types):
-    return [k for k,v in spec.items() if v['action'].get('kind', v['action'].get('status')).title() in types]
+        if f(kind, status):
+            out.append(k)
 
-SPEC_IMPLEMENTED = filter_on_result(spec, {"Agg", "Elwise", "Window", "Singleton"})
-SPEC_NOTIMPLEMENTED = filter_on_result(spec, {"Wontdo", "Todo", "Maydo"})
-SPEC_AGG = filter_on_result(spec, {"Agg"})
+    return out
+
+SPEC_IMPLEMENTED = filter_entry(spec, lambda k, s: s == "Supported")
+SPEC_NOTIMPLEMENTED = filter_entry(spec, lambda k, s: s != "Supported")
+SPEC_AGG = filter_entry(spec, lambda k, s: k in {"Agg"} and s == "Supported")
 
 _ = Symbolic()
 
@@ -53,32 +60,38 @@ def assert_src_array_equal(src, dst):
     
 # Data ========================================================================
 data_dt = data_frame(
+    id = [1, 2, 3, 4],
     g = ['a', 'a', 'b', 'b'],
     x = pd.to_datetime(["2019-01-01 01:01:01", "2020-04-08 02:02:02", "2021-07-15 03:03:03", "2022-10-22 04:04:04"])
     )
 
 data_str = data_frame(
+    id = [1, 2, 3, 4],
     g = ['a', 'a', 'b', 'b'],
     x = ['abc', 'cde', 'fg', 'h']
     )
 
 data_bool = data_frame(
+    id = [1, 2, 3, 4],
     g = ['a', 'a', 'b', 'b'],
     x = [True, False, True, False],
     y = [True, True, False, False]
         )
 
 data_cat = data_frame(
+    id = [1, 2, 3, 4],
     g = ['a', 'a', 'b', 'b'],
     x = pd.Categorical(['abc', 'cde', 'fg', 'h'])
     )
 
 data_sparse = data_frame(
+    id = [1, 2, 3, 4],
     g = ['a', 'a', 'b', 'b'],
     x = pd.Series([1, 2, 3, 4], dtype = "Sparse")
     )
 
 data_default = data_frame(
+    id = [1, 2, 3, 4, 5, 6],
     g = ['a', 'a', 'a', 'b', 'b', 'b'],
     x = [10, 11, 11, 13, 13, 13],
     y = [1,2,3,4,5,6]
@@ -95,54 +108,60 @@ DATA = data = {
 }
 
 def get_spec_no_mutate(entry, backend):
-    return "no_mutate" in entry['backends'].get(backend, {}).get('flags', [])
+    return "no_mutate" in entry['backends'].get(backend.name, {}).get('flags', [])
     
-def get_spec_backend_status(entry, backend):
-    return entry['backends'].get(backend, {}).get('status')
+def get_spec_backend_is_supported(entry, backend):
+    return entry['backends'].get(backend.name, {}).get('is_supported')
 
 def get_spec_sql_type(entry, backend):
-    return entry['backends'].get(backend, {}).get('result_type')
+    return entry['backends'].get(backend.name, {}).get('result_type')
 
 def get_data(entry, data, backend = None):
 
-    req_bool = entry['action'].get('input_type') == 'bool'
-
-    # pandas is forgiving to bool inputs
-    if isinstance(backend, PandasBackend):
+    if backend:
+        req_bool = entry["backends"].get(backend.name, {}).get('input_type') == 'bool'
+    else:
         req_bool = False
 
     return data['bool'] if req_bool else data[entry['accessor']]
 
 
-def test_missing_implementation(entry, backend):
+def do_test_missing_implementation(entry, backend):
     # Check whether test should xfail, skip, or -------------------------------
-    backend_status = get_spec_backend_status(entry, backend.name)
+    supported = get_spec_backend_is_supported(entry, backend)
 
-    # case: Needs to be implmented
-    # TODO(table): uses xfail
-    if backend_status == "todo":
-        pytest.xfail("TODO: impelement this translation")
-    
-    # case: Can't be used in a mutate (e.g. a SQL ordered set aggregate function)
-    # TODO(table): no_mutate
-    if get_spec_no_mutate(entry, backend.name):
+    if not supported:
         pytest.skip("Spec'd failure")
 
-    # case: won't be implemented
-    if get_spec_backend_status(entry, backend.name) == "wontdo":
-        pytest.skip()
+    if get_spec_no_mutate(entry, backend):
+        pytest.skip("Spec'd failure")
+
+    ## case: Needs to be implmented
+    ## TODO(table): uses xfail
+    #if backend_status == "todo":
+    #    pytest.xfail("TODO: impelement this translation")
+    #
+    ## case: Can't be used in a mutate (e.g. a SQL ordered set aggregate function)
+    ## TODO(table): no_mutate
+
+    ## case: won't be implemented
+    #if get_spec_backend_status(entry, backend.name) == "wontdo":
+    #    pytest.skip()
 
 
 def get_df_expr(entry):
     str_expr = str(entry['expr_frame'])
-    call_expr = strip_symbolic(eval(str_expr, {'_': _}))
+    #call_expr = strip_symbolic(eval(str_expr, {'_': _}))
+    return str_expr, entry["expr_frame"]
 
     return str_expr, call_expr
 
 def cast_result_type(entry, backend, ser):
-    sql_type = get_spec_sql_type(entry, backend.name)
+    sql_type = get_spec_sql_type(entry, backend)
     if isinstance(backend, SqlBackend) and sql_type == 'float':
         return ser.astype('float')
+    elif isinstance(backend, SqlBackend) and sql_type == 'int':
+        return ser.astype('int')
     
     return ser
 
@@ -150,17 +169,20 @@ def cast_result_type(entry, backend, ser):
 
 
 def test_series_against_call(entry):
-    if entry['action']['kind'] == "window":
+    # TODO: this test originally was evaluating string representations created
+    # by calls. I've changed it to just executing the calls directly.
+    # not sure the original intent of the test?
+    if entry['kind'] == "window":
         pytest.skip()
 
     df = data[entry['accessor']]
     # TODO: once reading from yaml, no need to repr
     str_expr = str(entry['expr_series'])
 
-    call_expr = strip_symbolic(eval(str_expr, {'_': _}))
+    call_expr = entry['expr_series']#  strip_symbolic(eval(str_expr, {'_': _}))
     res = call_expr(df.x)
 
-    dst = eval(str_expr, {'_': df.x})
+    dst = call_expr(df.x)# eval(str_expr, {'_': df.x})
     
     assert res.__class__ is dst.__class__
     assert_src_array_equal(res, dst)
@@ -172,10 +194,10 @@ def test_frame_expr(entry):
     # TODO: once reading from yaml, no need to repr
     str_expr = str(entry['expr_frame'])
 
-    call_expr = strip_symbolic(eval(str_expr, {'_': _}))
+    call_expr = entry['expr_frame']
     res = call_expr(df)
 
-    dst = eval(str_expr, {'_': df})
+    dst = call_expr(df)
     
     assert res.__class__ is dst.__class__
     assert_src_array_equal(res, dst)
@@ -186,11 +208,7 @@ def test_pandas_grouped_frame_fast_not_implemented(notimpl_entry):
     gdf = data[notimpl_entry['accessor']].groupby('g')
 
     # TODO: once reading from yaml, no need to repr
-    str_expr = str(notimpl_entry['expr_frame'])
-    call_expr = strip_symbolic(eval(str_expr, {'_': _}))
-
-    if notimpl_entry['action']['status'] in ["todo", "maydo", "wontdo"] and notimpl_entry["is_property"]:
-        pytest.xfail()
+    call_expr = notimpl_entry['expr_frame']
 
     with pytest.warns(UserWarning):
         try:
@@ -205,12 +223,12 @@ def test_pandas_grouped_frame_fast_not_implemented(notimpl_entry):
 #@backend_pandas
 @pytest.mark.skip_backend('sqlite')
 def test_frame_mutate(skip_backend, backend, entry):
-    test_missing_implementation(entry, backend)
+    do_test_missing_implementation(entry, backend)
 
     # Prepare input data ------------------------------------------------------
     # case: inputs must be boolean
     crnt_data = get_data(entry, DATA, backend)
-    df = backend.load_df(crnt_data)
+    df = backend.load_cached_df(crnt_data)
 
     # Execute mutate ----------------------------------------------------------
     str_expr, call_expr = get_df_expr(entry)
@@ -221,7 +239,7 @@ def test_frame_mutate(skip_backend, backend, entry):
 
     assert_equal_query(
             df,
-            mutate(result = call_expr),
+            arrange(_.id) >> mutate(result = call_expr),
             dst
             )
 
@@ -230,7 +248,7 @@ def test_frame_mutate(skip_backend, backend, entry):
     g_dst['result'] = cast_result_type(entry, backend, g_dst['result'])
     assert_equal_query(
             df,
-            group_by(_.g) >> mutate(result = call_expr),
+            arrange(_.id) >> group_by(_.g) >> mutate(result = call_expr),
             g_dst
             )
 
@@ -259,12 +277,12 @@ def test_pandas_grouped_frame_fast_mutate(entry):
 @pytest.mark.skip_backend('sqlite')
 def test_frame_summarize(skip_backend, backend, agg_entry):
     entry = agg_entry
-    test_missing_implementation(entry, backend)
+    do_test_missing_implementation(entry, backend)
 
     # Prepare input data ------------------------------------------------------
     # case: inputs must be boolean
     crnt_data = get_data(entry, DATA, backend)
-    df = backend.load_df(crnt_data)
+    df = backend.load_cached_df(crnt_data)
 
     # Execute mutate ----------------------------------------------------------
     str_expr, call_expr = get_df_expr(entry)
@@ -284,6 +302,7 @@ def test_frame_summarize(skip_backend, backend, agg_entry):
             )
 
     dst_g = crnt_data.groupby('g').apply(call_expr).reset_index().rename(columns = {0: 'result'})
+    dst_g["result"] = cast_result_type(entry, backend, dst_g['result'])
     assert_equal_query(
             df,
             group_by(_.g) >> summarize(result = call_expr),
@@ -316,7 +335,7 @@ def test_pandas_grouped_frame_fast_summarize(agg_entry):
 def test_frame_set_aggregates_postgresql():
     # TODO: probably shouldn't be creating backend here
     backend = SqlBackend("postgresql")
-    dfs = backend.load_df(data[None])
+    dfs = backend.load_cached_df(data[None])
     
     expr = _.x.quantile(.75)
     assert_equal_query(

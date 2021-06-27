@@ -1,6 +1,7 @@
-from siuba.sql import group_by, mutate, LazyTbl, collect
+from siuba import group_by, mutate, collect
 from siuba.siu import _
-from siuba.sql.translate import funcs
+from siuba.sql import LazyTbl 
+from siuba.sql.dialects.base import translator
 
 
 from sqlalchemy import sql
@@ -57,8 +58,8 @@ def test_lazy_tbl_manual_columns(db):
 
 # SqlFunctionLookupError ------------------------------------------------------
 
-from siuba import _
-from siuba.sql import arrange, filter, mutate, summarize, SqlFunctionLookupError
+from siuba import _, arrange, filter, mutate, summarize
+from siuba.sql import SqlFunctionLookupError
 from siuba.siu import strip_symbolic
 
 def test_lazy_tbl_shape_call_error(db):
@@ -79,7 +80,7 @@ def test_lazy_tbl_shape_call_error(db):
 # mutate ----------------------------------------------------------------------
 
 def test_sql_mutate(db):
-    tbl = LazyTbl(db, addresses, funcs = funcs)
+    tbl = LazyTbl(db, addresses, translator = translator)
     f = mutate(user_id2 = _.user_id + 1)
     out1 = tbl >> f >> collect()
     out2 = tbl >> collect() >> f
@@ -96,7 +97,7 @@ def test_sql_mutate(db):
     [_.id, _.user_id],                      # _ syntax multiple
     ])
 def test_sql_group_by(db, group_vars):
-    tbl = LazyTbl(db, addresses, funcs = funcs)
+    tbl = LazyTbl(db, addresses, translator = translator)
     group_by(tbl, *group_vars)
 
 
@@ -105,7 +106,7 @@ def test_sql_group_by(db, group_vars):
     (_.notacol, KeyError)                   # missing columns
     ])
 def tets_sql_group_by_fail(db, group_var, error):
-    tbl = LazyTbl(db, addresses, funcs = funcs)
+    tbl = LazyTbl(db, addresses, translator = translator)
     with pytest.raises(error):
         group_by(tbl, group_var)
     
