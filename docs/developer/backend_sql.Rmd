@@ -7,9 +7,9 @@ jupyter:
       format_version: '1.2'
       jupytext_version: 1.4.2
   kernelspec:
-    display_name: venv-siuba
+    display_name: Python 3
     language: python
-    name: venv-siuba
+    name: python3
 ---
 
 ```{python nbsphinx=hidden}
