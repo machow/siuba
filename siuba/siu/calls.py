@@ -77,6 +77,12 @@ for k, v in BINARY_OPS.items():
 for k, v in BINARY_LEVELS.copy().items():
     BINARY_LEVELS[k.replace("__", "__r", 1)] = v
 
+# Functions
+# ==============================================================================
+
+def str_to_getitem_call(x):
+    return Call("__getitem__", MetaArg("_"), x)
+    
 
 # Calls
 # =============================================================================

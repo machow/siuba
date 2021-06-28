@@ -93,10 +93,6 @@ def slice_to_call(x):
     return SliceOp("__siu_slice__", arg)
 
 
-def str_to_getitem_call(x):
-    return Call("__getitem__", MetaArg("_"), x)
-
-    
 def strip_symbolic(x):
     if isinstance(x, Symbolic):
         return x.__dict__["_Symbolic__source"]

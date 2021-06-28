@@ -1,5 +1,7 @@
 # Trees and Visitors ==========================================================
+from .calls import Call, FuncArg
 from .error import ShortException
+from .symbolic import strip_symbolic
 
 class FunctionLookupError(ShortException): pass
 

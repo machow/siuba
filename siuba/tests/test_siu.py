@@ -139,7 +139,7 @@ def test_explain_failures(_, expr):
 # SliceOp ----
 
 def test_sym_slice():
-    from siuba.siu import _SliceOpIndex
+    from siuba.siu.calls import _SliceOpIndex
 
     _ = Symbolic()
 
@@ -155,7 +155,7 @@ def test_sym_slice():
     assert indexer is False
 
 def test_sym_slice_multiple():
-    from siuba.siu import _SliceOpExt
+    from siuba.siu.calls import _SliceOpExt
 
     _ = Symbolic()
 
@@ -198,7 +198,7 @@ def test_slice_call_returns(_, expr, target):
 
 # Node copying ================================================================
 
-from siuba.siu import Call, BinaryOp, SliceOp, MetaArg, FuncArg, DictCall
+from siuba.siu.calls import Call, BinaryOp, SliceOp, MetaArg, FuncArg, DictCall
 # Call
 @pytest.mark.parametrize('node', [
     Call("__call__", lambda x, y = 2: x + y, 1, y = 2),
