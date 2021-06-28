@@ -1,5 +1,4 @@
 from .calls import ALL_OPS, Call, MetaArg
-from .symbolic import Symbolic, strip_symbolic
 
 class Formatter:
     def __init__(self): pass
@@ -10,10 +9,6 @@ class Formatter:
         fmt_block = "█─"
         fmt_pipe = "├─"
         
-        # TODO: why are some nodes still symbolic?
-        if isinstance(call, Symbolic):
-            return self.format(strip_symbolic(call))
-
         if isinstance(call, MetaArg):
             return "_"
 
