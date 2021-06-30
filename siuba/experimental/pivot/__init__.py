@@ -4,7 +4,8 @@ import numpy as np
 from typing import Union, Tuple, Dict, Optional
 from pandas.core.groupby import DataFrameGroupBy
 
-from siuba.dply.verbs import singledispatch2, gather, var_create, var_select
+from siuba.dply.verbs import gather, var_create, var_select
+from siuba.siu import singledispatch2
 
 
 def pivot_longer_spec(data,

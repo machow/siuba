@@ -10,7 +10,6 @@ translate.py handles translating column operations.
 import warnings
 
 from siuba.dply.verbs import (
-        singledispatch2,
         show_query, collect,
         simple_varname,
         select, VarList, var_select,
@@ -34,7 +33,7 @@ from .utils import get_dialect_translator, _FixedSqlDatabase, _sql_select, _sql_
 
 from sqlalchemy import sql
 import sqlalchemy
-from siuba.siu import Call, str_to_getitem_call, Lazy, FunctionLookupError
+from siuba.siu import Call, str_to_getitem_call, Lazy, FunctionLookupError, singledispatch2
 # TODO: currently needed for select, but can we remove pandas?
 from pandas import Series
 
