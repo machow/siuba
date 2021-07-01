@@ -107,7 +107,7 @@ Here is a more complex example, that uses grouping and calculating a mean with t
 
 ### Verbs: mutate, filter, summarize
 
-Verbs a functions that operate on a table of data.
+Verbs are functions that operate on a table of data.
 They can be combined using a pipe with the `>>` operator.
 
 The previous example can be re-written in siuba as the following.
@@ -170,7 +170,7 @@ Under the hood siuba's summarize function is converting the lazy expression show
 
 ### Using with plotnine
 
-Fortnuately, plotnine supports siuba's style of piping, so is easy to plug in to!
+Fortunately, plotnine supports siuba's style of piping, so is easy to plug in to!
 
 ```{python}
 from siuba import rename
