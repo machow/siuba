@@ -882,8 +882,16 @@ def _join(left, right, on = None, *args, how = "inner", sql_on = None):
     _raise_if_args(args)
 
     # Needs to be on the table, not the select
-    left_sel = left.last_op.alias()
-    right_sel = right.last_op.alias()
+    left_sel = left.last_op
+    right_sel = right.last_op
+
+    left_froms = left_sel.froms
+    right_froms = right_sel.froms
+
+    if len(left_froms) == 1:
+        left_sel = left_froms[0]
+    if len(right_froms) == 1:
+        right_sel = right_froms[0]
 
     # handle arguments ----
     on  = _validate_join_arg_on(on, sql_on)
@@ -1010,6 +1018,7 @@ def _validate_join_arg_how(how):
     return how
 
 def _create_join_conds(left_sel, right_sel, on):
+    print(left_sel, right_sel)
     left_cols  = left_sel.columns  #lift_inner_cols(left_sel)
     right_cols = right_sel.columns #lift_inner_cols(right_sel)
 
@@ -1019,7 +1028,13 @@ def _create_join_conds(left_sel, right_sel, on):
     else:
         # dict-like of form {left: right}
         conds = []
+        print(on)
+        print(left_cols.keys())
+        print(right_cols.keys())
+        print("-----")
         for l, r in on.items():
+            print(l,r)
+            print("..")
             col_expr = left_cols[l] == right_cols[r]
             conds.append(col_expr)
             
