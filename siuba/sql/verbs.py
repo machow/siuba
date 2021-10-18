@@ -876,7 +876,6 @@ def _relabeled_cols(columns, keys, suffix):
         cols.append(new_col)
     return cols
 
-
 @join.register(LazyTbl)
 def _join(left, right, on = None, *args, how = "inner", sql_on = None):
     _raise_if_args(args)
@@ -895,6 +894,7 @@ def _join(left, right, on = None, *args, how = "inner", sql_on = None):
 
     # handle arguments ----
     on  = _validate_join_arg_on(on, sql_on)
+    on  = _interpret_dotted_on_dicts(on)
     how = _validate_join_arg_how(how)
     
     # for equality join used to combine keys into single column
@@ -988,6 +988,14 @@ def _anti_join(left, right = None, on = None, *args, sql_on = None):
 def _raise_if_args(args):
     if len(args):
         raise NotImplemented("*args is reserved for future arguments (e.g. suffix)")
+
+def _interpret_dotted_on_dicts(on):
+    # interpret "on" dictionaries of the form:
+    # {table1.column: table2.column}
+    # and convert them to the format used throughout:
+    # {table1_column: table2_column}
+    # hacky, maybe the format with the dot should be enforced
+    return {k.replace(".", "_"): v.replace(".", "_") for k, v in on.items()}
 
 def _validate_join_arg_on(on, sql_on = None):
     # handle sql on case
