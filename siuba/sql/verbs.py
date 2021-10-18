@@ -893,6 +893,8 @@ def _resolve_select_object(sel):
             # initial select is equivalent to just selecting everything from the from_object
             # therefore the select itself can be omitted
             sel = from_obj
+        else:
+            sel = sel.alias()
 
     return sel
 
