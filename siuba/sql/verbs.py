@@ -876,6 +876,22 @@ def _relabeled_cols(columns, keys, suffix):
         cols.append(new_col)
     return cols
 
+def _resolve_select_object(sel):
+    # check if a select is a single table or a subquery
+    # if the former, it is better to pass simply the table object to the join
+    # if the latter, we need to pass the whole select as a subquery
+    froms = sel.froms
+    if len(froms) == 1:
+        from_obj = froms[0]
+        sel_from = from_obj.select()
+        col_names_original = set([c.name for c in sel.columns])
+        col_names_constructed = set([c.name for c in sel_from.columns])
+        if col_names_original == col_names_constructed:
+            # initial select is equivalent to just selecting everything from the from_object
+            sel = from_obj
+
+    return sel
+
 @join.register(LazyTbl)
 def _join(left, right, on = None, *args, how = "inner", sql_on = None):
     _raise_if_args(args)
@@ -884,13 +900,8 @@ def _join(left, right, on = None, *args, how = "inner", sql_on = None):
     left_sel = left.last_op
     right_sel = right.last_op
 
-    left_froms = left_sel.froms
-    right_froms = right_sel.froms
-
-    if len(left_froms) == 1:
-        left_sel = left_froms[0]
-    if len(right_froms) == 1:
-        right_sel = right_froms[0]
+    right_sel = _resolve_select_object(right_sel)
+    left_sel = _resolve_select_object(left_sel)
 
     # handle arguments ----
     on  = _validate_join_arg_on(on, sql_on)
