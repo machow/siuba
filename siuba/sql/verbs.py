@@ -1018,7 +1018,6 @@ def _validate_join_arg_how(how):
     return how
 
 def _create_join_conds(left_sel, right_sel, on):
-    print(left_sel, right_sel)
     left_cols  = left_sel.columns  #lift_inner_cols(left_sel)
     right_cols = right_sel.columns #lift_inner_cols(right_sel)
 
@@ -1028,13 +1027,7 @@ def _create_join_conds(left_sel, right_sel, on):
     else:
         # dict-like of form {left: right}
         conds = []
-        print(on)
-        print(left_cols.keys())
-        print(right_cols.keys())
-        print("-----")
         for l, r in on.items():
-            print(l,r)
-            print("..")
             col_expr = left_cols[l] == right_cols[r]
             conds.append(col_expr)
             
