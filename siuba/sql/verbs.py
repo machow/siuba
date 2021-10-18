@@ -884,10 +884,14 @@ def _resolve_select_object(sel):
     if len(froms) == 1:
         from_obj = froms[0]
         sel_from = from_obj.select()
+
+        # sqlalchemy doesn't allow direct comparison of the column set as it is linked to the database
+        # but if the sets of column names match, we are sure to be selecting the same thing
         col_names_original = set([c.name for c in sel.columns])
         col_names_constructed = set([c.name for c in sel_from.columns])
         if col_names_original == col_names_constructed:
             # initial select is equivalent to just selecting everything from the from_object
+            # therefore the select itself can be omitted
             sel = from_obj
 
     return sel
