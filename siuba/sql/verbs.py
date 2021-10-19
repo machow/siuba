@@ -1012,7 +1012,8 @@ def _interpret_dotted_on_dicts(on):
     # and convert them to the format used throughout:
     # {table1_column: table2_column}
     # hacky, maybe the format with the dot should be enforced
-    return {k.replace(".", "_"): v.replace(".", "_") for k, v in on.items()}
+    return (on if callable(on)
+            else {k.replace(".", "_"): v.replace(".", "_") for k, v in on.items()})
 
 def _validate_join_arg_on(on, sql_on = None):
     # handle sql on case
