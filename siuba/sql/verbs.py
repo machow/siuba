@@ -883,8 +883,13 @@ def _resolve_select_object(sel):
     froms = sel.froms
     if len(froms) == 1:
         from_obj = froms[0]
-        sel_from = from_obj.select()
 
+        # if we have a join, we need to alias it, or else the on argument
+        # isn't interpreted correctly
+        if isinstance(from_obj, sqlalchemy.sql.Join):
+            return sel.alias()
+
+        sel_from = from_obj.select()
         # sqlalchemy doesn't allow direct comparison of the column set as it is linked to the database
         # but if the sets of column names match, we are sure to be selecting the same thing
         col_names_original = set([c.name for c in sel.columns])
@@ -892,7 +897,7 @@ def _resolve_select_object(sel):
         if col_names_original == col_names_constructed:
             # initial select is equivalent to just selecting everything from the from_object
             # therefore the select itself can be omitted
-            sel = from_obj
+            return from_obj.alias()
 
     return sel.alias()
 
@@ -909,7 +914,6 @@ def _join(left, right, on = None, *args, how = "inner", sql_on = None):
 
     # handle arguments ----
     on  = _validate_join_arg_on(on, sql_on)
-    on  = _interpret_dotted_on_dicts(on)
     how = _validate_join_arg_how(how)
     
     # for equality join used to combine keys into single column
@@ -1003,15 +1007,6 @@ def _anti_join(left, right = None, on = None, *args, sql_on = None):
 def _raise_if_args(args):
     if len(args):
         raise NotImplemented("*args is reserved for future arguments (e.g. suffix)")
-
-def _interpret_dotted_on_dicts(on):
-    # interpret "on" dictionaries of the form:
-    # {table1.column: table2.column}
-    # and convert them to the format used throughout:
-    # {table1_column: table2_column}
-    # hacky, maybe the format with the dot should be enforced
-    return (on if callable(on)
-            else {k.replace(".", "_"): v.replace(".", "_") for k, v in on.items()})
 
 def _validate_join_arg_on(on, sql_on = None):
     # handle sql on case
