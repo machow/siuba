@@ -108,6 +108,7 @@ jobs:
     name: "Deploy to PyPI"
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
+    needs: [checks, test-bigquery]
     steps:
       - uses: actions/checkout@v2
       - name: "Set up Python 3.8"
