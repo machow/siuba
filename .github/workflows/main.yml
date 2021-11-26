@@ -2,7 +2,7 @@ name: main
 on:
   push:
     branches:
-      - 'master'
+      - 'main'
 
 jobs:
   spec-to-airtable:
