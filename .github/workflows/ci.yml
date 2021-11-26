@@ -108,6 +108,7 @@ jobs:
     name: "Deploy to PyPI"
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
+    needs: [checks, test-bigquery]
     steps:
       - uses: actions/checkout@v2
       - name: "Set up Python 3.8"
@@ -117,8 +118,20 @@ jobs:
       - name: "Build Package"
         run:
           python setup.py build sdist
-      - uses: pypa/gh-action-pypi-publish@master
+
+      # test deploy ----
+      - name: "Test Deploy to PyPI"
+        uses: pypa/gh-action-pypi-publish@release/v1
+        if: startsWith('TEST', github.event.release.name)
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_TEST_API_TOKEN }}
+          repository_url: https://test.pypi.org/legacy/
+
+      # prod deploy ----
+      - name: "Deploy to PyPI"
+        uses: pypa/gh-action-pypi-publish@master
+        if: "!startsWith('TEST', github.event.release.name)"
         with:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
-          repository_url: https://test.pypi.org/legacy/
