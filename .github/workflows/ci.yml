@@ -122,7 +122,7 @@ jobs:
       # test deploy ----
       - name: "Test Deploy to PyPI"
         uses: pypa/gh-action-pypi-publish@release/v1
-        if: startsWith('TEST', github.event.release.name)
+        if: startsWith(github.event.release.name, 'TEST')
         with:
           user: __token__
           password: ${{ secrets.PYPI_TEST_API_TOKEN }}
@@ -131,7 +131,7 @@ jobs:
       # prod deploy ----
       - name: "Deploy to PyPI"
         uses: pypa/gh-action-pypi-publish@master
-        if: "!startsWith('TEST', github.event.release.name)"
+        if: "!startsWith(github.event.release.name, 'TEST')"
         with:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
