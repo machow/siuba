@@ -21,7 +21,8 @@ jobs:
           python -m pip install airtable-python-wrapper==0.15.0
       - name: Upload spec
         run: |
-          python docs/scripts/upload_airtable.py
+          echo "TODO: skipping upload for now"
+          #python docs/scripts/upload_airtable.py
         env:
           AIRTABLE_API_KEY: ${{ secrets.AIRTABLE_API_KEY }}
 

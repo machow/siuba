@@ -5,7 +5,7 @@
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.5.2
+#       jupytext_version: 1.11.5
 #   kernelspec:
 #     display_name: venv-siuba
 #     language: python
@@ -17,7 +17,7 @@ import pandas as pd
 import os
 
 from airtable import Airtable
-from siuba.spec import series
+from siuba.ops.support import spec
 
 from siuba import _, select, inner_join, unnest, mutate, left_join, filter, pipe
 
@@ -53,32 +53,32 @@ air_backends = Airtable("app11UN7CECnqwlGY", "tblbmJgafdxiJLZz4", os.environ["AI
 
 # +
 
-raw_methods = air_methods.get_all()
+air_methods_records = air_methods.get_all()
 
-tbl_methods = (
-    pd.DataFrame(raw_methods)
+tbl_air_methods = (
+    pd.DataFrame(air_methods_records)
     >> mutate(fields = _.fields.apply(pd.DataFrame, index = [0]))
     >> unnest("fields")
 )
 
 # +
-raw_spec = pd.json_normalize([{"method": k, **v} for k,v in series.spec.items()])
+siu_raw_spec = pd.json_normalize([{"method": k, **v} for k,v in spec.items()])
 
-spec_methods = (raw_spec
+tbl_siu_methods = (siu_raw_spec
    .siu_select(-_.startswith('backend'), -_.expr_frame, -_.expr_series)
    .rename(columns = lambda s: s.replace('.', '_'))
 )
 
-joined_methods = (
-    spec_methods 
-    >> left_join(_, select(tbl_methods, _.id, _.method), ['method'])
+tbl_joined_methods = (
+    tbl_siu_methods 
+    >> left_join(_, select(tbl_air_methods, _.id, _.method), ['method'])
 )
 
-methods = joined_methods >> pipe(_.to_dict(orient = "records"))
+methods = tbl_joined_methods >> pipe(_.to_dict(orient = "records"))
 
 
 # +
-raw_map = {x['fields']['method']: x['fields'] for x in raw_methods}
+raw_map = {x['fields']['method']: x['fields'] for x in air_methods_records}
 
 inserts = []
 updated = []
@@ -88,7 +88,6 @@ for entry in methods:
     
     if record_needs_update(fields, dst_fields):
         updated.append(fields)
-    
         air_methods.update_by_field("method", entry["method"], fields = fields)
     
     if pd.isna(entry["id"]):
@@ -106,16 +105,16 @@ print("Inserted methods: ", ", ".join([d['method'] for d in inserts]))
 
 # ## Link method records to backends
 
-raw_backend = {x['fields']['backend_method']: x['fields'] for x in air_backends.get_all()}
+air_backend_records = {x['fields']['backend_method']: x['fields'] for x in air_backends.get_all()}
 
-spec_backend_entries = sum(
-    [get_backend_records(k, entry.get('backends', [])) for k, entry in series.spec.items()],
+siu_backend_entries = sum(
+    [get_backend_records(k, entry.get('backends', [])) for k, entry in spec.items()],
     []
 )
 
-for fields in spec_backend_entries:
+for fields in siu_backend_entries:
     indx = fields["name"] + "-" + fields["method_name"]
-    dst_fields = raw_backend.get(indx, {})
+    dst_fields = air_backend_recods.get(indx, {})
     if not dst_fields:
         air_backends.insert(fields)
 
