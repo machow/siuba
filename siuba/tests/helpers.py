@@ -1,4 +1,5 @@
 import sqlalchemy as sqla
+import uuid
 
 from siuba.sql import LazyTbl
 from siuba.dply.verbs import ungroup, collect
@@ -114,7 +115,7 @@ class SqlBackend(Backend):
 
         table_name = self.unique_table_name()
 
-        return copy_to_sql(df, self.unique_table_name(), self.engine)
+        return copy_to_sql(df, table_name, self.engine)
 
     def load_cached_df(self, df):
         import hashlib
@@ -128,6 +129,25 @@ class SqlBackend(Backend):
         res = self.cache[hashed] = self.load_df(df)
 
         return res
+
+class BigqueryBackend(SqlBackend):
+    @classmethod
+    def unique_table_name(cls):
+        return "siuba_{}".format(uuid.uuid4())
+
+    def load_df(self, df = None, **kwargs):
+        df = super().load_df(df, **kwargs)
+
+        # since we are using uuids, set table to expire after 1 day, so we can
+        # easily inspect the tables, but also ensure cleanup
+        self.engine.execute("""
+            ALTER TABLE `{table_name}` 
+            SET OPTIONS (
+              expiration_timestamp=TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 1 DAY)
+            )
+            """.format(table_name=df.tbl.name))
+        
+        return df
 
 
 def robust_multiple_sort(df, by):
