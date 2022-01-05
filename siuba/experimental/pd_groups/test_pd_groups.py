@@ -41,6 +41,7 @@ from siuba.experimental.pd_groups.groupby import GroupByAgg, SeriesGroupBy
 f_min = method_agg_op('min', is_property = False, accessor = None)
 f_add = method_el_op2('add', is_property = False, accessor = None)
 f_abs = method_el_op('abs', is_property = False, accessor = None)
+f_df_size = lambda x: GroupByAgg.from_result(x.size(), x)
 
 # GroupByAgg is liskov substitutable, so check that our functions operate
 # like similarly substitutable subtypes. This means that...
@@ -78,6 +79,9 @@ def test_grouped_translator_methods(f_op, f_dst, cls_result):
         (lambda g: f_min(g.x),        lambda g: g.x.transform('min')),
         (lambda g: f_min(f_min(g.x)), lambda g: g.x.transform('min')),
         (lambda g: f_abs(f_min(g.x)), lambda g: g.x.transform('min').abs()),
+
+        # Note that there's no way to transform a DF method, so use an arbitrary column
+        (lambda g: f_df_size(g), lambda g: g.x.transform('size')),
         ])
 def test_agg_groupby_broadcasted_equal_to_transform(f_op, f_dst):
     g = data_default.groupby('g')
@@ -89,6 +93,9 @@ def test_agg_groupby_broadcasted_equal_to_transform(f_op, f_dst):
     dst = f_dst(g)
     broadcasted = broadcast_agg(res)
     assert_series_equal(broadcasted, dst, check_names = False)
+
+
+# Test generic functions ======================================================
 
 
 # Test user-defined functions =================================================

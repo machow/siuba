@@ -7,7 +7,7 @@ from functools import singledispatch
 
 from pandas import Series
 from pandas.api.types import is_scalar
-from pandas.core.groupby import SeriesGroupBy
+from pandas.core.groupby import SeriesGroupBy, DataFrameGroupBy
 from pandas.core import algorithms
 
 
@@ -99,6 +99,7 @@ def broadcast_agg(groupby, result, obj):
 
     raise NotImplementedError()
 
+
 @broadcast_agg.register(GroupByAgg)
 def _broadcast_agg_gba(groupby):
     """
@@ -115,7 +116,9 @@ def _broadcast_agg_gba(groupby):
     ids, _, ngroup = groupby._orig_grouper.group_info
     out = algorithms.take_1d(groupby.obj._values, ids)
     
-    return Series(out, index=src.index, name=src.name)
+    # Note: reductions like siuba.dply.vector.n(_) map DataFrameGroupBy -> GroupByAgg,
+    # so the underlying object is a DataFrame, and does not have a .name attribute.
+    return Series(out, index=src.index, name=getattr(src, "name", None))
 
 @broadcast_agg.register(SeriesGroupBy)
 def _broadcast_agg_sgb(groupby):
