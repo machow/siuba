@@ -16,6 +16,10 @@ def fct_reorder(fct, x, func = np.median, desc = False) -> pd.Categorical:
         func: function run over all values within a level of the categorical.
         desc: whether to sort in descending order.
 
+    Notes that NaN categories can't be ordered. When func returns NaN, sorting
+    is always done with NaNs last.
+
+
     Examples:
         >>> fct_reorder(['a', 'a', 'b'], [4, 3, 2])
         ['a', 'a', 'b']
@@ -34,11 +38,11 @@ def fct_reorder(fct, x, func = np.median, desc = False) -> pd.Categorical:
     x_vals = x.values if isinstance(x, pd.Series) else x
     s = pd.Series(x_vals, index = fct)
 
-    # for each cat, calc agg func, make values of ordered the codes
+    # sort groups by calculated agg func. note that groupby uses dropna=True by default,
+    # but that's okay, since pandas categoricals can't order the NA category
     ordered = s.groupby(level = 0).agg(func).sort_values(ascending = not desc)
-    ordered[:] = np.arange(len(ordered))
-    codes = ordered[s.index.values]
-    return pd.Categorical.from_codes(codes, list(ordered.index))
+
+    return pd.Categorical(fct, categories=ordered.index)
 
 
 # fct_recode ------------------------------------------------------------------
