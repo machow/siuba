@@ -2,7 +2,6 @@ T: _.T
 __add__: _ + _
 __and__: _ & _
 __array__: _.__array__()
-__div__: _.__div__(_)
 __eq__: _ == _
 __floordiv__: _ // _
 __ge__: _ >= _
@@ -19,7 +18,6 @@ __pos__: +_
 __pow__: _**_
 __radd__: _ + _
 __rand__: _ & _
-__rdiv__: _.__rdiv__(_)
 __rfloordiv__: _ // _
 __rmod__: _ % _
 __rmul__: _ * _

@@ -5,7 +5,6 @@ from .utils import operation, Namespace
 ops_infix = Namespace(
     __add__ = operation('__add__', 'elwise', 2),
     __and__ = operation('__and__', 'elwise', 2),
-    __div__ = operation('__div__', 'elwise', 2),
     __eq__ = operation('__eq__', 'elwise', 2),
     __floordiv__ = operation('__floordiv__', 'elwise', 2),
     __ge__ = operation('__ge__', 'elwise', 2),
@@ -22,7 +21,6 @@ ops_infix = Namespace(
     __pow__ = operation('__pow__', 'elwise', 2),
     __radd__ = operation('__radd__', 'elwise', 2),
     __rand__ = operation('__rand__', 'elwise', 2),
-    __rdiv__ = operation('__rdiv__', 'elwise', 2),
     __rfloordiv__ = operation('__rfloordiv__', 'elwise', 2),
     __rmod__ = operation('__rmod__', 'elwise', 2),
     __rmul__ = operation('__rmul__', 'elwise', 2),
