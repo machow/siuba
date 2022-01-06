@@ -72,11 +72,9 @@ scalar = extend_base(
 
         # infix and infix methods ----
 
-        __div__ = sql_func_truediv,
         div = sql_func_truediv,
         divide = sql_func_truediv,
         rdiv = lambda x,y: sql_func_truediv(y, x),
-        __rdiv__ = lambda x, y: sql_func_truediv(y, x),
 
         __truediv__ = sql_func_truediv,
         truediv = sql_func_truediv,

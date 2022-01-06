@@ -8,7 +8,11 @@ from functools import singledispatch
 from pandas import Series
 from pandas.api.types import is_scalar
 from pandas.core.groupby import SeriesGroupBy, DataFrameGroupBy
-from pandas.core import algorithms
+
+try:
+    from pandas.core.algorithms import take_1d
+except ImportError:
+    from pandas.core.array_algos.take import take_1d
 
 
 # Custom SeriesGroupBy class ==================================================
@@ -114,7 +118,7 @@ def _broadcast_agg_gba(groupby):
 
     src = groupby._orig_obj
     ids, _, ngroup = groupby._orig_grouper.group_info
-    out = algorithms.take_1d(groupby.obj._values, ids)
+    out = take_1d(groupby.obj._values, ids)
     
     # Note: reductions like siuba.dply.vector.n(_) map DataFrameGroupBy -> GroupByAgg,
     # so the underlying object is a DataFrame, and does not have a .name attribute.
