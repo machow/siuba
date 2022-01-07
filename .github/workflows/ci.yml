@@ -37,6 +37,10 @@ jobs:
             python-version: 3.8
             requirements: numpy~=1.19.1 pandas~=1.1.0 SQLAlchemy~=1.4.13 psycopg2~=2.8.5 PyMySQL==1.0.2
             latest: true
+          - name: "2022-early dependencies"
+            python-version: 3.8
+            requirements: numpy~=1.22.1 pandas~=1.3.0 SQLAlchemy~=1.4.29 psycopg2-binary~=2.9.3 PyMySQL==1.0.2
+            latest: true
 
     steps:
       - uses: actions/checkout@v2
