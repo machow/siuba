@@ -104,7 +104,7 @@ DOCSTRING = """
 
     >>> per = pd.PeriodIndex([a_date], freq = "S")
     >>> floor_date(per, "M")
-    PeriodIndex(['2020-02'], dtype='period[M]', freq='M')
+    PeriodIndex(['2020-02'], dtype='period[M]'...
 
 """
 
