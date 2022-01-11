@@ -17,14 +17,6 @@ jobs:
         requirements: ['-r requirements.txt']
         include:
           # historical requirements
-          - name: "Minimum install_requires versions"
-            requirements: numpy~=1.12.0 pandas~=0.24.0 SQLAlchemy~=1.2.19 psycopg2~=2.7.0 PyMySQL==1.0.2
-            pytest_flags: --ignore=siuba/dply/forcats.py siuba
-            python-version: 3.6
-          - name: "2019-late dependencies"
-            requirements: numpy==1.17.4 pandas==0.24.2 SQLAlchemy==1.2.19 psycopg2==2.8.4 PyMySQL==1.0.2
-            pytest_flags: --ignore=siuba/dply/forcats.py siuba
-            python-version: 3.6
           - name: "2020-early dependencies"
             requirements: numpy==1.17.4 pandas~=0.25.3 SQLAlchemy~=1.3.11 psycopg2~=2.8.4 PyMySQL==1.0.2
             pytest_flags: --ignore=siuba/dply/forcats.py siuba
@@ -39,7 +31,11 @@ jobs:
             latest: true
           - name: "2022-early dependencies"
             python-version: 3.8
-            requirements: numpy~=1.22.1 pandas~=1.3.0 SQLAlchemy~=1.4.29 psycopg2-binary~=2.9.3 PyMySQL==1.0.2
+            requirements: numpy~=1.22.0 pandas~=1.3.5 SQLAlchemy~=1.4.29 psycopg2-binary~=2.9.3 PyMySQL==1.0.2
+            latest: true
+          - name: "2022-early dependencies"
+            python-version: 3.10.1
+            requirements: numpy~=1.22.0 pandas~=1.3.5 SQLAlchemy~=1.4.29 psycopg2-binary~=2.9.3 PyMySQL==1.0.2
             latest: true
 
     steps:
