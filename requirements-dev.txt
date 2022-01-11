@@ -61,7 +61,7 @@ pytest==5.3.5
 python-dateutil==2.8.1
 pytz==2020.1
 PyYAML==5.3.1
-pyzmq==19.0.0
+pyzmq==22.3.0
 requests==2.24.0
 scipy==1.5.2
 six==1.14.0

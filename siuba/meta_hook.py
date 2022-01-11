@@ -1,3 +1,10 @@
+"""
+DEPRECATED.
+
+Note that this module was experimental, and created very early in siuba's development.
+You should not rely on it for anything important.
+"""
+
 from importlib.abc import Loader, MetaPathFinder
 from importlib.machinery import ModuleSpec
 from importlib.util import find_spec
@@ -55,7 +62,8 @@ class CallLoader(Loader):
         #self.orig_loader.exec_module(self.orig_module)
 
         #for k,v in self.orig_module.__dict__.items():
-        for k,v in self.orig_module.__dict__.items():
+        all_items = list(self.orig_module.__dict__.items())
+        for k,v in all_items:
             if k.startswith('_'):
                 module.__dict__[k] = v
             else:
