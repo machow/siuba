@@ -319,9 +319,9 @@ def group_by(__data, *args, add = False, **kwargs):
     if isinstance(tmp_df, DataFrameGroupBy) and add:
         prior_groups = [el.name for el in __data.grouper.groupings]
         all_groups = ordered_union(prior_groups, by_vars)
-        return tmp_df.obj.groupby(list(all_groups))
+        return tmp_df.obj.groupby(list(all_groups), dropna=False)
 
-    return tmp_df.groupby(by = by_vars)
+    return tmp_df.groupby(by = by_vars, dropna=False)
 
 
 @singledispatch2((pd.DataFrame, DataFrameGroupBy))
