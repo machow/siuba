@@ -270,19 +270,19 @@ def coalesce(x, *args):
         *args: other Series that are the same length as x, or a scalar
 
     Examples:
-        >>> x = pd.Series([1., None, None])
+        >>> x = pd.Series([1.1, None, None])
         >>> abc = pd.Series(['a', 'b', None])
         >>> xyz = pd.Series(['x', 'y', 'z'])
         >>> coalesce(x, abc)
-        0       1
+        0     1.1
         1       b
         2    None
         dtype: object
 
         >>> coalesce(x, abc, xyz)
-        0    1
-        1    b
-        2    z
+        0    1.1
+        1      b
+        2      z
         dtype: object
         
     """

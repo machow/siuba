@@ -34,6 +34,12 @@ def test_fct_reorder_custom_func():
 
     assert_fct_equal(res, dst)
 
+def test_fct_reorder_na_fct():
+    import numpy as np
+    res = fct_reorder([None, 'x', 'y'], [4, 3, 2], np.max)
+    dst = Categorical([None, 'x', 'y'], ['y', 'x'])
+
+    assert_fct_equal(res, dst)
 
 # fct_recode ------------------------------------------------------------------
 

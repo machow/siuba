@@ -992,8 +992,18 @@ def nest(__data, *args, key = "data"):
     g_df = __data.groupby(grp_keys)
     splitter = g_df.grouper._get_splitter(g_df.obj[nest_keys])
 
+    # TODO: iterating over splitter now only produces 1 item (the dataframe)
+    # check backwards compat
+    def _extract_subdf_pandas_1_3(entry):
+        # in pandas < 1.3, splitter.__iter__ returns tuple entries (ii, df)
+        if isinstance(entry, tuple):
+            return entry[1]
+
+        # in pandas 1.3, each entry is just the dataframe
+        return entry
+
     result_index = g_df.grouper.result_index
-    nested_dfs = [x for ii, x in splitter]
+    nested_dfs = [_extract_subdf_pandas_1_3(x) for x in splitter]
 
     out = pd.DataFrame({key: nested_dfs}, index = result_index).reset_index()
 

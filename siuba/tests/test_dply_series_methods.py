@@ -263,15 +263,17 @@ def test_pandas_grouped_frame_fast_mutate(entry):
     res = fast_mutate(gdf, result = call_expr)
     dst = mutate(gdf, result = call_expr)
 
-    # TODO: apply mark to skip failing tests, rather than downcast
-    # pandas grouped aggs, when not using cython, _try_cast back to original type
-    # but since mutate uses apply, it doesn't :/. Currently only affects median func.
-    dst_obj = dst.obj
+    # TODO: apply mark to skip failing tests, rather than casting?
+    # in pandas 1.2, grouped agg returns int, ungrouped agg returns float
+    # in pandas 1.3, grouped agg returns float, same as ungrouped agg
+    # (the difference is because the grouped agg in 1.2 did not use cython,
+    # and tries casting back to the original column dtype)
+    res_obj = res.obj
     if str_expr == '_.x.median()':
-        dst_obj['result'] = dst_obj['result'].astype(gdf.x.obj.dtype)
+        res_obj['result'] = res_obj['result'].astype(float)
 
     assert isinstance(dst, DataFrameGroupBy)
-    assert_frame_equal(res.obj, dst_obj)
+    assert_frame_equal(res_obj, dst.obj)
 
 
 @pytest.mark.skip_backend('sqlite')
@@ -324,7 +326,7 @@ def test_pandas_grouped_frame_fast_summarize(agg_entry):
     # pandas grouped aggs, when not using cython, _try_cast back to original type
     # but since summarize uses apply, it doesn't :/. Currently only affects median func.
     if str_expr == '_.x.median()':
-        dst['result'] = dst['result'].astype(gdf.x.obj.dtype)
+        res['result'] = res['result'].astype(float)
 
     assert_frame_equal(res, dst)
 
