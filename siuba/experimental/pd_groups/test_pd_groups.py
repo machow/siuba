@@ -97,6 +97,17 @@ def test_agg_groupby_broadcasted_equal_to_transform(f_op, f_dst):
 
 # Test generic functions ======================================================
 
+def test_fast_mutate_basic():
+    # sanity check of https://github.com/machow/siuba/issues/355
+    from siuba.siu import _
+
+    res_df = data_default.groupby("g") >> fast_mutate(num = _.x / _.y * 100)
+
+    res = res_df.num
+    dst = data_default.x / data_default.y * 100
+
+    assert_series_equal(res.obj, dst, check_names=False)
+    
 
 # Test user-defined functions =================================================
 
