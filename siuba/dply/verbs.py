@@ -59,9 +59,14 @@ def install_pd_siu():
         setattr(DataFrameGroupBy, method_name, f)
 
     DataFrameGroupBy._repr_html_ = _repr_grouped_df_html_
+    DataFrameGroupBy.__repr__ = _repr_grouped_df_console_
 
 def _repr_grouped_df_html_(self):
-    return "<div><p>(grouped data frame)</p>" + self._selected_obj._repr_html_() + "</div>"
+    return "<div><p>(grouped data frame)</p>" + self.obj._repr_html_() + "</div>"
+
+def _repr_grouped_df_console_(self):
+    return "(grouped data frame)\n" + repr(self.obj)
+
 
 # TODO: should be a subclass of Call?
 class Pipeable:
