@@ -10,7 +10,7 @@ with open('siuba/__init__.py', 'rb') as f:
     VERSION = str(ast.literal_eval(_version_re.search(
         f.read().decode('utf-8')).group(1)))
 
-with open('README.md') as f:
+with open('README.md', encoding="utf-8") as f:
     README = f.read()
 
 # setup -----------------------------------------------------------------------
