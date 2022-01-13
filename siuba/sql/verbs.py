@@ -1005,7 +1005,7 @@ def _validate_join_arg_on(on, sql_on = None, lhs = None, rhs = None):
 
             if not on_cols:
                 raise ValueError(
-                    "No on columns specified, or shared column names in join."
+                    "No join column specified, or shared column names in join."
                 )
 
             # trivial dict mapping shared names to themselves
