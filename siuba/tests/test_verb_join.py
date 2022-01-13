@@ -169,6 +169,19 @@ def test_semi_join_no_cross(backend, df1, df2):
             DF1.iloc[:1,]
             )
 
+def test_semi_join_no_on_arg(backend, df1):
+    df_ii = backend.load_df(data_frame(ii = [1,1]))
+
+    with pytest.warns(UserWarning) as record:
+        assert_equal_query(
+                df1,
+                semi_join(_, df_ii),
+                DF1.iloc[:1,]
+                )
+
+    assert "No on column passed to join." in record[0].message.args[0]
+    assert "['ii']" in record[1].message.args[0]
+
 
 def test_basic_anti_join_on_map(backend, df1, df2):
     assert_frame_sort_equal(
