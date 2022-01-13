@@ -7,6 +7,7 @@ translate.py handles translating column operations.
 
 """
 
+import warnings
 
 from siuba.dply.verbs import (
         singledispatch2,
@@ -936,7 +937,7 @@ def _semi_join(left, right = None, on = None, *args, sql_on = None):
     right_sel = right.last_op.alias()
 
     # handle arguments ----
-    on  = _validate_join_arg_on(on, sql_on)
+    on  = _validate_join_arg_on(on, sql_on, left_sel, right_sel)
     
     # create join conditions ----
     bool_clause = _create_join_conds(left_sel, right_sel, on)
@@ -962,7 +963,7 @@ def _anti_join(left, right = None, on = None, *args, sql_on = None):
     right_sel = right.last_op.alias()
 
     # handle arguments ----
-    on  = _validate_join_arg_on(on, sql_on)
+    on  = _validate_join_arg_on(on, sql_on, left, right)
     
     # create join conditions ----
     bool_clause = _create_join_conds(left_sel, right_sel, on)
@@ -981,7 +982,7 @@ def _raise_if_args(args):
     if len(args):
         raise NotImplemented("*args is reserved for future arguments (e.g. suffix)")
 
-def _validate_join_arg_on(on, sql_on = None):
+def _validate_join_arg_on(on, sql_on = None, lhs = None, rhs = None):
     # handle sql on case
     if sql_on is not None:
         if on is not None:
@@ -991,11 +992,33 @@ def _validate_join_arg_on(on, sql_on = None):
 
     # handle general cases
     if on is None:
-        raise NotImplementedError("on arg currently cannot be None (default) for SQL")
+        # TODO:  currently, we check for lhs and rhs tables to indicate whether
+        #        a verb supports inferring columns. Otherwise, raise an error.
+        if lhs is not None and rhs is not None:
+            # TODO: consolidate with duplicate logic in pandas verb code
+            warnings.warn(
+                "No on column passed to join. "
+                "Inferring join columns instead using shared column names."
+            )
+
+            on_cols = list(set(lhs.columns.keys()).intersection(set(rhs.columns.keys())))
+
+            if not on_cols:
+                raise ValueError(
+                    "No on columns specified, or shared column names in join."
+                )
+
+            # trivial dict mapping shared names to themselves
+            warnings.warn("Detected shared columns: %s" % on_cols)
+            on = dict(zip(on_cols, on_cols))
+
+        else:
+            raise NotImplementedError("on arg currently cannot be None (default) for SQL")
     elif isinstance(on, str):
         on = {on: on}
     elif isinstance(on, (list, tuple)):
         on = dict(zip(on, on))
+
 
     if not isinstance(on, Mapping):
         raise TypeError("on must be a Mapping (e.g. dict)")
