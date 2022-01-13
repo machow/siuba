@@ -182,6 +182,14 @@ def test_semi_join_no_on_arg(backend, df1):
     assert "No on column passed to join." in record[0].message.args[0]
     assert "['ii']" in record[1].message.args[0]
 
+def test_semi_join_no_on_arg_fail(backend, df1):
+    df_ii = backend.load_df(data_frame(ZZ = [1,1]))
+
+    with pytest.raises(Exception) as excinfo:
+        collect(semi_join(df1, df_ii))
+    
+    assert "No join column specified" in str(excinfo.value) 
+
 
 def test_basic_anti_join_on_map(backend, df1, df2):
     assert_frame_sort_equal(

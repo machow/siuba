@@ -1117,7 +1117,7 @@ def semi_join(left, right = None, on = None):
 
         on_cols = list(set(left.columns).intersection(set(right.columns)))
         if not len(on_cols):
-            raise Exception("No joining column specified, and no shared column names")
+            raise Exception("No join column specified, and no shared column names")
 
         warnings.warn("Detected shared columns: %s" % on_cols)
     elif isinstance(on, str):
