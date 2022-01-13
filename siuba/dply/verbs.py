@@ -1110,9 +1110,16 @@ def semi_join(left, right = None, on = None):
         on_cols, right_on = map(list, zip(*on.items()))
         right = right[right_on].rename(dict(zip(right_on, on_cols)))
     elif on is None:
-        on_cols = set(left.columns).intersection(set(right.columns))
+        warnings.warn(
+            "No on column passed to join. "
+            "Inferring join columns instead using shared column names."
+        )
+
+        on_cols = list(set(left.columns).intersection(set(right.columns)))
         if not len(on_cols):
             raise Exception("No joining column specified, and no shared column names")
+
+        warnings.warn("Detected shared columns: %s" % on_cols)
     elif isinstance(on, str):
         on_cols = [on]
     else:
