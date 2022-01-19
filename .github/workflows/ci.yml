@@ -55,7 +55,7 @@ jobs:
           python -m pip install .
           # step to test duckdb
           # TODO: move these requirements into the test matrix
-          pip install git+https://github.com/Mause/duckdb_engine.git
+          pip install git+https://github.com/machow/duckdb_engine.git@feat-name-dialect
         env:
           REQUIREMENTS: ${{ matrix.requirements }}
       - name: Test with pytest
