@@ -90,7 +90,7 @@ scalar = extend_base(
         **returns_float(base_scalar, [
              "dt.day", "dt.dayofyear", "dt.days_in_month",
              "dt.daysinmonth", "dt.hour", "dt.minute", "dt.month",
-             "dt.quarter", "dt.second", "dt.week", "dt.weekday",
+             "dt.quarter", "dt.second", "dt.week",
              "dt.weekofyear", "dt.year"
              ]),
         )

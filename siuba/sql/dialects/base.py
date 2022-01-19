@@ -87,7 +87,7 @@ def sql_is_first_of(name, reference):
     return lambda col: fn.date_trunc(name, col) == fn.date_trunc(reference, col)
 
 def sql_func_last_day_in_period(col, period):
-    return fn.date_trunc(period, col) + sql.text("INTERVAL 1 %s - INTERVAL 1 day" % period)
+    return fn.date_trunc(period, col) + sql.text("INTERVAL '1 %s' - INTERVAL '1 day'" % period)
 
 def sql_func_days_in_month(col):
     return fn.extract('day', sql_func_last_day_in_period(col, 'month'))
