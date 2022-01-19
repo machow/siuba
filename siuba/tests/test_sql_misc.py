@@ -35,7 +35,13 @@ def test_raw_sql_mutate_grouped(backend, df):
 def test_raw_sql_mutate_refer_previous_raise_dberror(backend, df):
     # Note: unlikely will be able to support this case. Normally we analyze
     # the expression to know whether we need to create a subquery.
-    with pytest.raises(sqlalchemy.exc.DatabaseError):
+    if backend.name == "duckdb":
+        # duckdb dialect re-raises the engines exception, which is RuntimeError
+        exc = RuntimeError
+    else:
+        exc = sqlalchemy.exc.DatabaseError
+
+    with pytest.raises(exc):
         assert_equal_query(
                 df,
                 group_by("x") >> mutate(z1 = sql_raw("y + 1"), z2 = sql_raw("z1 + 1")),

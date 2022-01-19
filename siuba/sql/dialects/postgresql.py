@@ -88,7 +88,7 @@ scalar = extend_base(
             "str.contains": sql_func_contains,
         },
         **returns_float(base_scalar, [
-             "dt.day", "dt.dayofweek", "dt.dayofyear", "dt.days_in_month",
+             "dt.day", "dt.dayofyear", "dt.days_in_month",
              "dt.daysinmonth", "dt.hour", "dt.minute", "dt.month",
              "dt.quarter", "dt.second", "dt.week", "dt.weekday",
              "dt.weekofyear", "dt.year"

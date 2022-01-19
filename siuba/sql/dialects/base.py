@@ -80,13 +80,14 @@ def sql_func_extract_dow_monday(col):
     # make monday = 0 rather than sunday
     monday0 = sql.cast(sql.func.extract('dow', col) + 6, sa_types.Integer) % 7
     # cast to numeric, since that's what extract('dow') returns
-    return sql.cast(monday0, sa_types.Numeric)
+    #return sql.cast(monday0, sa_types.Numeric)
+    return monday0
 
 def sql_is_first_of(name, reference):
     return lambda col: fn.date_trunc(name, col) == fn.date_trunc(reference, col)
 
 def sql_func_last_day_in_period(col, period):
-    return fn.date_trunc(period, col) + sql.text("interval '1 %s - 1 day'" % period)
+    return fn.date_trunc(period, col) + sql.text("INTERVAL 1 %s - INTERVAL 1 day" % period)
 
 def sql_func_days_in_month(col):
     return fn.extract('day', sql_func_last_day_in_period(col, 'month'))
@@ -152,6 +153,56 @@ def req_bool(f):
 # =============================================================================
 # Base translation mappings
 # =============================================================================
+
+scalar_dt_methods = {
+      #"dt.ceil"             :
+      #"dt.date"             :
+      "dt.day"              : sql_extract("day"),
+      #"dt.day_name"         :
+      "dt.dayofweek"        : sql_func_extract_dow_monday,
+      "dt.dayofyear"        : sql_extract("doy"),
+      #"dt.days"             :
+      "dt.days_in_month"    : sql_func_days_in_month,
+      "dt.daysinmonth"      : sql_func_days_in_month,
+      #"dt.floor"            :
+      "dt.hour"             : sql_extract("hour"),
+      #"dt.is_leap_year"     :
+      "dt.is_month_end"     : sql_is_last_day_of("month"),
+      "dt.is_month_start"   : sql_is_first_of("day", "month"),
+      #"dt.is_quarter_end"   :
+      "dt.is_quarter_start" : sql_is_first_of("day", "quarter"),
+      "dt.is_year_end"      : sql_is_last_day_of("year"),
+      "dt.is_year_start"    : sql_is_first_of("day", "year"),
+      #"dt.microsecond"      :
+      #"dt.microseconds"     :
+      "dt.minute"           : sql_extract("minute"),
+      "dt.month"            : sql_extract("month"),
+      #"dt.month_name"       :
+      #"dt.nanosecond"       :
+      #"dt.nanoseconds"      :
+      #"dt.normalize"        :
+      "dt.quarter"          : sql_extract("quarter"),
+      #"dt.qyear"            :
+      #dt.round            =
+      "dt.second"           : sql_extract("second"),
+      #"dt.seconds"          :
+      #"dt.strftime"         :
+      #"dt.time"             :
+      #"dt.timetz"           :
+      #"dt.to_period"        :
+      #"dt.to_pydatetime"    :
+      #"dt.to_pytimedelta"   :
+      #"dt.to_timestamp"     :
+      #"dt.total_seconds"    :
+      #dt.tz_convert       =
+      #dt.tz_localize      =
+      "dt.week"             : sql_extract("week"),
+      "dt.weekday"          : sql_func_extract_dow_monday,
+      "dt.weekofyear"       : sql_extract("week"),
+      "dt.year"             : sql_extract("year"),
+      #"dt.freq" : 
+      #"dt.tz"   :
+}
 
 base_scalar = dict(
     # infix ----
@@ -274,57 +325,7 @@ base_scalar = dict(
 
 
     # datetime ----
-
-
-    **{
-      #"dt.ceil"             :
-      #"dt.date"             :
-      "dt.day"              : sql_extract("day"),
-      #"dt.day_name"         :
-      "dt.dayofweek"        : sql_func_extract_dow_monday,
-      "dt.dayofyear"        : sql_extract("doy"),
-      #"dt.days"             :
-      "dt.days_in_month"    : sql_func_days_in_month,
-      "dt.daysinmonth"      : sql_func_days_in_month,
-      #"dt.floor"            :
-      "dt.hour"             : sql_extract("hour"),
-      #"dt.is_leap_year"     :
-      "dt.is_month_end"     : sql_is_last_day_of("month"),
-      "dt.is_month_start"   : sql_is_first_of("day", "month"),
-      #"dt.is_quarter_end"   :
-      "dt.is_quarter_start" : sql_is_first_of("day", "quarter"),
-      "dt.is_year_end"      : sql_is_last_day_of("year"),
-      "dt.is_year_start"    : sql_is_first_of("day", "year"),
-      #"dt.microsecond"      :
-      #"dt.microseconds"     :
-      "dt.minute"           : sql_extract("minute"),
-      "dt.month"            : sql_extract("month"),
-      #"dt.month_name"       :
-      #"dt.nanosecond"       :
-      #"dt.nanoseconds"      :
-      #"dt.normalize"        :
-      "dt.quarter"          : sql_extract("quarter"),
-      #"dt.qyear"            :
-      #dt.round            =
-      "dt.second"           : sql_extract("second"),
-      #"dt.seconds"          :
-      #"dt.strftime"         :
-      #"dt.time"             :
-      #"dt.timetz"           :
-      #"dt.to_period"        :
-      #"dt.to_pydatetime"    :
-      #"dt.to_pytimedelta"   :
-      #"dt.to_timestamp"     :
-      #"dt.total_seconds"    :
-      #dt.tz_convert       =
-      #dt.tz_localize      =
-      "dt.week"             : sql_extract("week"),
-      "dt.weekday"          : sql_func_extract_dow_monday,
-      "dt.weekofyear"       : sql_extract("week"),
-      "dt.year"             : sql_extract("year"),
-      #"dt.freq" : 
-      #"dt.tz"   :
-      },
+    **scalar_dt_methods,
 
 
     # datetime methods not on accessor ----

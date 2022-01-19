@@ -53,6 +53,9 @@ jobs:
           python -m pip install $REQUIREMENTS
           python -m pip install -r requirements-test.txt
           python -m pip install .
+          # step to test duckdb
+          # TODO: move these requirements into the test matrix
+          pip install git+https://github.com/Mause/duckdb_engine.git
         env:
           REQUIREMENTS: ${{ matrix.requirements }}
       - name: Test with pytest
@@ -61,19 +64,6 @@ jobs:
         env:
           SB_TEST_PGPORT: 5432
           PYTEST_FLAGS: ${{ matrix.pytest_flags }}
-
-      # optional step for running bigquery tests ----
-      - name: Set up Cloud SDK
-        if: ${{(contains(github.ref, 'bigquery') || contains(github.ref, 'refs/tags')) && matrix.latest}}
-        uses: google-github-actions/setup-gcloud@master
-        with:
-          project_id: siuba-tests
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
-          export_default_credentials: true
-      - name: Test bigquery
-        if: ${{(contains(github.ref, 'bigquery') || contains(github.ref, 'refs/tags')) && matrix.latest}}
-        run: |
-          pip install git+https://github.com/googleapis/python-bigquery-sqlalchemy.git pandas-gbq==0.15.0
 
   test-bigquery:
     name: "Test BigQuery"
