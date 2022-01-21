@@ -263,7 +263,7 @@ def between(x, left, right, default = False):
 
 @symbolic_dispatch(cls = Series)
 def coalesce(x, *args):
-    """Returns a copy of x, with NaN values filled in from *args. Ignores indexes.
+    """Returns a copy of x, with NaN values filled in from \*args. Ignores indexes.
 
     Arguments:
         x: a pandas Series object
