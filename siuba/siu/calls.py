@@ -161,6 +161,10 @@ class Call:
         return arg
 
     def copy(self):
+        """Return a copy of this call object.
+
+        Note that copies are made of child calls, but not their arguments.
+        """
         args, kwargs = self.map_subcalls(lambda child: child.copy())
         return self.__class__(self.func, *args, **kwargs)
 

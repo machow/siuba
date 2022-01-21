@@ -115,6 +115,10 @@ def singledispatch2(cls, f = None):
 
     return wrapper
 
+# TODO: deprecate / remove singledispatch2
+verb_dispatch = singledispatch2
+
+
 # Pipe ========================================================================
 
 # TODO: should be a subclass of Call?

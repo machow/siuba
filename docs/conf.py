@@ -7,6 +7,7 @@
 extensions = [
     'nbsphinx',
     'sphinx.ext.autodoc',
+    'sphinx.ext.autosummary',
     'sphinx.ext.napoleon',
     #'sphinx.ext.mathjax',
     'sphinx.ext.autosectionlabel',
