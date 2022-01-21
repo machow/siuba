@@ -31,6 +31,21 @@ setup(
         "SQLAlchemy>=1.2.19",
         "PyYAML>=3.0.0"
     ],
+    extras_require={
+        "test": [
+            "pytest",
+            "hypothesis",
+        ],
+        "docs": [
+            "plotnine",
+            "jupyter",
+            "nbval",
+            "sphinx",
+            "nbsphinx",
+            "jupytext",
+            "gapminder==0.1",
+        ],
+    },
     python_requires=">=3.6",
     include_package_data=True,
     long_description=README,
