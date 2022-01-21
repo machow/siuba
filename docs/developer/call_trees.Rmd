@@ -72,7 +72,8 @@ Note that nodes like `+` and `.` in the graph above are shorthand for their pyth
 Below is an example tree listener that strips out a `__getattr__` operation from a call.
 
 ```{python}
-from siuba.siu import CallListener, Call, BinaryOp, strip_symbolic
+from siuba.siu import Call, BinaryOp, strip_symbolic
+from siuba.siu.visitors import CallListener
 from siuba import _ 
 
 class AttrStripper(CallListener):
