@@ -7,6 +7,8 @@ AUTODOC_SCRIPT=docs/scripts/generate_autodoc.py
 
 AUTODOC_PAGES=docs/api_extra/vector.rst docs/api_extra/forcats.rst
 
+SPHINX_BUILDARGS=-j auto
+
 .PHONY: docs
 
 test:
@@ -25,10 +27,10 @@ docs/api_extra/%.rst: siuba/dply/%.py $(AUTODOC_SCRIPT)
 	python3 $(AUTODOC_SCRIPT) . $< > $@
 
 docs-watch: $(AUTODOC_PAGES)
-	cd docs && sphinx-autobuild . ./_build/html
+	cd docs && sphinx-autobuild . ./_build/html $(SPHINX_BUILDARGS)
 
 docs-build: $(AUTODOC_PAGES)
-	cd docs && sphinx-build . ./_build/html
+	cd docs && sphinx-build . ./_build/html $(SPHINX_BUILDARGS)
 
 github_traffic:
 	# keep github traffic, since it is only held for 2 weeks

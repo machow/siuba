@@ -120,6 +120,9 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
           python -m pip install .
+      - uses: r-lib/actions/setup-pandoc@v1
+        with:
+          pandoc-version: '2.17.0'
       - name: Make docs
         run: |
           make docs-build
