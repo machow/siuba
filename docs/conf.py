@@ -16,8 +16,6 @@ extensions = [
 # Exclude build directory and Jupyter backup files:
 exclude_patterns = ['_build', '**.ipynb_checkpoints', '**.swp', 'draft*', 'scripts', '.*swp', '.~*.ipynb']
 
-source_suffix = ['.rst', '.ipynb']
-
 # Default language for syntax highlighting in reST and Markdown cells
 highlight_language = 'none'
 
