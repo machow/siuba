@@ -127,6 +127,33 @@ jobs:
         run: |
           make docs-build
 
+      # push to netlify ----
+      - name: Netlify docs preview
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          npm install -g netlify-cli
+          netlify deploy --dir=docs/_build/html --alias=${GITHUB_REPOSITORY#*/}-${PR_NUMBER}
+        env:
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          PR_NUMBER: ${{ github.event.number }}
+
+      - name: Add netlify link PR comment
+        uses: actions/github-script@v3
+        if: ${{ github.event_name == 'pull_request' }}
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            const suffix = "--siuba-previews.netlify.app"
+            github.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: "Preview url: https://" + context.repo.repo + "-" + process.env.PR_NUMBER + suffix
+            })
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+
 
   deploy:
     name: "Deploy to PyPI"
