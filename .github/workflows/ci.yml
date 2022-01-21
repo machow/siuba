@@ -128,32 +128,38 @@ jobs:
           make docs-build
 
       # push to netlify ----
+      - name: Create Github Deployment
+        uses: bobheadxi/deployments@v0.4.3
+        id: deployment
+        with:
+          step: start
+          token: ${{ secrets.GITHUB_TOKEN }}
+          env: ${{ format('pr-{0}', github.event.number) }}
+          ref: ${{ github.head_ref }}
+          transient: true
+          logs: 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+          no_override: false
+
       - name: Netlify docs preview
         if: ${{ github.event_name == 'pull_request' }}
         run: |
           npm install -g netlify-cli
-          netlify deploy --dir=docs/_build/html --alias=${GITHUB_REPOSITORY#*/}-${PR_NUMBER}
+          netlify deploy --dir=docs/_build/html --alias="${ALIAS}"
         env:
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          PR_NUMBER: ${{ github.event.number }}
+          ALIAS: ${{ steps.deployment.outputs.env }}
 
-      - name: Add netlify link PR comment
-        uses: actions/github-script@v3
-        if: ${{ github.event_name == 'pull_request' }}
+      - name: Update Github Deployment
+        uses: bobheadxi/deployments@v0.4.3
+        if: ${{ always() }}
         with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
-          script: |
-            const suffix = "--siuba-previews.netlify.app"
-            github.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: "Preview url: https://" + context.repo.repo + "-" + process.env.PR_NUMBER + suffix
-            })
-        env:
-          PR_NUMBER: ${{ github.event.number }}
-
+          step: finish
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: ${{ job.status }}
+          deployment_id: ${{ steps.deployment.outputs.deployment_id }}
+          env_url: 'https://${{ steps.deployment.outputs.env }}--siuba.netlify.app'
+          logs: 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
 
   deploy:
     name: "Deploy to PyPI"
