@@ -1,4 +1,4 @@
-from siuba import error
+from siuba.siu import error
 import sys
 import pytest
 

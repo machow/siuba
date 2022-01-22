@@ -102,8 +102,8 @@ call_listener = CallTreeLocal(
 
 # Fast group by verbs =========================================================
 
-from siuba.siu import Call
-from siuba.dply.verbs import mutate, filter, summarize, singledispatch2, DataFrameGroupBy
+from siuba.siu import Call, singledispatch2
+from siuba.dply.verbs import mutate, filter, summarize, DataFrameGroupBy
 from pandas.core.dtypes.inference import is_scalar
 import warnings
 

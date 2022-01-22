@@ -14,7 +14,8 @@
     :maxdepth: 3
     :caption: Reference
 
-    api_index
+    api_user_index
+    api_developer_index
     api_extra/index
 
 

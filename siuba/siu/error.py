@@ -2,7 +2,7 @@ from contextlib import contextmanager, AbstractContextManager
 import sys
 import copy
 
-ERROR_INSTRUCTIONS = "To see the full error, run: import siuba.error; raise siuba.error.last()"
+ERROR_INSTRUCTIONS = "To see the full error, run: import siuba.siu.error; raise siuba.siu.error.last()"
 
 def last():
     """Return last error with suppress context set to False.

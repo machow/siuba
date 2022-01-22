@@ -5,7 +5,11 @@ import numpy as np
 
 from pandas.core.groupby import DataFrameGroupBy
 from pandas.core.dtypes.inference import is_scalar
-from siuba.siu import Symbolic, Call, strip_symbolic, MetaArg, BinaryOp, _SliceOpIndex, create_sym_call, Lazy
+from siuba.siu import (
+    Symbolic, Call, strip_symbolic, create_sym_call, 
+    MetaArg, BinaryOp, _SliceOpIndex, Lazy,
+    singledispatch2, pipe_no_args, Pipeable, pipe
+    )
 
 DPLY_FUNCTIONS = (
         # Dply ----
@@ -68,48 +72,6 @@ def _repr_grouped_df_console_(self):
     return "(grouped data frame)\n" + repr(self.obj)
 
 
-# TODO: should be a subclass of Call?
-class Pipeable:
-    def __init__(self, f = None, calls = None):
-        # symbolics like _.some_attr need to be stripped down to a call, because
-        # calling _.some_attr() returns another symbolic.
-        f = strip_symbolic(f)
-
-        if f is not None:
-            if calls is not None: raise Exception()
-            self.calls = [f]
-        else:
-            self.calls = calls
-
-    def __rshift__(self, x):
-        """Handle >> syntax when pipe is on the left (lazy piping)."""
-        if isinstance(x, Pipeable):
-            return Pipeable(calls = self.calls + x.calls)
-        elif isinstance(x, (Symbolic, Call)):
-            call = strip_symbolic(x)
-            return Pipeable(calls = self.calls + [call])
-        elif callable(x):
-            return Pipeable(calls = self.calls + [x])
-
-        raise Exception()
-
-    def __rrshift__(self, x):
-        """Handle >> syntax when pipe is on the right (eager piping)."""
-        if isinstance(x, (Symbolic, Call)):
-            call = strip_symbolic(x)
-            return Pipeable(calls = [call] + self.calls)
-        elif callable(x):
-            return Pipeable(calls = [x] + self.calls)
-
-        return self(x)
-
-    def __call__(self, x):
-        res = x
-        for f in self.calls:
-            res = f(res)
-        return res
-
-pipe = Pipeable
 
 def _regroup(df):
     # try to regroup after an apply, when user kept index (e.g. group_keys = True)
@@ -120,6 +82,15 @@ def _regroup(df):
         grp_levels = [x for x in df.index.names if x is not None] or [0]
 
     return df.groupby(level = grp_levels)
+
+
+MSG_TYPE_ERROR = "The first argument to {func} must be one of: {types}"
+
+def raise_type_error(f):
+    raise TypeError(MSG_TYPE_ERROR.format(
+                func = f.__name__,
+                types = ", ".join(map(str, f.registry.keys()))
+                ))
 
 
 def simple_varname(call):
@@ -149,104 +120,6 @@ def ordered_union(*args):
         out.update({el: True for el in arg})
     return tuple(out)
 
-# Symbolic Wrapper ============================================================
-
-from functools import wraps
-
-class NoArgs: pass
-
-def pipe_no_args(f, cls = NoArgs):
-    @f.register(cls)
-    def wrapper(__data, *args, **kwargs):
-        return create_pipe_call(f, MetaArg("_"), *args, **kwargs)
-
-    return f
-
-def register_pipe(f, cls):
-    @f.register(cls)
-    def wrapper(*args, **kwargs):
-        return create_pipe_call(f, MetaArg("_"), *args, **kwargs)
-    return f
-
-
-# option: no args, custom dispatch (e.g. register NoArgs)
-# strips symbols
-def singledispatch2(cls, f = None):
-    """Wrap singledispatch. Making sure to keep its attributes on the wrapper.
-    
-    This wrapper has three jobs:
-        1. strip symbols off of calls
-        2. pass NoArgs instance for calls like some_func(), so dispatcher can handle
-        3. return a Pipeable when the first arg of a call is a symbol
-    """
-
-    # classic way of allowing args to a decorator
-    if f is None:
-        return lambda f: singledispatch2(cls, f)
-
-    # initially registers func for object, so need to change to pd.DataFrame
-    dispatch_func = singledispatch(f)
-    if isinstance(cls, tuple):
-        for c in cls: dispatch_func.register(c, f)
-    else:
-        dispatch_func.register(cls, f)
-    # then, set the default object dispatcher to create a pipe
-    register_pipe(dispatch_func, object)
-
-    # register dispatcher for Call, and NoArgs
-    pipe_call(dispatch_func)
-    pipe_no_args(dispatch_func)
-
-    @wraps(dispatch_func)
-    def wrapper(*args, **kwargs):
-        strip_args = map(strip_symbolic, args)
-        strip_kwargs = {k: strip_symbolic(v) for k,v in kwargs.items()}
-
-        if not args:
-            return dispatch_func(NoArgs(), **strip_kwargs)
-
-        return dispatch_func(*strip_args, **strip_kwargs)
-
-    return wrapper
-
-
-def create_pipe_call(source, *args, **kwargs):
-    first, *rest = args
-    return Pipeable(Call(
-            "__call__",
-            strip_symbolic(source),
-            strip_symbolic(first),
-            *(Lazy(strip_symbolic(x)) for x in rest),
-            **{k: Lazy(strip_symbolic(v)) for k,v in kwargs.items()}
-            ))
-
-def pipe_with_meta(f, *args, **kwargs):
-    return create_pipe_call(f, MetaArg("_"), *args, **kwargs)
-
-
-def pipe_call(f):
-    @f.register(Call)
-    def f_dispatch(__data, *args, **kwargs):
-        call = __data
-        if isinstance(call, MetaArg):
-            # single _ passed as first arg to function
-            # e.g. mutate(_, _.id)
-            return create_pipe_call(f, call, *args, **kwargs)
-        else:
-            # more complex _ expr passed as first arg to function
-            # e.g. mutate(_.id)
-            return pipe_with_meta(f, call, *args, **kwargs)
-
-    return f
-
-
-MSG_TYPE_ERROR = "The first argument to {func} must be one of: {types}"
-
-def raise_type_error(f):
-    raise TypeError(MSG_TYPE_ERROR.format(
-                func = f.__name__,
-                types = ", ".join(map(str, f.registry.keys()))
-                ))
 
 # Collect and show_query =========
 
@@ -770,7 +643,6 @@ def distinct(__data, *args, _keep_all = False, **kwargs):
 def _distinct(__data, *args, _keep_all = False, **kwargs):
     df = __data.apply(lambda x: distinct(x, *args, _keep_all = _keep_all, **kwargs))
     return _regroup(df)
-
 
 # if_else
 # TODO: move to vector.py
