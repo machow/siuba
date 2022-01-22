@@ -159,7 +159,11 @@ jobs:
       - name: Netlify docs preview
         run: |
           npm install -g netlify-cli
-          netlify deploy --dir=docs/_build/html --alias="${ALIAS}"
+          # push main branch to production, others to preview --
+          if [ "${ALIAS}" == "main" ]; then
+            netlify deploy --dir=docs/_build/html --prod
+          else
+            netlify deploy --dir=docs/_build/html --alias="${ALIAS}"
         env:
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
