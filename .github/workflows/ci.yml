@@ -127,21 +127,36 @@ jobs:
         run: |
           make docs-build
 
-      # push to netlify ----
+      # push to netlify -------------------------------------------------------
+
+      # set release name ----
+
+      - name: Configure pull release name
+        if: ${{github.event_name == 'pull_request'}}
+        run: |
+          echo "RELEASE_NAME=pr-${PR_NUMBER}" >> $GITHUB_ENV
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+      - name: Configure branch release name
+        if: ${{github.event_name != 'pull_request'}}
+        run: |
+          # use branch name, but replace slashes. E.g. feat/a -> feat-a
+          echo "RELEASE_NAME=${GITHUB_REF_NAME/\//-}" >> $GITHUB_ENV
+
+      # deploy ----
+
       - name: Create Github Deployment
         uses: bobheadxi/deployments@v0.4.3
         id: deployment
         with:
           step: start
           token: ${{ secrets.GITHUB_TOKEN }}
-          env: ${{ format('pr-{0}', github.event.number) }}
+          env: ${{ env.RELEASE_NAME }}
           ref: ${{ github.head_ref }}
           transient: true
           logs: 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'
-          no_override: false
 
       - name: Netlify docs preview
-        if: ${{ github.event_name == 'pull_request' }}
         run: |
           npm install -g netlify-cli
           netlify deploy --dir=docs/_build/html --alias="${ALIAS}"
