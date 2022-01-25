@@ -28,8 +28,8 @@ pd.set_option("display.max_rows", 5)
 See also these resources:
 
 * [pandas Series methods API](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.html)
-* [siuba verb API reference](api_index.rst)
-* [siuba examples](examples)
+* [siuba verb API reference](api_user_index.rst)
+* [siuba examples](examples.ipynb)
 
 
 ## Overview

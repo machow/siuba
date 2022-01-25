@@ -88,8 +88,7 @@ def str_to_getitem_call(x):
 # =============================================================================
 
 class Call:
-    """
-    Representation of python operations.
+    """Represent python operations.
 
     This class is responsible for representing the pieces of a python expression,
     as a function, along with its args and kwargs.
@@ -97,11 +96,24 @@ class Call:
     For example, "some_object.a" would be represented at the function "__getattr__",
     with the args `some_object`, and `"a"`.
 
-    Args:
-        func: name of the function called. Class methods are represented using the names
-              they have when defined on the class.
-        *args: arguments the func call uses.
-        **kwargs: keyword arguments the func call uses.
+    Parameters
+    ----------
+    func :
+        Name of the function called. Class methods are represented using the names
+        they have when defined on the class.
+    *args :
+        Arguments the function call uses.
+    **kwargs :
+        Keyword arguments the function call uses.
+
+    Examples
+    --------
+    >>> Call("__add__", 1, 1)
+    (1 + 1)
+
+    See Also
+    --------
+    siuba.siu.Symbolic : Helper class for creating Calls.
 
 
     """
@@ -111,6 +123,11 @@ class Call:
         self.kwargs = kwargs
 
     def __repr__(self):
+        """Return a (best guess) python code representation of the Call.
+
+        Note that this is not necessarily valid python code (e.g. if a python
+        function is passed as a call argument).
+        """
         # TODO: format binary, unary, call, associative
         if self.func in BINARY_OPS:
             op_repr = BINARY_OPS[self.func]
@@ -136,6 +153,24 @@ class Call:
                     )
 
     def __call__(self, x):
+        """Evaluate a call over some context and return the result.
+
+        Note that subclasses like MetaArg, simply return the context, so that a call
+        acts like a unary function, with ``x`` as its argument.
+
+        Parameters
+        ----------
+        x :
+            Object passed down the call tree as context.
+
+        Examples
+        --------
+        >>> expr = Call("__add__", MetaArg("_"), 2)
+        >>> expr(1)   # 1 + 2
+        3
+
+        
+        """
         args, kwargs = self.map_subcalls(self.evaluate_calls, args = (x,))
         inst, *rest = args
 
@@ -160,7 +195,7 @@ class Call:
 
         return arg
 
-    def copy(self):
+    def copy(self) -> "Call":
         """Return a copy of this call object.
 
         Note that copies are made of child calls, but not their arguments.
@@ -169,6 +204,27 @@ class Call:
         return self.__class__(self.func, *args, **kwargs)
 
     def map_subcalls(self, f, args = tuple(), kwargs = None):
+        """Call a function on all child calls.
+
+        Parameters
+        ----------
+        f :
+            A function to call on any child calls.
+        args:
+            Optional position arguments to pass to ``f``.
+        kwargs:
+            Optional keyword arguments to pass to ``f``.
+
+        Returns
+        -------
+        A tuple of (new_args, new_kwargs) that can be used to recreate the original
+        Call object with transformed (copies of) child nodes.
+
+        See Also
+        --------
+        copy : Recursively calls map_subcalls to clone a call tree.
+
+        """
         if kwargs is None: kwargs = {}
 
         new_args = tuple(f(arg, *args, **kwargs) if isinstance(arg, Call) else arg for arg in self.args)
@@ -230,6 +286,7 @@ class Call:
 
 
 class Lazy(Call):
+    """Lazily return calls rather than evaluating them."""
     def __init__(self, func, arg = None):
         if arg is None:
             self.func = "<lazy>"
@@ -247,6 +304,7 @@ class Lazy(Call):
 
 
 class UnaryOp(Call):
+    """Represent unary call operations."""
     def __repr__(self):
         fmt = "{func}{args[0]}"
 
@@ -255,6 +313,7 @@ class UnaryOp(Call):
 
 
 class BinaryOp(Call):
+    """Represent binary call operations."""
 
     def __repr__(self):
         return self._repr(reverse = False)
@@ -306,6 +365,7 @@ class BinaryOp(Call):
         return False
 
 class BinaryRightOp(BinaryOp):
+    """Represent right associative binary call operations."""
 
     def __call__(self, x):
         inst, *rest = (self.evaluate_calls(arg, x) for arg in self.args)
@@ -323,7 +383,13 @@ class BinaryRightOp(BinaryOp):
 
 
 class DictCall(Call):
-    """evaluates both keys and vals."""
+    """Calls representation of dictionary construction.
+
+    Note that this class is important for two reasons:
+
+      * Dictionary literal syntax cannot produce a call.
+      * Calls cannot recognize subcalls nested inside containers. E.g. dicts, lists.
+    """
 
     def __init__(self, f, *args, **kwargs):
         # TODO: validation, clean up class
@@ -451,7 +517,7 @@ class _SliceOpIndex(_SliceOpExt):
 
 
 class SliceOp(ABC):
-    """Factory class for creating slice calls. 
+    """Factory class for representing from single and extended slice calls. 
 
     Note that it has SliceOpIndex, and SliceOpExt registered as subclasses, so
     that this class can be used rather than the specific implementations.
@@ -488,6 +554,8 @@ SliceOp.register(_SliceOpExt)
 # TODO: validate that call.args[0] is a Call in tree visitors?
 
 class MetaArg(Call):
+    """Represent an argument, by returning the argument passed to __call__."""
+
     def __init__(self, func, *args, **kwargs):
         self.func = "_"
         self.args = tuple()
@@ -500,6 +568,8 @@ class MetaArg(Call):
         return x
 
 class FuncArg(Call):
+    """Represent a function to be called."""
+
     def __init__(self, func, *args, **kwargs):
         self.func = '__custom_func__'
 
