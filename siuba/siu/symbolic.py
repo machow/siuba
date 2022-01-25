@@ -23,7 +23,7 @@ class Symbolic(object):
                 ))
                 
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, **kwargs) -> "Symbolic":
         if self.__ready_to_call:
             return self.__source(*args, **kwargs)
 

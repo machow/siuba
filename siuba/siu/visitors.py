@@ -103,17 +103,24 @@ class CallTreeLocal(CallListener):
             call_props = None
             ):
         """
-        Arguments:
-            local: a dictionary mapping func_name: func, used to replace call expressions.
-            call_sub_attr: a set of attributes signaling any subattributes are property
-                           methods. Eg. {'dt'} to signify in _.dt.year, year is a property call.
-            chain_sub_attr: whether to included the attributes in the above argument, when looking up
-                           up a replacement for the property call. E.g. does local have a 'dt.year' entry.
-            dispatch_cls: if custom calls are dispatchers, dispatch on this class. If none, use their name
-                          to try and get their corresponding local function.
-            result_cls: if custom calls are dispatchers, require their result annotation to be a subclass
-                          of this class.
-            call_props: property methods to potentially convert to local calls.
+        Parameters
+        ----------
+            local : mapping
+                A dictionary mapping func_name: func, used to replace call expressions.
+            call_sub_attr : set, optional
+                A set of attributes signaling any subattributes are property
+                methods. Eg. {'dt'} to signify in _.dt.year, year is a property call.
+            chain_sub_attr : bool
+                Whether to included the attributes in the above argument, when looking up
+                up a replacement for the property call. E.g. does local have a 'dt.year' entry.
+            dispatch_cls : class
+                If custom calls are dispatchers, dispatch on this class. If none, use their name
+                to try and get their corresponding local function.
+            result_cls : class 
+                If custom calls are dispatchers, require their result annotation to be a subclass
+                of this class.
+            call_props : set, sequence
+                Property methods to potentially convert to local calls.
         """
         self.local = local
         self.call_sub_attr = set(call_sub_attr or [])
