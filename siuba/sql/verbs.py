@@ -275,7 +275,17 @@ class LazyTbl:
 
         # raise informative error message if missing translation
         try:
-            return self.translator.translate(call, window = window)
+            # TODO: MC-NOTE -- scaffolding in to verify prior behavior works
+            from siuba.siu.visitors import ExecutionValidatorVisitor
+            shaped_call = self.translator.translate(call, window = window)
+            if window:
+                trans = self.translator.window
+            else:
+                trans = self.translator.aggregate
+
+            v = ExecutionValidatorVisitor(trans.dispatch_cls, trans.result_cls)
+            return v.visit(shaped_call)
+            
         except FunctionLookupError as err:
             raise SqlFunctionLookupError.from_verb(
                     verb_name or "Unknown",

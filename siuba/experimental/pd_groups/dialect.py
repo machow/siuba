@@ -1,4 +1,4 @@
-from siuba.siu import CallTreeLocal, FunctionLookupError
+from siuba.siu import CallTreeLocal, FunctionLookupError, ExecutionValidatorVisitor
 from .groupby import SeriesGroupBy
 
 from .translate import (
@@ -99,6 +99,8 @@ call_listener = CallTreeLocal(
         call_props = ALL_PROPERTIES
         )
 
+call_validator = ExecutionValidatorVisitor(GroupByAgg, SeriesGroupBy)
+
 
 # Fast group by verbs =========================================================
 
@@ -123,6 +125,8 @@ def grouped_eval(__data, expr, require_agg = False):
     if isinstance(expr, Call):
         try:
             call = call_listener.enter(expr)
+            call_validator.visit(call)
+
         except FunctionLookupError as e:
             fallback_warning(expr, str(e))
             call = expr
@@ -162,6 +166,7 @@ def _transform_args(args):
         elif isinstance(expr, Call):
             try:
                 call = call_listener.enter(expr)
+                call_validator.visit(call)
                 out.append(call)
             except FunctionLookupError as e:
                 fallback_warning(expr, str(e))

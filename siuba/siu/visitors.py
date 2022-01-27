@@ -66,6 +66,9 @@ class CallListener:
             return self.enter(x)
 
         return x
+    
+    def visit(self, node):
+        return self.enter(node)
 
 def get_attr_chain(node, max_n):
     # TODO: need to make custom calls their own Call class, then will not have to
@@ -140,12 +143,12 @@ class CallTreeLocal(CallListener):
         return self.enter(strip_symbolic(expr))
 
     def dispatch_local(self, name):
-        func = self.local[name]
+        f_local = self.local[name]
 
-        if hasattr(func, "dispatch") and self.result_cls is not None:
-            return func.dispatch(self.result_cls)
+        if isinstance(f_local, FunctionLookupBound):
+            raise FunctionLookupError(f_local.msg)
 
-        return func
+        return f_local
 
     def create_local_call(self, name, prev_obj, cls, func_args = None, func_kwargs = None):
         # need call attr name (arg[0].args[1]) 
@@ -158,16 +161,9 @@ class CallTreeLocal(CallListener):
         except KeyError as err:
             raise FunctionLookupError("Missing translation for function call: %s"% name)
 
-        if isinstance(local_func, FunctionLookupBound):
-            raise FunctionLookupError(local_func.msg)
-            #local_func()
-
-        #if isclass(local_func) and issubclass(local_func, Exception):
-        #    raise local_func
-
         return cls(
                 "__call__",
-                local_func,
+                FuncArg(local_func),
                 prev_obj,
                 *func_args,
                 **func_kwargs
@@ -185,54 +181,26 @@ class CallTreeLocal(CallListener):
 
     def enter___getattr__(self, node):
         obj, attr = node.args
-        if obj.func == "__getattr__" and obj.args[1] in self.call_sub_attr:
-            prev_obj, prev_attr = obj.args
+
+        # Note that the conversion of attribute chains to calls is similar
+        # to that in the __call__ visit. But in the code below we're handling
+        # optional cases where attribute chains might have property methods,
+        # which may (optionally) be converted to calls.
+        attr_chain, target = get_attr_chain(node, 2)
+        if len(attr_chain) == 2 and attr_chain[0] in self.call_sub_attr:
+            # convert subattributes to calls, e.g. dt.days -> dt.days()
 
             # TODO: should always call exit?
             if self.chain_sub_attr:
                 # use chained attribute to look up local function instead
-                # e.g. dt.round, rather than round
-                attr = prev_attr + '.' + attr
-            return self.create_local_call(attr, prev_obj, Call)
+                # e.g. `dt.round`(), rather than `round`()
+                attr = ".".join(attr_chain)
+            return self.create_local_call(attr, target, Call)
         elif attr in self.call_props:
             return self.create_local_call(attr, obj, Call)
 
         return self.generic_enter(node)
 
-    def enter___custom_func__(self, node):
-        func = node(None)
-        
-        # TODO: not robust at all, need class for singledispatch? unique attr flag?
-        if (hasattr(func, 'registry')
-            and hasattr(func, 'dispatch')
-            and self.dispatch_cls is not None
-            ):
-            # allow custom functions that dispatch on dispatch_cls
-            f_for_cls = func.dispatch(self.dispatch_cls)
-
-            if isinstance(f_for_cls, FunctionLookupBound):
-                # TODO: this is a bit funky, since FLB raises when called
-                raise FunctionLookupError(f_for_cls.msg)
-
-            if (self.result_cls is None
-                or is_dispatch_func_subtype(f_for_cls, self.dispatch_cls, self.result_cls)
-                ):
-                # matches return annotation type (or not required)
-                return node.__class__(f_for_cls)
-            
-            raise FunctionLookupError(
-                    "External function {name} can dispatch on the class {dispatch_cls}, but "
-                    "must also have result annotation of (sub)type {result_cls}"
-                        .format(
-                            name = func.__name__,
-                            dispatch_cls = self.dispatch_cls,
-                            result_cls = self.result_cls
-                            )
-                    )
-
-        # doesn't raise an error so we can look in locals for now
-        # TODO: remove behavior, once all SQL dispatch funcs moved from locals
-        return self.generic_enter(node)
 
     def enter___call__(self, node):
         """
@@ -255,7 +223,7 @@ class CallTreeLocal(CallListener):
         attr_chain, target = get_attr_chain(obj, max_n = 2)
         if attr_chain:
             # want _.x.method() -> method(_.x), need to transform
-            if attr_chain[0] in self.call_sub_attr:
+            if len(attr_chain) == 2 and attr_chain[0] in self.call_sub_attr:
                 # e.g. _.dt.round()
                 call_name = ".".join(attr_chain) if self.chain_sub_attr else attr_chain[-1]
                 entered_target = self.enter_if_call(target)
@@ -263,11 +231,6 @@ class CallTreeLocal(CallListener):
                 call_name = attr_chain[-1]
                 entered_target = self.enter_if_call(obj.args[0])
 
-        elif isinstance(obj, FuncArg) and self.dispatch_cls is None:
-            # want function(_.x) -> new_function(_.x), has form
-            call_name = obj.obj_name()
-            # the first argument is basically "self"
-            entered_target, *args = args
         else:
             # default to generic enter
             return self.generic_enter(node)
@@ -278,7 +241,63 @@ class CallTreeLocal(CallListener):
                 )
 
 
-# Also need NodeTransformer
+class ExecutionValidatorVisitor(CallListener):
+    def __init__(
+            self,
+            dispatch_cls = None,
+            result_cls = None,
+            ):
+        """
+        Parameters
+        ----------
+            dispatch_cls : class
+                If custom calls are dispatchers, dispatch on this class. If none, use their name
+                to try and get their corresponding local function.
+            result_cls : class 
+                If custom calls are dispatchers, require their result annotation to be a subclass
+                of this class.
+        """
+        self.dispatch_cls = dispatch_cls
+        self.result_cls = result_cls
+
+    def validate_dispatcher(self, dispatcher):
+        f_concrete = dispatcher.dispatch(self.dispatch_cls)
+        if isinstance(f_concrete, FunctionLookupBound):
+            raise FunctionLookupError(f_concrete.msg)
+
+        if isclass(f_concrete) and issubclass(f_concrete, Exception):
+            raise f_concrete
+
+        return f_concrete
+
+    @staticmethod
+    def is_dispatcher(f):
+        # TODO: this is essentially a protocol
+        return hasattr(f, 'registry') and hasattr(f, 'dispatch')
 
 
+    def enter___custom_func__(self, node):
+        func = node(None)
+        
+        if self.is_dispatcher(func) and self.dispatch_cls is not None:
+            # allow custom functions that dispatch on dispatch_cls
+            f = self.validate_dispatcher(func)
+
+            if (self.result_cls is None
+                or is_dispatch_func_subtype(f, self.dispatch_cls, self.result_cls)
+                ):
+                # TODO: MC-NOTE: recreates old behavior, as a temporary step toward codata
+                return FuncArg(func.dispatch(self.dispatch_cls))
+            
+            raise FunctionLookupError(
+                    "External function {name} can dispatch on the class {dispatch_cls}, but "
+                    "must also have result annotation of (sub)type {result_cls}"
+                        .format(
+                            name = func.__name__,
+                            dispatch_cls = self.dispatch_cls,
+                            result_cls = self.result_cls
+                            )
+                    )
+
+        return self.generic_enter(node)
 

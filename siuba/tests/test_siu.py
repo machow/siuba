@@ -304,7 +304,9 @@ def test_call_tree_local_sub_attr_property_missing(_, ctl):
     with pytest.raises(FunctionLookupError):
         ctl.enter(strip_symbolic(_.str.f_b))
 
-# symbolic dispatch and call tree local ----
+# symbolic dispatch and execution validation visitor ----
+from siuba.siu import ExecutionValidatorVisitor
+
 class SomeClass: pass
 
 @pytest.fixture
@@ -321,8 +323,7 @@ def f_dispatch():
 
 
 def test_call_tree_local_dispatch_cls_object(f_dispatch):
-    ctl = CallTreeLocal(
-            {'f_a': lambda self: self},
+    ctl = ExecutionValidatorVisitor(
             dispatch_cls = object
             )
 
@@ -332,8 +333,7 @@ def test_call_tree_local_dispatch_cls_object(f_dispatch):
 
 
 def test_call_tree_local_dispatch_cls_subclass(f_dispatch):
-    ctl = CallTreeLocal(
-            {'f_a': lambda self: self},
+    ctl = ExecutionValidatorVisitor(
             dispatch_cls = SomeClass
             )
 
@@ -372,3 +372,4 @@ def test_call_tree_local_dispatch_fail(f_dispatch_strict):
     new_call = ctl.enter(call)
     with pytest.raises(TypeError):
         new_call('na')
+
