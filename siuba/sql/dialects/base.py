@@ -28,10 +28,10 @@ from siuba.sql.translate import (
         win_over,
         win_cumul,
         win_agg,
-        set_agg,
         sql_agg,
         sql_scalar,
         sql_colmeth,
+        sql_ordered_set,
         sql_not_impl,
         annotate,
         RankOver,
@@ -380,7 +380,7 @@ base_win = dict(
     nunique = win_absent("nunique"),
     #prod = 
     #product = 
-    quantile =  win_absent("quantile"),
+    quantile = sql_ordered_set("percentile_cont", is_analytic=True),
     #sem = 
     #skew = 
     #std =  # TODO(pg)
@@ -444,7 +444,7 @@ base_agg = dict(
     nunique = lambda col: sql.func.count(sql.func.distinct(col)),
     #prod = 
     #product = 
-    quantile = set_agg("percentile_cont"), # TODO: flag no_mutate
+    quantile = sql_ordered_set("percentile_cont"),
     #sem = 
     #skew = 
     #std =  # TODO(pg)

@@ -50,13 +50,13 @@ class Operation:
         self.accessor = accessor
     
 def operation(name, *args):
-    def op_method(self, *args, **kwargs):
-        return default(self, op_method, args, kwargs)
+    from siuba.siu.visitors import FunctionLookupBound
+    # TODO: MC-NOTE - move FunctionLookupBound to dispatchers?
 
-    op_method.operation = Operation(name, *args)
-    op_method.__name__ = name
-
-    dispatcher = symbolic_dispatch(op_method)
+    msg = "No default singledispatch implemented for %s" % name
+    dispatcher = symbolic_dispatch(FunctionLookupBound(msg))
+    dispatcher.operation = Operation(name, *args)
+    dispatcher.__name__ = name
 
     return dispatcher
 

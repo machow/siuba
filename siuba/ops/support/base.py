@@ -67,19 +67,21 @@ def read_sql_op(name, backend, translator):
     if f_win is None and agg_supported:
         raise Exception("agg functions in %s without window funcs: %s" %(backend, name))
 
-    if win_supported:
-        if not agg_supported:
-            flags = "no_mutate"
-        else:
-            flags = ""
+    if win_supported and not agg_supported:
+        flags = "no_aggregate"
+    elif agg_supported and not win_supported:
+        flags = "no_mutate"
+    else:
+        flags = ""
 
+    if win_supported or agg_supported:
         metadata = getattr(f_win, "operation", {})
         if isinstance(metadata, Operation):
             metadata = {**vars(metadata)}
         meta = {"is_supported": True, "flags": flags, **metadata}
 
     else:
-        meta = {"is_supported": False, "flags": ""}
+        meta = {"is_supported": False, "flags": flags}
     
     return {"full_name": name, "backend": backend, "metadata": meta}
 

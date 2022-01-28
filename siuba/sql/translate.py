@@ -160,9 +160,15 @@ def sql_colmeth(meth, *outerargs):
         return getattr(col, meth)(*outerargs, *args)
     return f
 
-def set_agg(name):
+def sql_ordered_set(name, is_analytic=False):
     # Ordered and theoretical set aggregates
     sa_func = getattr(sql.func, name)
+
+    if is_analytic:
+        return lambda col, *args: AggOver(
+            sa_func(*args).within_group(col)
+        )
+
     return lambda col, *args: sa_func(*args).within_group(col)
 
 # Handling not implemented translations ----

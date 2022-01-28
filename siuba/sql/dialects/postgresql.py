@@ -3,7 +3,7 @@ Translations for the postgresql dialect of SQL.
 """
 
 from ..translate import (
-        win_agg, win_over, win_cumul, sql_scalar, sql_agg,
+        win_agg, win_over, win_cumul, sql_scalar, sql_agg, win_absent,
         RankOver,
         wrap_annotate, annotate,
         extend_base,
@@ -108,6 +108,7 @@ window = extend_base(
         # overrides ----
 
         # note that postgres does sum(bigint) -> numeric
+        quantile = win_absent("percentile_cont"),
         size = win_agg("count"),     #TODO double check
         )
 

@@ -3,7 +3,7 @@ from ..translate import (
         SqlColumn, SqlColumnAgg, extend_base, win_agg,
         SqlTranslator,
         annotate, sql_scalar, sql_agg, win_cumul, sql_not_impl,
-        AggOver, Over,
+        AggOver, RankOver, Over,
         )
 
 from .base import base_scalar, base_agg, base_win

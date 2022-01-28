@@ -1,7 +1,7 @@
 # sqlvariant, allow defining 3 namespaces to override defaults
 from ..translate import (
         SqlColumn, SqlColumnAgg, extend_base, win_agg,
-        SqlTranslator, sql_not_impl
+        SqlTranslator, sql_not_impl, win_absent
         )
 
 from .base import base_scalar, base_agg, base_win
@@ -112,12 +112,17 @@ scalar = extend_base(
 
 aggregate = extend_base(
         MysqlColumnAgg,
-        base_agg
+        base_agg,
+
+        quantile = win_absent("percentile_cont"),
         )
 
 window = extend_base(
         MysqlColumn,
         base_win,
+
+        # TODO: analytic percentile_cont is supported in mariadb
+        quantile = win_absent("percentile_cont"),
         #sd = win_agg("stddev")
         )
 
