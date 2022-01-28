@@ -191,12 +191,15 @@ def _n_sql(x) -> ClauseElement:
     """
     return AggOver(sql.func.count())
 
+# TODO: MC-Note - fix
+
 @n.register(SqlColumnAgg)
 def _n_sql_agg(x) -> ClauseElement:
     """
     Example:
-        >>> from siuba.sql.translate import SqlColumnAgg
-        >>> print(n(SqlColumnAgg('x')))
+        >>>
+        >> from siuba.sql.translate import SqlColumnAgg
+        >> print(n(SqlColumnAgg('x')))
         count(*)
     """
 

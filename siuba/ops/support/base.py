@@ -32,24 +32,55 @@ def read_dialect(name):
 
 
 def read_sql_op(name, backend, translator):
-    f_win = translator.window.local.get(name)
-    f_agg = translator.aggregate.local.get(name)
+    # TODO: MC-NOTE - cleanup this code
+    from siuba.siu.visitors import CodataVisitor, FunctionLookupError
+    from siuba.ops.utils import Operation
+    co_win = CodataVisitor(translator.window.dispatch_cls)
+    co_agg = CodataVisitor(translator.aggregate.dispatch_cls)
 
-    # check FunctionLookupBound, a sentinal class for not implemented funcs
-    support =  not (f_win is None or isinstance(f_win, FunctionLookupBound))
-    metadata = getattr(f_win, "operation", {})
+    disp_win = translator.window.local[name]
+    disp_agg = translator.aggregate.local[name]
+
+    try:
+        f_win = co_win.validate_dispatcher(disp_win, strict=False)
+        if isinstance(f_win, FunctionLookupBound):
+            win_supported = False
+        elif disp_win.dispatch(object) is f_win:
+            win_supported = False
+        else:
+            win_supported = True
+    except FunctionLookupError:
+        f_win = None
+        win_supported = False
+
+
+    try:
+        f_agg = co_agg.validate_dispatcher(disp_agg)
+        if isinstance(f_agg, FunctionLookupBound):
+            agg_supported = False
+        else:
+            agg_supported = True
+    except FunctionLookupError:
+        agg_supported = False
 
     # window functions should be a superset of agg functions
-    if f_win is None and f_agg is not None:
+    if f_win is None and agg_supported:
         raise Exception("agg functions in %s without window funcs: %s" %(backend, name))
 
-    if support and isinstance(f_agg, FunctionLookupBound):
-        flags = "no_mutate"
+    if win_supported:
+        if not agg_supported:
+            flags = "no_mutate"
+        else:
+            flags = ""
+
+        metadata = getattr(f_win, "operation", {})
+        if isinstance(metadata, Operation):
+            metadata = {**vars(metadata)}
+        meta = {"is_supported": True, "flags": flags, **metadata}
+
     else:
-        flags = ""
-
-    meta = {"is_supported": support, "flags": flags, **metadata}
-
+        meta = {"is_supported": False, "flags": ""}
+    
     return {"full_name": name, "backend": backend, "metadata": meta}
 
 

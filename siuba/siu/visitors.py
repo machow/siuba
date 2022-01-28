@@ -242,6 +242,9 @@ class CallTreeLocal(CallListener):
 
 
 class ExecutionValidatorVisitor(CallListener):
+    # MC-NOTE TOTEST: 
+    # * dispatch input parent validates
+    # * dispatch output child validates
     def __init__(
             self,
             dispatch_cls = None,
@@ -260,9 +263,9 @@ class ExecutionValidatorVisitor(CallListener):
         self.dispatch_cls = dispatch_cls
         self.result_cls = result_cls
 
-    def validate_dispatcher(self, dispatcher):
+    def validate_dispatcher(self, dispatcher, strict=True):
         f_concrete = dispatcher.dispatch(self.dispatch_cls)
-        if isinstance(f_concrete, FunctionLookupBound):
+        if isinstance(f_concrete, FunctionLookupBound) and strict:
             raise FunctionLookupError(f_concrete.msg)
 
         if isclass(f_concrete) and issubclass(f_concrete, Exception):
@@ -287,7 +290,7 @@ class ExecutionValidatorVisitor(CallListener):
                 or is_dispatch_func_subtype(f, self.dispatch_cls, self.result_cls)
                 ):
                 # TODO: MC-NOTE: recreates old behavior, as a temporary step toward codata
-                return FuncArg(func.dispatch(self.dispatch_cls))
+                return self.exit(FuncArg(func.dispatch(self.dispatch_cls)))
             
             raise FunctionLookupError(
                     "External function {name} can dispatch on the class {dispatch_cls}, but "
@@ -300,4 +303,22 @@ class ExecutionValidatorVisitor(CallListener):
                     )
 
         return self.generic_enter(node)
+
+
+class CodataVisitor(ExecutionValidatorVisitor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.codata_instance = self.dispatch_cls()
+
+    def exit___call__(self, node):
+        if isinstance(node.args[0], FuncArg):
+            return Call(
+                    "__call__",
+                    node.args[0],
+                    self.codata_instance,
+                    *node.args[1:],
+                    **node.kwargs
+                    )
+
 

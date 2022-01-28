@@ -60,15 +60,16 @@ def sql_func_truediv(x, y):
 
 
 scalar = extend_base(
+        PostgresqlColumn,
         base_scalar,
 
         # TODO: remove log, not a pandas method
-        log = sql_log,
+        #log = sql_log,
 
         # TODO: bring up to date (not pandas methods)
-        concat = lambda col: sql.func.concat(col),
-        cat = lambda col: sql.func.concat(col),
-        str_c = lambda col: sql.func.concat(col),
+        #concat = lambda col: sql.func.concat(col),
+        #cat = lambda col: sql.func.concat(col),
+        #str_c = lambda col: sql.func.concat(col),
 
         # infix and infix methods ----
 
@@ -96,10 +97,11 @@ scalar = extend_base(
         )
 
 window = extend_base(
+        PostgresqlColumn,
         base_win,
         any = annotate(win_agg("bool_or"), input_type = "bool"),
         all = annotate(win_agg("bool_and"), input_type = "bool"),
-        lag = win_agg("lag"),
+        #lag = win_agg("lag"),
         std = win_agg("stddev_samp"),
         var = win_agg("var_samp"),
 
@@ -110,6 +112,7 @@ window = extend_base(
         )
 
 aggregate = extend_base(
+        PostgresqlColumnAgg,
         base_agg,
         all = sql_agg("bool_and"),
         any = sql_agg("bool_or"),

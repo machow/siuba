@@ -283,7 +283,11 @@ class LazyTbl:
             else:
                 trans = self.translator.aggregate
 
-            v = ExecutionValidatorVisitor(trans.dispatch_cls, trans.result_cls)
+            # TODO: MC-NOTE - once all sql singledispatch funcs are annotated
+            # with return types, then switch object back out
+            # alternatively, could register a bounding class, and remove
+            # the result type check
+            v = ExecutionValidatorVisitor(trans.dispatch_cls, object)
             return v.visit(shaped_call)
             
         except FunctionLookupError as err:

@@ -69,6 +69,7 @@ def sql_func_between(col, left, right, inclusive=True):
     return expr
 
 scalar = extend_base(
+        MysqlColumn,
         base_scalar,
 
         # copied from postgres. MYSQL does true division over ints by default,
@@ -110,12 +111,14 @@ scalar = extend_base(
         )
 
 aggregate = extend_base(
+        MysqlColumnAgg,
         base_agg
         )
 
 window = extend_base(
+        MysqlColumn,
         base_win,
-        sd = win_agg("stddev")
+        #sd = win_agg("stddev")
         )
 
 funcs = dict(scalar = scalar, aggregate = aggregate, window = window)

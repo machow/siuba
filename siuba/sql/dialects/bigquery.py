@@ -96,6 +96,7 @@ def sql_all(window = False):
 sql_median = lambda col: fn.percentile_cont(col, .5)
 
 scalar = extend_base(
+    BigqueryColumn,
     base_scalar,
     __floordiv__  = sql_floordiv,
     __rfloordiv__ = annotate(lambda x, y: sql_floordiv(y, x), result_type="float"),
@@ -132,6 +133,7 @@ scalar = extend_base(
     )
 
 aggregate = extend_base(
+    BigqueryColumnAgg,
     base_agg,
     # NOTE: bigquery has an all() func, but it's not an aggregate
     any      = sql_any(),
@@ -147,6 +149,7 @@ aggregate = extend_base(
     )
 
 window = extend_base(
+    BigqueryColumn,
     base_win,
     any      = sql_any(window = True),
     all      = sql_all(window = True),

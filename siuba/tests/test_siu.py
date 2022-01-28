@@ -373,3 +373,35 @@ def test_call_tree_local_dispatch_fail(f_dispatch_strict):
     with pytest.raises(TypeError):
         new_call('na')
 
+
+# Codatavisitor ===============================================================
+from siuba.siu.visitors import CodataVisitor
+
+def test_codata_visitor_enclosed_call(_):
+    class Alternative: pass
+
+    @symbolic_dispatch
+    def n(col):
+        return f"n({col})"
+
+    @symbolic_dispatch
+    def mean(col):
+        str_n = n(col)
+        return f"sum({col}) / {str_n}"
+
+    @n.register(Alternative)
+    def _f(self, col):
+        return f"n_alternative({col})"
+
+    @mean.register(Alternative)
+    def _f(self, col):
+        str_n = n(self, col)
+        return f"sum_alternative({col}) / {str_n}"
+
+    codata = CodataVisitor(dispatch_cls = Alternative)
+
+    expr = strip_symbolic(mean(_))
+    new_expr = codata.visit(expr)
+
+    assert new_expr("a") == "sum_alternative(a) / n_alternative(a)"
+

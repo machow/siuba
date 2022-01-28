@@ -14,17 +14,20 @@ class SqliteColumn(SqlColumn): pass
 class SqliteColumnAgg(SqlColumnAgg, SqliteColumn): pass
 
 scalar = extend_base(
+        SqliteColumn,
         base_scalar,
         )
 
 aggregate = extend_base(
+        SqliteColumnAgg,
         base_agg
         )
 
 window = extend_base(
+        SqliteColumn,
         # TODO: should check sqlite version, since < 3.25 can't use windows
         base_nowin,
-        sd = win_agg("stddev")
+        #sd = win_agg("stddev")
         )
 
 
