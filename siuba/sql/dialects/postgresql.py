@@ -30,16 +30,16 @@ class PostgresqlColumnAgg(SqlColumnAgg, PostgresqlColumn): pass
 def returns_float(ns, func_names):
     return {k: wrap_annotate(ns[k], result_type = "float") for k in func_names}
 
-def sql_log(col, base = None):
+def sql_log(_, col, base = None):
     if base is None:
         return sql.func.ln(col)
     return sql.func.log(col)
 
 @annotate(result_type = "float")
-def sql_round(col, n):
+def sql_round(_, col, n):
     return sql.func.round(col, n)
 
-def sql_func_contains(col, pat, case = True, flags = 0, na = None, regex = True):
+def sql_func_contains(_, col, pat, case = True, flags = 0, na = None, regex = True):
     # TODO: warn there differences in regex for python and sql?
     # TODO: validate pat is string?
     if not isinstance(pat, str):
@@ -55,7 +55,7 @@ def sql_func_contains(col, pat, case = True, flags = 0, na = None, regex = True)
 
     return col.op(full_op)(pat)
 
-def sql_func_truediv(x, y):
+def sql_func_truediv(_, x, y):
     return sql.cast(x, sa_types.Float()) / y
 
 
@@ -75,11 +75,11 @@ scalar = extend_base(
 
         div = sql_func_truediv,
         divide = sql_func_truediv,
-        rdiv = lambda x,y: sql_func_truediv(y, x),
+        rdiv = lambda _, x,y: sql_func_truediv(_, y, x),
 
         __truediv__ = sql_func_truediv,
         truediv = sql_func_truediv,
-        __rtruediv__ = lambda x, y: sql_func_truediv(y, x),
+        __rtruediv__ = lambda _, x, y: sql_func_truediv(_, y, x),
 
 
         round = sql_round,

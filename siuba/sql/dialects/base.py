@@ -52,7 +52,7 @@ from siuba.sql.translate import SqlColumn, SqlColumnAgg
 
 # Computation -----------------------------------------------------------------
 
-def sql_func_diff(col, periods = 1):
+def sql_func_diff(_, col, periods = 1):
     if periods > 0:
         return CumlOver(col - sql.func.lag(col, periods))
     elif periods < 0:
@@ -60,10 +60,10 @@ def sql_func_diff(col, periods = 1):
 
     raise ValueError("periods argument to sql diff cannot be 0")
 
-def sql_func_floordiv(x, y):
+def sql_func_floordiv(_, x, y):
     return sql.cast(x / y, sa_types.Integer())
 
-def sql_func_rank(col):
+def sql_func_rank(_, col):
     # see https://stackoverflow.com/a/36823637/1144523
     min_rank = RankOver(sql.func.rank(), order_by = col)
     to_mean = (RankOver(sql.func.count(), partition_by = col) - 1) / 2.0
@@ -74,31 +74,31 @@ def sql_func_rank(col):
 # Datetime -------------------------------------------------------------------
 
 def sql_extract(name):
-    return lambda col: sql.func.extract(name, col)
+    return lambda _, col: sql.func.extract(name, col)
 
-def sql_func_extract_dow_monday(col):
+def sql_func_extract_dow_monday(_, col):
     # make monday = 0 rather than sunday
     monday0 = sql.cast(sql.func.extract('dow', col) + 6, sa_types.Integer) % 7
     # cast to numeric, since that's what extract('dow') returns
     return sql.cast(monday0, sa_types.Numeric)
 
 def sql_is_first_of(name, reference):
-    return lambda col: fn.date_trunc(name, col) == fn.date_trunc(reference, col)
+    return lambda _, col: fn.date_trunc(name, col) == fn.date_trunc(reference, col)
 
-def sql_func_last_day_in_period(col, period):
+def sql_func_last_day_in_period(_, col, period):
     return fn.date_trunc(period, col) + sql.text("interval '1 %s - 1 day'" % period)
 
-def sql_func_days_in_month(col):
-    return fn.extract('day', sql_func_last_day_in_period(col, 'month'))
+def sql_func_days_in_month(codata, col):
+    return fn.extract('day', sql_func_last_day_in_period(codata, col, 'month'))
 
 def sql_is_last_day_of(period):
-    def f(col):
-        last_day = sql_func_last_day_in_period(col, period)
+    def f(codata, col):
+        last_day = sql_func_last_day_in_period(codata, col, period)
         return fn.date_trunc('day', col) == last_day
 
     return f
 
-def sql_func_floor_date(col, unit):
+def sql_func_floor_date(_, col, unit):
     # see https://www.postgresql.org/docs/9.1/functions-datetime.html#FUNCTIONS-DATETIME-TRUNC
     # valid values: 
     #   microseconds, milliseconds, second, minute, hour,
@@ -112,12 +112,12 @@ def sql_func_floor_date(col, unit):
 def sql_str_strip(name):
     
     strip_func = getattr(fn, name)
-    def f(col, to_strip = " \t\n\v\f\r"):
+    def f(_, col, to_strip = " \t\n\v\f\r"):
         return strip_func(col, to_strip)
 
     return f
 
-def sql_func_capitalize(col):
+def sql_func_capitalize(_, col):
     first_char = fn.upper(fn.left(col, 1)) 
     rest = fn.right(col, fn.length(col) - 1)
     return sql.functions.concat(first_char, rest)
@@ -125,7 +125,7 @@ def sql_func_capitalize(col):
 
 # Misc implementations --------------------------------------------------------
 
-def sql_func_astype(col, _type):
+def sql_func_astype(_, col, _type):
     mappings = {
             str: sa_types.Text,
             'str': sa_types.Text,
@@ -173,7 +173,7 @@ base_scalar = dict(
     __pow__       = sql_not_impl(),
     __radd__      = sql_colmeth("__radd__"),
     __rand__      = req_bool(sql_colmeth("__rand__")),
-    __rfloordiv__ = lambda x, y: sql_func_floordiv(y, x),
+    __rfloordiv__ = lambda _, x, y: sql_func_floordiv(y, x),
     __rmod__      = sql_colmeth("__rmod__"),
     __rmul__      = sql_colmeth("__rmul__"),
     __ror__       = req_bool(sql_colmeth("__ror__")),
@@ -224,7 +224,7 @@ base_scalar = dict(
 
     abs                     = sql_scalar("abs"),
     between                 = sql_colmeth("between"),
-    clip                    = lambda col, low, upp: fn.least(fn.greatest(col, low), upp),
+    clip                    = lambda _, col, low, upp: fn.least(fn.greatest(col, low), upp),
     isin                    = sql_colmeth("in_"),
 
 
@@ -245,14 +245,14 @@ base_scalar = dict(
       #"str.isalpha"       :,
       #"str.isdecimal"     :,
       #"str.isdigit"       :,
-      "str.islower"       : lambda col: col == sql.func.lower(col),
+      "str.islower"       : lambda _, col: col == sql.func.lower(col),
       #"str.isnumeric"     :,
       #"str.isspace"       :,
       #"str.istitle"       :,
       #"str.isupper"       :,
-      "str.len"           : lambda col: sql.func.length(col),
+      "str.len"           : lambda _, col: sql.func.length(col),
       #"str.ljust"         :,
-      "str.lower"         : lambda col: sql.func.lower(col),
+      "str.lower"         : lambda _, col: sql.func.lower(col),
       "str.lstrip"        : sql_str_strip("ltrim"),
       #"str.match"         :,
       #"str.pad"           :,
@@ -267,8 +267,8 @@ base_scalar = dict(
       "str.startswith"    : sql_colmeth("startswith"),
       "str.strip"         : sql_str_strip("trim"),
       #"str.swapcase"      :,
-      "str.title"         : lambda col: sql.func.initcap(col),
-      "str.upper"         : lambda col: sql.func.upper(col),
+      "str.title"         : lambda _, col: sql.func.initcap(col),
+      "str.upper"         : lambda _, col: sql.func.upper(col),
       #"str.wrap"          :,
     },
 
@@ -335,11 +335,11 @@ base_scalar = dict(
 
     # Missing values ----
 
-    fillna      = lambda x, y: sql.functions.coalesce(x,y),
+    fillna      = lambda _, x, y: sql.functions.coalesce(x,y),
     isna        = sql_colmeth("is_", None),
     isnull      = sql_colmeth("is_", None),
-    notna       = lambda col: ~col.is_(None),
-    notnull     = lambda col: ~col.is_(None),
+    notna       = lambda _, col: ~col.is_(None),
+    notnull     = lambda _, col: ~col.is_(None),
 
     # Misc ---
     #replace       =  # TODO
@@ -431,7 +431,7 @@ base_agg = dict(
     #all = #TODO(pg): all = sql_aggregate("BOOL_AND", "all")
     #any = #TODO(pg): any = sql_aggregate("BOOL_OR", "any"),
     #corr = # TODO(pg)
-    count = lambda col: sql.func.count(),
+    count = lambda _, col: sql.func.count(),
     #cov = 
     #is_unique = # TODO(low)
     #kurt = 
@@ -441,7 +441,7 @@ base_agg = dict(
     mean = sql_agg("avg"),
     #median = 
     min = sql_agg("min"),
-    nunique = lambda col: sql.func.count(sql.func.distinct(col)),
+    nunique = lambda _, col: sql.func.count(sql.func.distinct(col)),
     #prod = 
     #product = 
     quantile = sql_ordered_set("percentile_cont"),

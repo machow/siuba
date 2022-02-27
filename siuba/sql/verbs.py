@@ -276,7 +276,7 @@ class LazyTbl:
         # raise informative error message if missing translation
         try:
             # TODO: MC-NOTE -- scaffolding in to verify prior behavior works
-            from siuba.siu.visitors import ExecutionValidatorVisitor
+            from siuba.siu.visitors import CodataVisitor
             shaped_call = self.translator.translate(call, window = window)
             if window:
                 trans = self.translator.window
@@ -287,7 +287,7 @@ class LazyTbl:
             # with return types, then switch object back out
             # alternatively, could register a bounding class, and remove
             # the result type check
-            v = ExecutionValidatorVisitor(trans.dispatch_cls, object)
+            v = CodataVisitor(trans.dispatch_cls, object)
             return v.visit(shaped_call)
             
         except FunctionLookupError as err:

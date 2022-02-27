@@ -35,11 +35,11 @@ warnings.simplefilter('once', SiubaSqlRuntimeWarning)
 
 # desc ------------------------------------------------------------------------
 
-@desc.register(ClauseElement)
-def _desc_sql(x) -> ClauseElement:
+@desc.register
+def _desc_sql(codata: SqlColumn, x: ClauseElement) -> ClauseElement:
     """
     Example:
-        >>> print(desc(sql.column('a')))
+        >>> print(desc(SqlColumn(), sql.column('a')))
         a DESC
     """
     return x.desc()
@@ -65,7 +65,7 @@ def _sql_rank_over(rank_func, col, partition, nulls_last):
 def _sql_rank(func_name, partition = False, nulls_last = False):
     rank_func = getattr(sql.func, func_name)
 
-    def f(col, na_option = None) -> RankOver:
+    def f(_, col, na_option = None) -> RankOver:
         if na_option == "keep":
             return _sql_rank_over(rank_func, col, partition, nulls_last)
 
@@ -76,10 +76,10 @@ def _sql_rank(func_name, partition = False, nulls_last = False):
     return f
 
 
-dense_rank  .register(ClauseElement, _sql_rank("dense_rank"))
-percent_rank.register(ClauseElement, _sql_rank("percent_rank"))
-cume_dist   .register(ClauseElement, _sql_rank("cume_dist", partition = True))
-min_rank    .register(ClauseElement, _sql_rank("rank", partition = True))
+dense_rank  .register(SqlColumn, _sql_rank("dense_rank"))
+percent_rank.register(SqlColumn, _sql_rank("percent_rank"))
+cume_dist   .register(SqlColumn, _sql_rank("cume_dist", partition = True))
+min_rank    .register(SqlColumn, _sql_rank("rank", partition = True))
 
 
 dense_rank  .register(SqliteColumn, win_absent("DENSE_RANK"))
@@ -103,11 +103,11 @@ percent_rank.register(BigqueryColumn, _sql_rank("percent_rank", nulls_last = Tru
 
 # row_number ------------------------------------------------------------------
 
-@row_number.register(ClauseElement)
-def _row_number_sql(col) -> CumlOver:
+@row_number.register
+def _row_number_sql(codata: SqlColumn, col: ClauseElement) -> CumlOver:
     """
     Example:
-        >>> print(row_number(sql.column('a')))
+        >>> print(row_number(SqlColumn(), sql.column('a')))
         row_number() OVER ()
         
     """
@@ -117,14 +117,14 @@ row_number.register(SqliteColumn, win_absent("ROW_NUMBER"))
 
 # between ---------------------------------------------------------------------
 
-@between.register(ClauseElement)
-def _between_sql(x, left, right, default = None) -> ClauseElement:
+@between.register
+def _between_sql(codata: SqlColumn, x, left, right, default = None) -> ClauseElement:
     """
     Example:
-        >>> print(between(sql.column('a'), 1, 2))
+        >>> print(between(SqlColumn(), sql.column('a'), 1, 2))
         a BETWEEN :a_1 AND :a_2
 
-        >>> print(between(sql.column('a'), 1, 2, default = False))
+        >>> print(between(SqlColumn(), sql.column('a'), 1, 2, default = False))
         coalesce(a BETWEEN :a_1 AND :a_2, :coalesce_1)
 
     """
@@ -140,66 +140,63 @@ def _between_sql(x, left, right, default = None) -> ClauseElement:
 
 # coalesce --------------------------------------------------------------------
 
-@coalesce.register(ClauseElement)
-def _coalesce_sql(x, *args) -> ClauseElement:
+@coalesce.register
+def _coalesce_sql(codata: SqlColumn, x, *args) -> ClauseElement:
     """
     Example:
-        >>> print(coalesce(sql.column('a'), sql.column('b')))
+        >>> print(coalesce(SqlColumn(), sql.column('a'), sql.column('b')))
         coalesce(a, b)
 
-        >>> coalesce(1, sql.column('a'))
-        Traceback (most recent call last):
-            ...
-        TypeError: ...
+        >>> print(coalesce(SqlColumn(), 1, sql.column('a')))
+        coalesce(:coalesce_1, a)
     """
     return sql.functions.coalesce(x, *args)
 
 
 # lead and lag ----------------------------------------------------------------
 
-@lead.register(ClauseElement)
-def _lead_sql(x, n = 1, default = None) -> ClauseElement:
+@lead.register
+def _lead_sql(codata: SqlColumn, x, n = 1, default = None) -> ClauseElement:
     """
     Example:
-        >>> print(lead(sql.column('a'), 2, 99))
+        >>> print(lead(SqlColumn(), sql.column('a'), 2, 99))
         lead(a, :lead_1, :lead_2) OVER ()
     """
     
     f = win_cumul("lead", rows=None)
-    return f(x, n, default)
+    return f(codata, x, n, default)
 
-@lag.register(ClauseElement)
-def _lag_sql(x, n = 1, default = None) -> ClauseElement:
+@lag.register
+def _lag_sql(codata: SqlColumn, x, n = 1, default = None) -> ClauseElement:
     """
     Example:
-        >>> print(lag(sql.column('a'), 2, 99))
+        >>> print(lag(SqlColumn(), sql.column('a'), 2, 99))
         lag(a, :lag_1, :lag_2) OVER ()
     """
     f = win_cumul("lag", rows=None)
-    return f(x, n , default)
+    return f(codata, x, n , default)
 
 
 # n ---------------------------------------------------------------------------
 
-@n.register(ClauseElement)
-@n.register(ImmutableColumnCollection)
-def _n_sql(x) -> ClauseElement:
+@n.register
+def _n_sql(codata: SqlColumn, x) -> ClauseElement:
     """
     Example:
-        >>> print(n(sql.column('a')))
+        >>> print(n(SqlColumn(), sql.column('a')))
         count(*) OVER ()
     """
     return AggOver(sql.func.count())
 
 # TODO: MC-Note - fix
 
-@n.register(SqlColumnAgg)
-def _n_sql_agg(x) -> ClauseElement:
+@n.register
+def _n_sql_agg(codata: SqlColumnAgg, x) -> ClauseElement:
     """
     Example:
         >>>
         >> from siuba.sql.translate import SqlColumnAgg
-        >> print(n(SqlColumnAgg('x')))
+        >> print(n(SqlColumnAgg(), None))
         count(*)
     """
 
@@ -211,11 +208,11 @@ row_number.register(SqliteColumn, win_absent("ROW_NUMBER"))
 
 # n_distinct ------------------------------------------------------------------
 
-@n_distinct.register(ClauseElement)
-def _n_distinct_sql(x) -> ClauseElement:
+@n_distinct.register
+def _n_distinct_sql(codata: SqlColumn, x: ClauseElement) -> ClauseElement:
     """
     Example:
-        >>> print(n_distinct(sql.column('a')) )
+        >>> print(n_distinct(SqlColumn(), sql.column('a')) )
         count(distinct(a))
     """
     return sql.func.count(sql.func.distinct(x))
@@ -223,11 +220,11 @@ def _n_distinct_sql(x) -> ClauseElement:
 
 # na_if -----------------------------------------------------------------------
 
-@na_if.register(ClauseElement)
-def _na_if_sql(x, y) -> ClauseElement:
+@na_if.register
+def _na_if_sql(codata: SqlColumn, x, y) -> ClauseElement:
     """
     Example:
-        >>> print(na_if(sql.column('x'), 2))
+        >>> print(na_if(SqlColumn(), sql.column('x'), 2))
         nullif(x, :nullif_1)
     """
     return sql.func.nullif(x, y)
@@ -238,8 +235,8 @@ def _na_if_sql(x, y) -> ClauseElement:
 #       this may need to change this in the future, since this means they won't
 #       show their own name, when you print, e.g. first(_.x)
 
-@nth.register(ClauseElement)
-def _nth_sql(x, n, order_by = None, default = None) -> ClauseElement:
+@nth.register
+def _nth_sql(codata: SqlColumn, x, n, order_by = None, default = None) -> ClauseElement:
     if default is not None:
         raise NotImplementedError("default argument not implemented")
 
@@ -263,7 +260,7 @@ def _nth_sql(x, n, order_by = None, default = None) -> ClauseElement:
             )
 
 
-@nth.register(SqlColumnAgg)
-def _nth_sql_agg(x, n, order_by = None, default = None) -> ClauseElement:
+@nth.register
+def _nth_sql_agg(codata: SqlColumnAgg, x, n, order_by = None, default = None) -> ClauseElement:
     raise NotImplementedError("nth, first, and last not available in summarize")
 

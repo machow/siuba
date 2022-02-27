@@ -19,28 +19,28 @@ class BigqueryColumnAgg(SqlColumnAgg, BigqueryColumn): pass
 # Custom translations =========================================================
 
 @annotate(result_type="float")
-def sql_floordiv(x, y):
+def sql_floordiv(_, x, y):
     return sql.func.floor(x / y)
 
 # datetime ----
 
-def _date_trunc(col, name):
+def _date_trunc(_, col, name):
     return fn.datetime_trunc(col, sql.text(name))
 
 def sql_extract(field):
-    return lambda col: fn.extract(field, col)
+    return lambda _, col: fn.extract(field, col)
 
 def sql_is_first_of(name, reference):
-    return lambda col: _date_trunc(col, name) == _date_trunc(col, reference)
+    return lambda _, col: _date_trunc(col, name) == _date_trunc(col, reference)
 
-def sql_func_last_day_in_period(col, period):
+def sql_func_last_day_in_period(_, col, period):
     return fn.last_day(col, sql.text(period))
 
-def sql_func_days_in_month(col):
+def sql_func_days_in_month(_, col):
     return fn.extract('DAY', sql_func_last_day_in_period(col, 'MONTH'))
 
 def sql_is_last_day_of(period):
-    def f(col):
+    def f(_, col):
         last_day = sql_func_last_day_in_period(col, period)
         return _date_trunc(col, "DAY") == last_day
 
@@ -49,7 +49,7 @@ def sql_is_last_day_of(period):
 
 # string ----
 
-def sql_str_replace(col, pat, repl, n=-1, case=None, flags=0, regex=True):
+def sql_str_replace(_, col, pat, repl, n=-1, case=None, flags=0, regex=True):
     if n != -1 or case is not None or flags != 0:
         raise NotImplementedError("only pat and repl arguments supported in sql")
 
@@ -58,7 +58,7 @@ def sql_str_replace(col, pat, repl, n=-1, case=None, flags=0, regex=True):
 
     return fn.replace(col, pat, repl)
 
-def sql_str_contains(col, pat, case=None, flags=0, na=None, regex=True):
+def sql_str_contains(_, col, pat, case=None, flags=0, na=None, regex=True):
     if case is not None or flags != 0:
         raise NotImplementedError("only pat and repl arguments supported in sql")
 
@@ -78,7 +78,7 @@ def sql_any(window = False):
     f_win = AggOver if window else lambda x: x
     
     @annotate(input_type="bool")
-    def f(col):
+    def f(_, col):
         return f_win(fn.sum(fn.cast(col, sa_types.Integer()))) != 0
 
     return f
@@ -87,24 +87,24 @@ def sql_all(window = False):
     f_win = AggOver if window else lambda x: x
     
     @annotate(input_type="bool")
-    def f(col):
+    def f(_, col):
         # similar to any, but uses (not cond) summed is 0
         return f_win(fn.sum(fn.cast(~col, sa_types.Integer()))) == 0
 
     return f
 
-sql_median = lambda col: fn.percentile_cont(col, .5)
+sql_median = lambda _, col: fn.percentile_cont(col, .5)
 
 scalar = extend_base(
     BigqueryColumn,
     base_scalar,
     __floordiv__  = sql_floordiv,
-    __rfloordiv__ = annotate(lambda x, y: sql_floordiv(y, x), result_type="float"),
+    __rfloordiv__ = annotate(lambda _, x, y: sql_floordiv(y, x), result_type="float"),
 
-    __mod__       = lambda x, y: sql.func.mod(x, y),
-    mod           = lambda x, y: sql.func.mod(x, y),
-    __rmod__      = lambda x, y: sql.func.mod(y, x),
-    rmod          = lambda x, y: sql.func.mod(y, x),
+    __mod__       = lambda _, x, y: sql.func.mod(x, y),
+    mod           = lambda _, x, y: sql.func.mod(x, y),
+    __rmod__      = lambda _, x, y: sql.func.mod(y, x),
+    rmod          = lambda _, x, y: sql.func.mod(y, x),
 
     __round__     = annotate(sql_scalar("round"), result_type = "float"),
     round         = annotate(sql_scalar("round"), result_type = "float"),
@@ -112,7 +112,7 @@ scalar = extend_base(
     # date ----
     **{
       # bigquery has Sunday as 1, pandas wants Monday as 0
-      "dt.dayofweek":        lambda col: fn.extract("DAYOFWEEK", col) - 2,
+      "dt.dayofweek":        lambda _, col: fn.extract("DAYOFWEEK", col) - 2,
       "dt.dayofyear":        sql_extract("DAYOFYEAR"),
       "dt.daysinmonth":      sql_func_days_in_month,
       "dt.days_in_month":    sql_func_days_in_month,
@@ -121,9 +121,9 @@ scalar = extend_base(
       "dt.is_quarter_start": sql_is_first_of("DAY", "QUARTER"),
       "dt.is_year_end":      sql_is_last_day_of("YEAR"),
       "dt.is_year_start":    sql_is_first_of("DAY", "YEAR"),
-      "dt.month_name":       lambda col: fn.format_date("%B", col),
+      "dt.month_name":       lambda _, col: fn.format_date("%B", col),
       "dt.week":             sql_extract("ISOWEEK"),
-      "dt.weekday":          lambda col: fn.extract("DAYOFWEEK", col) - 2,
+      "dt.weekday":          lambda _, col: fn.extract("DAYOFWEEK", col) - 2,
       "dt.weekofyear":       sql_extract("ISOWEEK")
     },
     **{
@@ -138,11 +138,11 @@ aggregate = extend_base(
     # NOTE: bigquery has an all() func, but it's not an aggregate
     any      = sql_any(),
     all      = sql_all(),
-    count    = lambda col: fn.count(col),
+    count    = lambda _, col: fn.count(col),
     median   = sql_not_impl(QUANTILE_ERROR),
-    nunique  = lambda col: fn.count(fn.distinct(col)),
+    nunique  = lambda _, col: fn.count(fn.distinct(col)),
     quantile = sql_not_impl(QUANTILE_ERROR),
-    size     = lambda col: fn.count("*"),
+    size     = lambda _, col: fn.count("*"),
     std       = sql_agg("stddev"),
     sum      = sql_agg("sum"),
     var      = sql_agg("variance"),
@@ -153,14 +153,14 @@ window = extend_base(
     base_win,
     any      = sql_any(window = True),
     all      = sql_all(window = True),
-    count    = lambda col: AggOver(fn.count(col)),
+    count    = lambda _, col: AggOver(fn.count(col)),
     cumsum   = win_cumul("sum"),
-    median   = lambda col: RankOver(sql_median(col)),
-    nunique  = lambda col: AggOver(fn.count(fn.distinct(col))),
-    quantile = lambda col, q: RankOver(fn.percentile_cont(col, q)),
+    median   = lambda _, col: RankOver(sql_median(col)),
+    nunique  = lambda _, col: AggOver(fn.count(fn.distinct(col))),
+    quantile = lambda _, col, q: RankOver(fn.percentile_cont(col, q)),
     std       = win_agg("stddev"),
     sum      = win_agg("sum"),
-    size     = lambda col: AggOver(fn.count("*")),
+    size     = lambda _, col: AggOver(fn.count("*")),
     var      = win_agg("variance"),
     )
 

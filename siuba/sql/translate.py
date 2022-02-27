@@ -79,7 +79,7 @@ class AggOver(CustomOverClause):
     @classmethod
     def func(cls, name):
         sa_func = getattr(sql.func, name)
-        def f(col, *args, **kwargs) -> AggOver:
+        def f(codata, col, *args, **kwargs) -> AggOver:
             return cls(sa_func(col, *args, **kwargs))
 
         return f
@@ -99,7 +99,7 @@ class RankOver(CustomOverClause):
     @classmethod
     def func(cls, name):
         sa_func = getattr(sql.func, name)
-        def f(col) -> RankOver:
+        def f(codata, col) -> RankOver:
             return cls(sa_func(), order_by = col)
 
         return f
@@ -134,12 +134,15 @@ class CumlOver(CustomOverClause):
     @classmethod
     def func(cls, name, rows=(None, 0)):
         sa_func = getattr(sql.func, name)
-        def f(col, *args, **kwargs) -> CumlOver:
+        def f(codata, col, *args, **kwargs) -> CumlOver:
             return cls(sa_func(col, *args, **kwargs), rows = rows)
 
         return f
 
 # convenience aliases for class methods above
+# TODO MC-NOTE: funcs like AggOver.func should not have codata as the first argument, 
+# since they are simple sqlalchemy subclasses. However, they're used as function
+# factories in the dialects...
 win_agg = AggOver.func
 win_over = RankOver.func
 win_cumul = CumlOver.func
@@ -149,14 +152,14 @@ win_cumul = CumlOver.func
 
 def sql_agg(name):
     sa_func = getattr(sql.func, name)
-    return lambda col: sa_func(col)
+    return lambda codata, col: sa_func(col)
 
 def sql_scalar(name):
     sa_func = getattr(sql.func, name)
-    return lambda col, *args: sa_func(col, *args)
+    return lambda codata, col, *args: sa_func(col, *args)
 
 def sql_colmeth(meth, *outerargs):
-    def f(col, *args) -> SqlColumn:
+    def f(codata, col, *args) -> SqlColumn:
         return getattr(col, meth)(*outerargs, *args)
     return f
 
@@ -165,11 +168,11 @@ def sql_ordered_set(name, is_analytic=False):
     sa_func = getattr(sql.func, name)
 
     if is_analytic:
-        return lambda col, *args: AggOver(
+        return lambda codata, col, *args: AggOver(
             sa_func(*args).within_group(col)
         )
 
-    return lambda col, *args: sa_func(*args).within_group(col)
+    return lambda codata, col, *args: sa_func(*args).within_group(col)
 
 # Handling not implemented translations ----
 
