@@ -94,6 +94,7 @@ scalar = extend_base(
           "str.title": sql_not_impl()                       # see https://stackoverflow.com/q/12364086/1144523
         },
         **{
+          # TODO: MC-NOTE -- can be reworked using extract
           "dt.dayofweek": sql_func_extract_dow_monday,
           "dt.dayofyear": lambda _, col: fn.dayofyear(col),
           "dt.days_in_month": lambda _, col: fn.dayofmonth(fn.last_day(col)),

@@ -218,10 +218,13 @@ def wrap_annotate(f, **kwargs):
 #  Translator =================================================================
 
 def extend_base(cls, mapping, **kwargs):
+    # TODO: MC-NOTE remove mapping
     from siuba.ops import ALL_OPS
     for meth_name, f in kwargs.items():
         ALL_OPS[meth_name].register(cls, f)
-    return {**mapping, **kwargs}
+
+    # TODO: MC-NOTE remove once done
+    return {}
 
 from siuba.ops.translate import create_pandas_translator
 
@@ -268,14 +271,15 @@ class SqlTranslator:
 
     def from_mappings(base, window, aggregate, WinCls, AggCls):
         from siuba.ops import ALL_OPS
-        trans_win = {**base, **window}
-        trans_agg = {**base, **aggregate}
+        # TODO: MC-NOTE remove trans_win, trans_agg
+        # trans_win = {**base, **window}
+        # trans_agg = {**base, **aggregate}
 
-        for meth_name, f in trans_win.items():
-            ALL_OPS[meth_name].register(WinCls, f)
+        #for meth_name, f in trans_win.items():
+        #    ALL_OPS[meth_name].register(WinCls, f)
 
-        for meth_name, f in trans_agg.items():
-            ALL_OPS[meth_name].register(AggCls, f)
+        #for meth_name, f in trans_agg.items():
+        #    ALL_OPS[meth_name].register(AggCls, f)
 
         return SqlTranslator(
                 window = create_pandas_translator(ALL_OPS, WinCls, sql.elements.ClauseElement),

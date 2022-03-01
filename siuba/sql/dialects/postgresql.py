@@ -27,8 +27,18 @@ class PostgresqlColumnAgg(SqlColumnAgg, PostgresqlColumn): pass
 
 # Custom translations =========================================================
 
-def returns_float(ns, func_names):
-    return {k: wrap_annotate(ns[k], result_type = "float") for k in func_names}
+def returns_float(func_names):
+    # TODO: MC-NOTE - shift all translations to directly register
+    # TODO: MC-NOTE - make an AliasAnnotated class or something, that signals
+    #                 it is using another method, but w/ an updated annotation.
+    from siuba.ops import ALL_OPS
+    
+    for name in func_names:
+        generic = ALL_OPS[name]
+        f_concrete = generic.dispatch(SqlColumn)
+        f_annotated = wrap_annotate(f_concrete, result_type="float")
+        generic.register(PostgresqlColumn, f_annotated)
+    
 
 def sql_log(_, col, base = None):
     if base is None:
@@ -59,7 +69,7 @@ def sql_func_truediv(_, x, y):
     return sql.cast(x, sa_types.Float()) / y
 
 
-scalar = extend_base(
+extend_base(
         PostgresqlColumn,
         base_scalar,
 
@@ -88,13 +98,14 @@ scalar = extend_base(
         **{
             "str.contains": sql_func_contains,
         },
-        **returns_float(base_scalar, [
+        )
+
+returns_float([
              "dt.day", "dt.dayofweek", "dt.dayofyear", "dt.days_in_month",
              "dt.daysinmonth", "dt.hour", "dt.minute", "dt.month",
              "dt.quarter", "dt.second", "dt.week", "dt.weekday",
              "dt.weekofyear", "dt.year"
-             ]),
-        )
+             ])
 
 window = extend_base(
         PostgresqlColumn,
@@ -122,10 +133,8 @@ aggregate = extend_base(
         )
 
 
-funcs = dict(scalar = scalar, aggregate = aggregate, window = window)
-
 # translate(config, CallTreeLocal, PostgresqlColumn, _.a + _.b)
 translator = SqlTranslator.from_mappings(
-        scalar, window, aggregate,
+        {}, {}, {},
         PostgresqlColumn, PostgresqlColumnAgg
         )

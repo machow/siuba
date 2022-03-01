@@ -24,6 +24,7 @@ from sqlalchemy.sql import func as fn
 from sqlalchemy.sql.elements import ColumnClause
 
 from siuba.sql.translate import (
+        extend_base,
         win_absent,
         win_over,
         win_cumul,
@@ -73,30 +74,31 @@ def sql_func_rank(_, col):
 
 # Datetime -------------------------------------------------------------------
 
-def sql_extract(name):
-    return lambda _, col: sql.func.extract(name, col)
-
-def sql_func_extract_dow_monday(_, col):
-    # make monday = 0 rather than sunday
-    monday0 = sql.cast(sql.func.extract('dow', col) + 6, sa_types.Integer) % 7
-    # cast to numeric, since that's what extract('dow') returns
-    return sql.cast(monday0, sa_types.Numeric)
-
-def sql_is_first_of(name, reference):
-    return lambda _, col: fn.date_trunc(name, col) == fn.date_trunc(reference, col)
-
-def sql_func_last_day_in_period(_, col, period):
-    return fn.date_trunc(period, col) + sql.text("interval '1 %s - 1 day'" % period)
-
-def sql_func_days_in_month(codata, col):
-    return fn.extract('day', sql_func_last_day_in_period(codata, col, 'month'))
-
-def sql_is_last_day_of(period):
-    def f(codata, col):
-        last_day = sql_func_last_day_in_period(codata, col, period)
-        return fn.date_trunc('day', col) == last_day
-
-    return f
+from . import _dt_generics as _dt
+# def sql_extract(name):
+#     return lambda _, col: sql.func.extract(name, col)
+# 
+# def sql_func_extract_dow_monday(_, col):
+#     # make monday = 0 rather than sunday
+#     monday0 = sql.cast(sql.func.extract('dow', col) + 6, sa_types.Integer) % 7
+#     # cast to numeric, since that's what extract('dow') returns
+#     return sql.cast(monday0, sa_types.Numeric)
+# 
+# def sql_is_first_of(name, reference):
+#     return lambda _, col: fn.date_trunc(name, col) == fn.date_trunc(reference, col)
+# 
+# def sql_func_last_day_in_period(_, col, period):
+#     return fn.date_trunc(period, col) + sql.text("interval '1 %s - 1 day'" % period)
+# 
+# def sql_func_days_in_month(codata, col):
+#     return fn.extract('day', sql_func_last_day_in_period(codata, col, 'month'))
+# 
+# def sql_is_last_day_of(period):
+#     def f(codata, col):
+#         last_day = sql_func_last_day_in_period(codata, col, period)
+#         return fn.date_trunc('day', col) == last_day
+# 
+#     return f
 
 def sql_func_floor_date(_, col, unit):
     # see https://www.postgresql.org/docs/9.1/functions-datetime.html#FUNCTIONS-DATETIME-TRUNC
@@ -153,7 +155,7 @@ def req_bool(f):
 # Base translation mappings
 # =============================================================================
 
-base_scalar = dict(
+base_scalar = extend_base(SqlColumn, {},
     # infix ----
     __add__       = sql_colmeth("__add__"),
     __and__       = req_bool(sql_colmeth("__and__")),
@@ -279,34 +281,34 @@ base_scalar = dict(
     **{
       #"dt.ceil"             :
       #"dt.date"             :
-      "dt.day"              : sql_extract("day"),
+      "dt.day"              : _dt.sql_extract("day"),
       #"dt.day_name"         :
-      "dt.dayofweek"        : sql_func_extract_dow_monday,
-      "dt.dayofyear"        : sql_extract("doy"),
+      "dt.dayofweek"        : _dt.sql_func_extract_dow_monday,
+      "dt.dayofyear"        : _dt.sql_extract("doy"),
       #"dt.days"             :
-      "dt.days_in_month"    : sql_func_days_in_month,
-      "dt.daysinmonth"      : sql_func_days_in_month,
+      "dt.days_in_month"    : _dt.sql_func_days_in_month,
+      "dt.daysinmonth"      : _dt.sql_func_days_in_month,
       #"dt.floor"            :
-      "dt.hour"             : sql_extract("hour"),
+      "dt.hour"             : _dt.sql_extract("hour"),
       #"dt.is_leap_year"     :
-      "dt.is_month_end"     : sql_is_last_day_of("month"),
-      "dt.is_month_start"   : sql_is_first_of("day", "month"),
+      "dt.is_month_end"     : _dt.sql_is_last_day_of("month"),
+      "dt.is_month_start"   : _dt.sql_is_first_of("day", "month"),
       #"dt.is_quarter_end"   :
-      "dt.is_quarter_start" : sql_is_first_of("day", "quarter"),
-      "dt.is_year_end"      : sql_is_last_day_of("year"),
-      "dt.is_year_start"    : sql_is_first_of("day", "year"),
+      "dt.is_quarter_start" : _dt.sql_is_first_of("day", "quarter"),
+      "dt.is_year_end"      : _dt.sql_is_last_day_of("year"),
+      "dt.is_year_start"    : _dt.sql_is_first_of("day", "year"),
       #"dt.microsecond"      :
       #"dt.microseconds"     :
-      "dt.minute"           : sql_extract("minute"),
-      "dt.month"            : sql_extract("month"),
+      "dt.minute"           : _dt.sql_extract("minute"),
+      "dt.month"            : _dt.sql_extract("month"),
       #"dt.month_name"       :
       #"dt.nanosecond"       :
       #"dt.nanoseconds"      :
       #"dt.normalize"        :
-      "dt.quarter"          : sql_extract("quarter"),
+      "dt.quarter"          : _dt.sql_extract("quarter"),
       #"dt.qyear"            :
       #dt.round            =
-      "dt.second"           : sql_extract("second"),
+      "dt.second"           : _dt.sql_extract("second"),
       #"dt.seconds"          :
       #"dt.strftime"         :
       #"dt.time"             :
@@ -318,10 +320,10 @@ base_scalar = dict(
       #"dt.total_seconds"    :
       #dt.tz_convert       =
       #dt.tz_localize      =
-      "dt.week"             : sql_extract("week"),
-      "dt.weekday"          : sql_func_extract_dow_monday,
-      "dt.weekofyear"       : sql_extract("week"),
-      "dt.year"             : sql_extract("year"),
+      "dt.week"             : _dt.sql_extract("week"),
+      "dt.weekday"          : _dt.sql_func_extract_dow_monday,
+      "dt.weekofyear"       : _dt.sql_extract("week"),
+      "dt.year"             : _dt.sql_extract("year"),
       #"dt.freq" : 
       #"dt.tz"   :
       },
@@ -348,7 +350,7 @@ base_scalar = dict(
 )
 
 
-base_win = dict(
+base_win = extend_base(SqlColumn, {},
 
     # computation ----
     #autocorr                = 
@@ -421,7 +423,7 @@ base_win = dict(
 # Aggregate functions
 # =============================================================================
 
-base_agg = dict(
+base_agg = extend_base(SqlColumnAgg, {},
     # infix methods ----
 
     #dot = sql_not_impl(),

@@ -26,7 +26,9 @@ aggregate = extend_base(
 window = extend_base(
         SqliteColumn,
         # TODO: should check sqlite version, since < 3.25 can't use windows
-        base_nowin,
+        {},
+        # TODO: MC-NOTE hack for transition to generics in dialects
+        **base_nowin,
         #sd = win_agg("stddev")
         )
 
