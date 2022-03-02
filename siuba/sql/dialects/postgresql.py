@@ -11,12 +11,12 @@ from ..translate import (
         )
 
 from .base import (
-        SqlColumn, SqlColumnAgg,
-        base_scalar, base_win, base_agg
+        SqlColumn, SqlColumnAgg
         )
 
 import sqlalchemy.sql.sqltypes as sa_types
 from sqlalchemy import sql
+from sqlalchemy.sql import func as fn
 
 
 # Custom dispatching in call trees ============================================
@@ -26,6 +26,17 @@ class PostgresqlColumn(SqlColumn): pass
 class PostgresqlColumnAgg(SqlColumnAgg, PostgresqlColumn): pass
 
 # Custom translations =========================================================
+
+# datetime
+
+@annotate(return_type="float")
+def sql_is_quarter_end(_, col):
+    last_day = fn.date_trunc("quarter", col) + sql.text("interval '3 month - 1 day'")
+    return fn.date_trunc("day", col) == last_day
+
+
+
+# other
 
 def returns_float(func_names):
     # TODO: MC-NOTE - shift all translations to directly register
@@ -71,7 +82,6 @@ def sql_func_truediv(_, x, y):
 
 extend_base(
         PostgresqlColumn,
-        base_scalar,
 
         # TODO: remove log, not a pandas method
         #log = sql_log,
@@ -98,6 +108,9 @@ extend_base(
         **{
             "str.contains": sql_func_contains,
         },
+        **{
+            "dt.is_quarter_end": sql_is_quarter_end
+        }
         )
 
 returns_float([
@@ -109,7 +122,6 @@ returns_float([
 
 window = extend_base(
         PostgresqlColumn,
-        base_win,
         any = annotate(win_agg("bool_or"), input_type = "bool"),
         all = annotate(win_agg("bool_and"), input_type = "bool"),
         #lag = win_agg("lag"),
@@ -125,7 +137,6 @@ window = extend_base(
 
 aggregate = extend_base(
         PostgresqlColumnAgg,
-        base_agg,
         all = sql_agg("bool_and"),
         any = sql_agg("bool_or"),
         std = sql_agg("stddev_samp"),
@@ -135,6 +146,5 @@ aggregate = extend_base(
 
 # translate(config, CallTreeLocal, PostgresqlColumn, _.a + _.b)
 translator = SqlTranslator.from_mappings(
-        {}, {}, {},
         PostgresqlColumn, PostgresqlColumnAgg
         )

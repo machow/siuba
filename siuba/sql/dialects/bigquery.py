@@ -6,7 +6,6 @@ from ..translate import (
         AggOver, RankOver, Over,
         )
 
-from .base import base_scalar, base_agg, base_win
 import sqlalchemy.sql.sqltypes as sa_types
 from sqlalchemy import sql
 from sqlalchemy.sql import func as fn
@@ -31,7 +30,10 @@ def sql_extract(field):
     return lambda _, col: fn.extract(field, col)
 
 def sql_is_first_of(name, reference):
-    return lambda _, col: _date_trunc(col, name) == _date_trunc(col, reference)
+    def f(codata, col):
+        return _date_trunc(codata, col, name) == _date_trunc(codata, col, reference)
+
+    return f
 
 def sql_func_last_day_in_period(_, col, period):
     return fn.last_day(col, sql.text(period))
@@ -40,9 +42,9 @@ def sql_func_days_in_month(_, col):
     return fn.extract('DAY', sql_func_last_day_in_period(col, 'MONTH'))
 
 def sql_is_last_day_of(period):
-    def f(_, col):
-        last_day = sql_func_last_day_in_period(col, period)
-        return _date_trunc(col, "DAY") == last_day
+    def f(codata, col):
+        last_day = sql_func_last_day_in_period(codata, col, period)
+        return _date_trunc(codata, col, "DAY") == last_day
 
     return f
 
@@ -97,7 +99,6 @@ sql_median = lambda _, col: fn.percentile_cont(col, .5)
 
 scalar = extend_base(
     BigqueryColumn,
-    base_scalar,
     __floordiv__  = sql_floordiv,
     __rfloordiv__ = annotate(lambda _, x, y: sql_floordiv(y, x), result_type="float"),
 
@@ -134,7 +135,6 @@ scalar = extend_base(
 
 aggregate = extend_base(
     BigqueryColumnAgg,
-    base_agg,
     # NOTE: bigquery has an all() func, but it's not an aggregate
     any      = sql_any(),
     all      = sql_all(),
@@ -150,7 +150,6 @@ aggregate = extend_base(
 
 window = extend_base(
     BigqueryColumn,
-    base_win,
     any      = sql_any(window = True),
     all      = sql_all(window = True),
     count    = lambda _, col: AggOver(fn.count(col)),
@@ -166,6 +165,5 @@ window = extend_base(
 
 
 translator = SqlTranslator.from_mappings(
-        scalar, window, aggregate,
         BigqueryColumn, BigqueryColumnAgg
         )
