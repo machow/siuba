@@ -30,6 +30,7 @@ BACKEND_CONFIG = {
             "user": ["SB_TEST_PGUSER", "postgres"],
             "password": ["SB_TEST_PGPASSWORD", ""],
             "host": ["SB_TEST_PGHOST", "localhost"],
+            "options": ""
             },
         "bigquery": {
             "dialect": "bigquery",
@@ -39,6 +40,17 @@ BACKEND_CONFIG = {
             "user": "",
             "password": "",
             "host": ["SB_TEST_BQPROJECT", "siuba-tests"],
+            "options": ""
+            },
+        "snowflake": {
+            "dialect": "snowflake",
+            "driver": "",
+            "dbname": ["SB_TEST_SNOWFLAKEDATABASE", "CI/TESTS"],
+            "port": "",
+            "user": ["SB_TesT_SNOWFLAKEUSER", "CI"],
+            "password": ["SB_TEST_SNOWFLAKEPASSWORD", ""],
+            "host": ["SB_TEST_SNOWFLAKEHOST", ""],
+            "options": ["SB_TEST_SNOWFLAKEOPTIONS", "warehouse=COMPUTE_WH&role=CI_USER"]
             },
         "mysql": {
             "dialect": "mysql+pymysql",
@@ -47,6 +59,7 @@ BACKEND_CONFIG = {
             "user": "root",
             "password": "",
             "host": "127.0.0.1",
+            "options": ""
             },
         "sqlite": {
             "dialect": "sqlite",
@@ -55,7 +68,8 @@ BACKEND_CONFIG = {
             "port": "0",
             "user": "",
             "password": "",
-            "host": ""
+            "host": "",
+            "options": ""
             }
         }
 
@@ -89,14 +103,19 @@ class SqlBackend(Backend):
     # if there is a :, sqlalchemy tries to parse the port number.
     # since backends like bigquery do not specify a port, we'll insert it
     # later on the port value passed in.
-    sa_conn_fmt = "{dialect}://{user}:{password}@{host}{port}/{dbname}"
+    sa_conn_fmt = "{dialect}://{user}:{password}@{host}{port}/{dbname}?{options}"
 
     def __init__(self, name):
+        from urllib.parse import quote_plus
+
         cnfg = BACKEND_CONFIG[name]
         params = {k: os.environ.get(*v) if isinstance(v, (list)) else v for k,v in cnfg.items()}
 
         if params["port"]:
             params["port"] = ":%s" % params["port"]
+
+        if params["password"]:
+            params["password"] = quote_plus(params["password"])
 
         self.name = name
         self.engine = sqla.create_engine(self.sa_conn_fmt.format(**params))
@@ -130,11 +149,12 @@ class SqlBackend(Backend):
 
         return res
 
-class BigqueryBackend(SqlBackend):
+class CloudBackend(SqlBackend):
     @classmethod
     def unique_table_name(cls):
         return "siuba_{}".format(uuid.uuid4())
 
+class BigqueryBackend(CloudBackend):
     def load_df(self, df = None, **kwargs):
         df = super().load_df(df, **kwargs)
 

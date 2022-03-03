@@ -130,8 +130,8 @@ def sql_func_astype(_, col, _type):
             'str': sa_types.Text,
             int: sa_types.Integer,
             'int': sa_types.Integer,
-            float: sa_types.Numeric,
-            'float': sa_types.Numeric,
+            float: sa_types.Float,
+            'float': sa_types.Float,
             bool: sa_types.Boolean,
             'bool': sa_types.Boolean
             }

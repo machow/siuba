@@ -4,7 +4,7 @@ Note: this test file was heavily influenced by its dbplyr counterpart.
 https://github.com/tidyverse/dbplyr/blob/master/tests/testthat/test-verb-mutate.R
 """
     
-from siuba import _, mutate, select, group_by, summarize, filter, show_query
+from siuba import _, mutate, select, group_by, summarize, filter, show_query, arrange
 from siuba.dply.vector import row_number, n
 
 import pytest
@@ -43,7 +43,7 @@ def test_ungrouped_summarize_literal(df):
 def test_summarize_after_mutate_cuml_win(backend, df_float):
     assert_equal_query(
             df_float,
-            mutate(y = _.x.cumsum()) >> summarize(z = _.y.max()),
+            arrange(_.x) >> mutate(y = _.x.cumsum()) >> summarize(z = _.y.max()),
             data_frame(z = [10.])
             )
 
