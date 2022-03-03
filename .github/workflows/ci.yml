@@ -10,6 +10,7 @@ jobs:
   checks:
     name: "Checks"
     runs-on: ubuntu-latest
+    if: !github.event_name == 'pull_request' || github.event.pull_request.head.repo.fork == false
     strategy:
       fail-fast: false
       matrix:
