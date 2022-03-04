@@ -218,13 +218,11 @@ def wrap_annotate(f, **kwargs):
 #  Translator =================================================================
 
 def extend_base(cls, **kwargs):
-    # TODO: MC-NOTE remove mapping
+    """Register concrete methods onto generic functions for pandas Series methods."""
     from siuba.ops import ALL_OPS
     for meth_name, f in kwargs.items():
         ALL_OPS[meth_name].register(cls, f)
 
-    # TODO: MC-NOTE remove once done
-    return {}
 
 from siuba.ops.translate import create_pandas_translator
 
