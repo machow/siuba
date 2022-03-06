@@ -47,7 +47,7 @@ BACKEND_CONFIG = {
             "driver": "",
             "dbname": ["SB_TEST_SNOWFLAKEDATABASE", "CI/TESTS"],
             "port": "",
-            "user": ["SB_TesT_SNOWFLAKEUSER", "CI"],
+            "user": ["SB_TEST_SNOWFLAKEUSER", "CI"],
             "password": ["SB_TEST_SNOWFLAKEPASSWORD", ""],
             "host": ["SB_TEST_SNOWFLAKEHOST", ""],
             "options": ["SB_TEST_SNOWFLAKEOPTIONS", "warehouse=COMPUTE_WH&role=CI_USER"]
