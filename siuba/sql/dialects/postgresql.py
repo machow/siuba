@@ -120,7 +120,7 @@ returns_float([
              "dt.weekofyear", "dt.year"
              ])
 
-window = extend_base(
+extend_base(
         PostgresqlColumn,
         any = annotate(win_agg("bool_or"), input_type = "bool"),
         all = annotate(win_agg("bool_and"), input_type = "bool"),
@@ -135,7 +135,7 @@ window = extend_base(
         size = win_agg("count"),     #TODO double check
         )
 
-aggregate = extend_base(
+extend_base(
         PostgresqlColumnAgg,
         all = sql_agg("bool_and"),
         any = sql_agg("bool_or"),
