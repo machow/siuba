@@ -55,7 +55,7 @@ BACKEND_CONFIG = {
         "mysql": {
             "dialect": "mysql+pymysql",
             "dbname": "public",
-            "port": 3306,
+            "port": ["SB_TEST_MYSQLPORT", 3306],
             "user": "root",
             "password": "",
             "host": "127.0.0.1",
@@ -64,7 +64,7 @@ BACKEND_CONFIG = {
         "sqlite": {
             "dialect": "sqlite",
             "driver": "",
-            "dbname": ":memory:",
+            "dbname": ["SB_TEST_SQLITEDATABASE", ":memory:"],
             "port": "0",
             "user": "",
             "password": "",
