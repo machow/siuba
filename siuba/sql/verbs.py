@@ -334,7 +334,7 @@ class LazyTbl:
             source: a sqlalchemy engine, used to autoload columns.
 
         """
-        if isinstance(tbl, sqlalchemy.Table):
+        if isinstance(tbl, sql.selectable.FromClause):
             return tbl
         
         if not isinstance(tbl, str):
