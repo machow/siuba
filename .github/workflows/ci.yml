@@ -65,7 +65,7 @@ jobs:
       # optional step for running bigquery tests ----
       - name: Set up Cloud SDK
         if: ${{(contains(github.ref, 'bigquery') || contains(github.ref, 'refs/tags')) && matrix.latest}}
-        uses: google-github-actions/setup-gcloud@master
+        uses: google-github-actions/setup-gcloud@v0
         with:
           project_id: siuba-tests
           service_account_key: ${{ secrets.GCP_SA_KEY }}
@@ -93,7 +93,7 @@ jobs:
           python -m pip install git+https://github.com/machow/pybigquery.git pandas-gbq==0.15.0
           python -m pip install .
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@master
+        uses: google-github-actions/setup-gcloud@v0
         with:
           project_id: siuba-tests
           service_account_key: ${{ secrets.GCP_SA_KEY }}
