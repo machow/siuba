@@ -394,7 +394,15 @@ class LazyTbl:
                 )
 
         data = self._get_preview()
-        html_data = getattr(data, '_repr_html_', lambda: repr(data))()
+
+        # _repr_html_ can not exist or return None, to signify that repr should be used
+        if not hasattr(data, '_repr_html_'):
+            return None
+
+        html_data = data._repr_html_()
+        if html_data is None:
+            return None
+
         return template.format(self.source.engine, html_data)
 
 
