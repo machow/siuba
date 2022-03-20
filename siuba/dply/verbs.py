@@ -66,6 +66,13 @@ def install_pd_siu():
     DataFrameGroupBy.__repr__ = _repr_grouped_df_console_
 
 def _repr_grouped_df_html_(self):
+    obj_repr = self.obj._repr_html_()
+    
+    # user can config pandas not to return html representation, in which case
+    # the ipython behavior should fall back to repr
+    if obj_repr is None:
+        return repr(self)
+
     return "<div><p>(grouped data frame)</p>" + self.obj._repr_html_() + "</div>"
 
 def _repr_grouped_df_console_(self):
