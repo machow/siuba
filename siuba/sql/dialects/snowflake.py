@@ -1,7 +1,15 @@
 from sqlalchemy.sql import func as fn
 from sqlalchemy import sql
 
-from ..translate import SqlTranslator, extend_base, sql_scalar, sql_agg, win_agg
+from ..translate import (
+    SqlTranslator,
+    extend_base,
+    sql_scalar,
+    sql_agg,
+    win_agg,
+    win_cumul,
+    annotate
+)
 
 #from .postgresql import PostgresqlColumn, PostgresqlColumnAgg
 from .base import SqlColumn, SqlColumnAgg
@@ -44,8 +52,15 @@ extend_base(
     all = win_agg("booland_agg"),
     any = win_agg("boolor_agg"),
     count = win_agg("count"),
-
+    cumsum = annotate(win_cumul("sum"), result_type="variable"),
+    # note that the number of decimal places Snowflake returns, and whether
+    # the result is numeric depends on the input. mark as variable, so tests
+    # do not check dtype
+    # see https://community.snowflake.com/s/question/0D50Z000079hpxvSAA/numeric-calculations-truncated-to-3-decimal-places
+    mean = annotate(win_agg("avg"), result_type="variable"),
     std = win_agg("stddev_samp"),
+    sum = annotate(win_agg("sum"), result_type="variable"),
+
     var = win_agg("var_samp"),
 
     # str.contains
