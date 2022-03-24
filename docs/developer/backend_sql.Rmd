@@ -23,6 +23,8 @@ show_tree = lambda x: print(Formatter().format(x))
 
 # SQL backend
 
+> ⚠️: This document is being revised (though the code runs correctly!).
+
 
 ## Step 1: Column Translation
 
