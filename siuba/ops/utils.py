@@ -50,38 +50,34 @@ class Operation:
         self.accessor = accessor
     
 def operation(name, *args):
-    def op_method(self, *args, **kwargs):
-        return default(self, op_method, args, kwargs)
+    from siuba.siu.visitors import FunctionLookupBound
+    # TODO: MC-NOTE - move FunctionLookupBound to dispatchers?
 
-    op_method.operation = Operation(name, *args)
-    op_method.__name__ = name
-
-    dispatcher = symbolic_dispatch(op_method)
+    msg = "No default singledispatch implemented for %s" % name
+    dispatcher = symbolic_dispatch(FunctionLookupBound(msg))
+    dispatcher.operation = Operation(name, *args)
+    dispatcher.__name__ = name
 
     return dispatcher
 
 
 # Default dispatcher ----------------------------------------------------------
 
-@symbolic_dispatch
-def default(self, generic, args = tuple(), kwargs = {}):
-    raise NotImplementedError()
+def _register_series_default(generic):
+    import pandas as pd
+    from functools import partial
 
+    generic.register(pd.Series, partial(_default_pd_series, generic.operation))
 
-# TODO: move into pd fast groups code
-
-import pandas as pd
-
-@default.register(pd.Series)
-def _default_pd_series(self, generic, args = tuple(), kwargs = {}):
-    op = generic.operation
-    if op.accessor is not None:
-        method = getattr(getattr(self, op.accessor), op.name)
+def _default_pd_series(__op, self, args = tuple(), kwargs = {}):
+    # Once we drop python 3.7 dependency, could make __op position only
+    if __op.accessor is not None:
+        method = getattr(getattr(self, __op.accessor), __op.name)
     else:
-        method = getattr(self, op.name)
+        method = getattr(self, __op.name)
 
 
-    if op.is_property:
+    if __op.is_property:
         return method
 
     return method(*args, **kwargs)

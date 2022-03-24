@@ -122,7 +122,7 @@ def test_transform_args():
 def test_fast_grouped_custom_user_funcs():
     @symbolic_dispatch
     def f(x):
-        return x.mean()
+        raise NotImplementedError()
 
     @f.register(SeriesGroupBy)
     def _f_grouped(x) -> GroupByAgg:
@@ -149,7 +149,7 @@ def test_fast_grouped_custom_user_func_fail():
     def f(x):
         return x.mean()
 
-    @f.register(GroupByAgg)
+    @f.register(SeriesGroupBy)
     def _f_gser(x):
         # note, no return annotation, so translator will raise an error
         return GroupByAgg.from_result(x.mean(), x)

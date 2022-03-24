@@ -18,20 +18,23 @@ A dialect requires three pieces:
 # NOTE: this file should be an example that could live outside siuba, so
 # we (1) use full import paths, (2) define everything a new backend would need
 # here.
+from functools import partial
+
 from sqlalchemy import sql
 from sqlalchemy import types as sa_types
 from sqlalchemy.sql import func as fn
 from sqlalchemy.sql.elements import ColumnClause
 
 from siuba.sql.translate import (
+        extend_base,
         win_absent,
         win_over,
         win_cumul,
         win_agg,
-        set_agg,
         sql_agg,
         sql_scalar,
         sql_colmeth,
+        sql_ordered_set,
         sql_not_impl,
         annotate,
         RankOver,
@@ -52,7 +55,7 @@ from siuba.sql.translate import SqlColumn, SqlColumnAgg
 
 # Computation -----------------------------------------------------------------
 
-def sql_func_diff(col, periods = 1):
+def sql_func_diff(_, col, periods = 1):
     if periods > 0:
         return CumlOver(col - sql.func.lag(col, periods))
     elif periods < 0:
@@ -60,10 +63,10 @@ def sql_func_diff(col, periods = 1):
 
     raise ValueError("periods argument to sql diff cannot be 0")
 
-def sql_func_floordiv(x, y):
+def sql_func_floordiv(_, x, y):
     return sql.cast(x / y, sa_types.Integer())
 
-def sql_func_rank(col):
+def sql_func_rank(_, col):
     # see https://stackoverflow.com/a/36823637/1144523
     min_rank = RankOver(sql.func.rank(), order_by = col)
     to_mean = (RankOver(sql.func.count(), partition_by = col) - 1) / 2.0
@@ -73,32 +76,28 @@ def sql_func_rank(col):
 
 # Datetime -------------------------------------------------------------------
 
-def sql_extract(name):
-    return lambda col: sql.func.extract(name, col)
+from . import _dt_generics as _dt
 
-def sql_func_extract_dow_monday(col):
+def sql_extract(name):
+    """Return function that extracts named component from column.
+
+    E.g. to produce EXTRACT(MONTH, some_column)
+    """
+    return lambda _, col: fn.extract(name, col)
+
+
+def sql_func_days_in_month(codata, col):
+    return fn.extract('day', _dt.sql_func_last_day_in_period(codata, col, 'month'))
+
+
+def sql_func_extract_dow_monday(_, col):
     # make monday = 0 rather than sunday
     monday0 = sql.cast(sql.func.extract('dow', col) + 6, sa_types.Integer) % 7
     # cast to numeric, since that's what extract('dow') returns
     return sql.cast(monday0, sa_types.Numeric)
 
-def sql_is_first_of(name, reference):
-    return lambda col: fn.date_trunc(name, col) == fn.date_trunc(reference, col)
 
-def sql_func_last_day_in_period(col, period):
-    return fn.date_trunc(period, col) + sql.text("interval '1 %s - 1 day'" % period)
-
-def sql_func_days_in_month(col):
-    return fn.extract('day', sql_func_last_day_in_period(col, 'month'))
-
-def sql_is_last_day_of(period):
-    def f(col):
-        last_day = sql_func_last_day_in_period(col, period)
-        return fn.date_trunc('day', col) == last_day
-
-    return f
-
-def sql_func_floor_date(col, unit):
+def sql_func_floor_date(_, col, unit):
     # see https://www.postgresql.org/docs/9.1/functions-datetime.html#FUNCTIONS-DATETIME-TRUNC
     # valid values: 
     #   microseconds, milliseconds, second, minute, hour,
@@ -112,12 +111,12 @@ def sql_func_floor_date(col, unit):
 def sql_str_strip(name):
     
     strip_func = getattr(fn, name)
-    def f(col, to_strip = " \t\n\v\f\r"):
+    def f(_, col, to_strip = " \t\n\v\f\r"):
         return strip_func(col, to_strip)
 
     return f
 
-def sql_func_capitalize(col):
+def sql_func_capitalize(_, col):
     first_char = fn.upper(fn.left(col, 1)) 
     rest = fn.right(col, fn.length(col) - 1)
     return sql.functions.concat(first_char, rest)
@@ -125,14 +124,14 @@ def sql_func_capitalize(col):
 
 # Misc implementations --------------------------------------------------------
 
-def sql_func_astype(col, _type):
+def sql_func_astype(_, col, _type):
     mappings = {
             str: sa_types.Text,
             'str': sa_types.Text,
             int: sa_types.Integer,
             'int': sa_types.Integer,
-            float: sa_types.Numeric,
-            'float': sa_types.Numeric,
+            float: sa_types.Float,
+            'float': sa_types.Float,
             bool: sa_types.Boolean,
             'bool': sa_types.Boolean
             }
@@ -153,7 +152,7 @@ def req_bool(f):
 # Base translation mappings
 # =============================================================================
 
-base_scalar = dict(
+extend_base(SqlColumn,
     # infix ----
     __add__       = sql_colmeth("__add__"),
     __and__       = req_bool(sql_colmeth("__and__")),
@@ -173,7 +172,7 @@ base_scalar = dict(
     __pow__       = sql_not_impl(),
     __radd__      = sql_colmeth("__radd__"),
     __rand__      = req_bool(sql_colmeth("__rand__")),
-    __rfloordiv__ = lambda x, y: sql_func_floordiv(y, x),
+    __rfloordiv__ = lambda _, x, y: sql_func_floordiv(y, x),
     __rmod__      = sql_colmeth("__rmod__"),
     __rmul__      = sql_colmeth("__rmul__"),
     __ror__       = req_bool(sql_colmeth("__ror__")),
@@ -224,7 +223,7 @@ base_scalar = dict(
 
     abs                     = sql_scalar("abs"),
     between                 = sql_colmeth("between"),
-    clip                    = lambda col, low, upp: fn.least(fn.greatest(col, low), upp),
+    clip                    = lambda _, col, low, upp: fn.least(fn.greatest(col, low), upp),
     isin                    = sql_colmeth("in_"),
 
 
@@ -245,14 +244,14 @@ base_scalar = dict(
       #"str.isalpha"       :,
       #"str.isdecimal"     :,
       #"str.isdigit"       :,
-      "str.islower"       : lambda col: col == sql.func.lower(col),
+      "str.islower"       : lambda _, col: col == sql.func.lower(col),
       #"str.isnumeric"     :,
       #"str.isspace"       :,
       #"str.istitle"       :,
       #"str.isupper"       :,
-      "str.len"           : lambda col: sql.func.length(col),
+      "str.len"           : lambda _, col: sql.func.length(col),
       #"str.ljust"         :,
-      "str.lower"         : lambda col: sql.func.lower(col),
+      "str.lower"         : lambda _, col: sql.func.lower(col),
       "str.lstrip"        : sql_str_strip("ltrim"),
       #"str.match"         :,
       #"str.pad"           :,
@@ -267,8 +266,8 @@ base_scalar = dict(
       "str.startswith"    : sql_colmeth("startswith"),
       "str.strip"         : sql_str_strip("trim"),
       #"str.swapcase"      :,
-      "str.title"         : lambda col: sql.func.initcap(col),
-      "str.upper"         : lambda col: sql.func.upper(col),
+      "str.title"         : lambda _, col: sql.func.initcap(col),
+      "str.upper"         : lambda _, col: sql.func.upper(col),
       #"str.wrap"          :,
     },
 
@@ -289,12 +288,12 @@ base_scalar = dict(
       #"dt.floor"            :
       "dt.hour"             : sql_extract("hour"),
       #"dt.is_leap_year"     :
-      "dt.is_month_end"     : sql_is_last_day_of("month"),
-      "dt.is_month_start"   : sql_is_first_of("day", "month"),
-      #"dt.is_quarter_end"   :
-      "dt.is_quarter_start" : sql_is_first_of("day", "quarter"),
-      "dt.is_year_end"      : sql_is_last_day_of("year"),
-      "dt.is_year_start"    : sql_is_first_of("day", "year"),
+      "dt.is_month_end"     : partial(_dt.sql_is_last_day_of, period="month"),
+      "dt.is_month_start"   : partial(_dt.sql_is_first_day_of, period="month"),
+      "dt.is_quarter_end"   : partial(_dt.sql_is_last_day_of, period="quarter"),
+      "dt.is_quarter_start" : partial(_dt.sql_is_first_day_of, period="quarter"),
+      "dt.is_year_end"      : partial(_dt.sql_is_last_day_of, period="year"),
+      "dt.is_year_start"    : partial(_dt.sql_is_first_day_of, period="year"),
       #"dt.microsecond"      :
       #"dt.microseconds"     :
       "dt.minute"           : sql_extract("minute"),
@@ -335,11 +334,11 @@ base_scalar = dict(
 
     # Missing values ----
 
-    fillna      = lambda x, y: sql.functions.coalesce(x,y),
+    fillna      = lambda _, x, y: sql.functions.coalesce(x,y),
     isna        = sql_colmeth("is_", None),
     isnull      = sql_colmeth("is_", None),
-    notna       = lambda col: ~col.is_(None),
-    notnull     = lambda col: ~col.is_(None),
+    notna       = lambda _, col: ~col.is_(None),
+    notnull     = lambda _, col: ~col.is_(None),
 
     # Misc ---
     #replace       =  # TODO
@@ -348,7 +347,7 @@ base_scalar = dict(
 )
 
 
-base_win = dict(
+extend_base(SqlColumn,
 
     # computation ----
     #autocorr                = 
@@ -380,7 +379,7 @@ base_win = dict(
     nunique = win_absent("nunique"),
     #prod = 
     #product = 
-    quantile =  win_absent("quantile"),
+    quantile = sql_ordered_set("percentile_cont", is_analytic=True),
     #sem = 
     #skew = 
     #std =  # TODO(pg)
@@ -421,7 +420,7 @@ base_win = dict(
 # Aggregate functions
 # =============================================================================
 
-base_agg = dict(
+extend_base(SqlColumnAgg,
     # infix methods ----
 
     #dot = sql_not_impl(),
@@ -431,7 +430,7 @@ base_agg = dict(
     #all = #TODO(pg): all = sql_aggregate("BOOL_AND", "all")
     #any = #TODO(pg): any = sql_aggregate("BOOL_OR", "any"),
     #corr = # TODO(pg)
-    count = lambda col: sql.func.count(),
+    count = lambda _, col: sql.func.count(),
     #cov = 
     #is_unique = # TODO(low)
     #kurt = 
@@ -441,10 +440,10 @@ base_agg = dict(
     mean = sql_agg("avg"),
     #median = 
     min = sql_agg("min"),
-    nunique = lambda col: sql.func.count(sql.func.distinct(col)),
+    nunique = lambda _, col: sql.func.count(sql.func.distinct(col)),
     #prod = 
     #product = 
-    quantile = set_agg("percentile_cont"), # TODO: flag no_mutate
+    quantile = sql_ordered_set("percentile_cont"),
     #sem = 
     #skew = 
     #std =  # TODO(pg)
@@ -474,45 +473,22 @@ base_agg = dict(
 
 # based on https://github.com/tidyverse/dbplyr/blob/master/R/backend-.R
 base_nowin = dict(
-        #row_number   = win_absent("ROW_NUMBER"),
-        #min_rank     = win_absent("RANK"),
-        rank         = win_absent("RANK"),
-        dense_rank   = win_absent("DENSE_RANK"),
-        percent_rank = win_absent("PERCENT_RANK"),
-        cume_dist    = win_absent("CUME_DIST"),
-        ntile        = win_absent("NTILE"),
-        mean         = win_absent("AVG"),
-        sd           = win_absent("SD"),
-        var          = win_absent("VAR"),
-        cov          = win_absent("COV"),
-        cor          = win_absent("COR"),
-        sum          = win_absent("SUM"),
-        min          = win_absent("MIN"),
-        max          = win_absent("MAX"),
-        median       = win_absent("PERCENTILE_CONT"),
-        quantile    = win_absent("PERCENTILE_CONT"),
-        n            = win_absent("N"),
-        n_distinct   = win_absent("N_DISTINCT"),
-        nunique      = win_absent("nunique function"),
-        cummean      = win_absent("MEAN"),
-        cumsum       = win_absent("SUM"),
-        cummin       = win_absent("MIN"),
-        cummax       = win_absent("MAX"),
-        nth          = win_absent("NTH_VALUE"),
-        first        = win_absent("FIRST_VALUE"),
-        last         = win_absent("LAST_VALUE"),
-        lead         = win_absent("LEAD"),
-        lag          = win_absent("LAG"),
-        order_by     = win_absent("ORDER_BY"),
-        str_flatten  = win_absent("STR_FLATTEN"),
-        count        = win_absent("COUNT"),
-        size         = win_absent("size function"),
-        )
+    cummax                  = win_absent("max"),
+    cummin                  = win_absent("min"),
+    cumsum                  = win_absent("sum"),
+    diff                    = win_absent("diff"),
+    rank                    = win_absent("rank"),
+    count                   = win_absent("count"),
+    max =                     win_absent("max"),
+    mean = win_absent("avg"),
+    min = win_absent("min"),
+    nunique = win_absent("nunique"),
+    quantile =  win_absent("quantile"),
+    sum = win_absent("sum"),
+    size = win_absent("count"),
+)
 
-
-funcs = dict(scalar = base_scalar, aggregate = base_agg, window = base_win)
 
 translator = SqlTranslator.from_mappings(
-        base_scalar, base_win, base_agg,
         SqlColumn, SqlColumnAgg
         )

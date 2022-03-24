@@ -40,9 +40,9 @@ def warn_arg_default(func_name, arg_name, arg, correct):
 
 # Column data types ===========================================================
 
-from sqlalchemy.sql.elements import ColumnClause
+from sqlalchemy.sql.elements import ClauseElement
 
-class SqlBase(ColumnClause): pass
+class SqlBase(ClauseElement): pass
 
 class SqlColumn(SqlBase): pass
 
@@ -79,7 +79,7 @@ class AggOver(CustomOverClause):
     @classmethod
     def func(cls, name):
         sa_func = getattr(sql.func, name)
-        def f(col, *args, **kwargs) -> AggOver:
+        def f(codata, col, *args, **kwargs) -> AggOver:
             return cls(sa_func(col, *args, **kwargs))
 
         return f
@@ -99,7 +99,7 @@ class RankOver(CustomOverClause):
     @classmethod
     def func(cls, name):
         sa_func = getattr(sql.func, name)
-        def f(col) -> RankOver:
+        def f(codata, col) -> RankOver:
             return cls(sa_func(), order_by = col)
 
         return f
@@ -134,12 +134,15 @@ class CumlOver(CustomOverClause):
     @classmethod
     def func(cls, name, rows=(None, 0)):
         sa_func = getattr(sql.func, name)
-        def f(col, *args, **kwargs) -> CumlOver:
+        def f(codata, col, *args, **kwargs) -> CumlOver:
             return cls(sa_func(col, *args, **kwargs), rows = rows)
 
         return f
 
 # convenience aliases for class methods above
+# TODO MC-NOTE: funcs like AggOver.func should not have codata as the first argument, 
+# since they are simple sqlalchemy subclasses. However, they're used as function
+# factories in the dialects...
 win_agg = AggOver.func
 win_over = RankOver.func
 win_cumul = CumlOver.func
@@ -149,21 +152,27 @@ win_cumul = CumlOver.func
 
 def sql_agg(name):
     sa_func = getattr(sql.func, name)
-    return lambda col: sa_func(col)
+    return lambda codata, col: sa_func(col)
 
 def sql_scalar(name):
     sa_func = getattr(sql.func, name)
-    return lambda col, *args: sa_func(col, *args)
+    return lambda codata, col, *args: sa_func(col, *args)
 
 def sql_colmeth(meth, *outerargs):
-    def f(col, *args) -> SqlColumn:
+    def f(codata, col, *args) -> SqlColumn:
         return getattr(col, meth)(*outerargs, *args)
     return f
 
-def set_agg(name):
+def sql_ordered_set(name, is_analytic=False):
     # Ordered and theoretical set aggregates
     sa_func = getattr(sql.func, name)
-    return lambda col, *args: sa_func(*args).within_group(col)
+
+    if is_analytic:
+        return lambda codata, col, *args: AggOver(
+            sa_func(*args).within_group(col)
+        )
+
+    return lambda codata, col, *args: sa_func(*args).within_group(col)
 
 # Handling not implemented translations ----
 
@@ -208,8 +217,12 @@ def wrap_annotate(f, **kwargs):
 
 #  Translator =================================================================
 
-def extend_base(mapping, **kwargs):
-    return {**mapping, **kwargs}
+def extend_base(cls, **kwargs):
+    """Register concrete methods onto generic functions for pandas Series methods."""
+    from siuba.ops import ALL_OPS
+    for meth_name, f in kwargs.items():
+        ALL_OPS[meth_name].register(cls, f)
+
 
 from siuba.ops.translate import create_pandas_translator
 
@@ -254,12 +267,11 @@ class SqlTranslator:
 
         return self.aggregate.translate(expr)
 
-    def from_mappings(base, window, aggregate, WinCls, AggCls):
-        trans_win = {**base, **window}
-        trans_agg = {**base, **aggregate}
+    def from_mappings(WinCls, AggCls):
+        from siuba.ops import ALL_OPS
 
         return SqlTranslator(
-                window = create_pandas_translator(trans_win, WinCls, sql.elements.ClauseElement),
-                aggregate = create_pandas_translator(trans_agg, AggCls, sql.elements.ClauseElement)
+                window = create_pandas_translator(ALL_OPS, WinCls, sql.elements.ClauseElement),
+                aggregate = create_pandas_translator(ALL_OPS, AggCls, sql.elements.ClauseElement)
                 )
 

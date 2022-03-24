@@ -275,7 +275,21 @@ class LazyTbl:
 
         # raise informative error message if missing translation
         try:
-            return self.translator.translate(call, window = window)
+            # TODO: MC-NOTE -- scaffolding in to verify prior behavior works
+            from siuba.siu.visitors import CodataVisitor
+            shaped_call = self.translator.translate(call, window = window)
+            if window:
+                trans = self.translator.window
+            else:
+                trans = self.translator.aggregate
+
+            # TODO: MC-NOTE - once all sql singledispatch funcs are annotated
+            # with return types, then switch object back out
+            # alternatively, could register a bounding class, and remove
+            # the result type check
+            v = CodataVisitor(trans.dispatch_cls, object)
+            return v.visit(shaped_call)
+            
         except FunctionLookupError as err:
             raise SqlFunctionLookupError.from_verb(
                     verb_name or "Unknown",
@@ -320,7 +334,7 @@ class LazyTbl:
             source: a sqlalchemy engine, used to autoload columns.
 
         """
-        if isinstance(tbl, sqlalchemy.Table):
+        if isinstance(tbl, sql.selectable.FromClause):
             return tbl
         
         if not isinstance(tbl, str):
@@ -380,7 +394,15 @@ class LazyTbl:
                 )
 
         data = self._get_preview()
-        html_data = getattr(data, '_repr_html_', lambda: repr(data))()
+
+        # _repr_html_ can not exist or return None, to signify that repr should be used
+        if not hasattr(data, '_repr_html_'):
+            return None
+
+        html_data = data._repr_html_()
+        if html_data is None:
+            return None
+
         return template.format(self.source.engine, html_data)
 
 

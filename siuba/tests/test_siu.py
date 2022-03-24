@@ -304,7 +304,9 @@ def test_call_tree_local_sub_attr_property_missing(_, ctl):
     with pytest.raises(FunctionLookupError):
         ctl.enter(strip_symbolic(_.str.f_b))
 
-# symbolic dispatch and call tree local ----
+# symbolic dispatch and execution validation visitor ----
+from siuba.siu import ExecutionValidatorVisitor
+
 class SomeClass: pass
 
 @pytest.fixture
@@ -321,8 +323,7 @@ def f_dispatch():
 
 
 def test_call_tree_local_dispatch_cls_object(f_dispatch):
-    ctl = CallTreeLocal(
-            {'f_a': lambda self: self},
+    ctl = ExecutionValidatorVisitor(
             dispatch_cls = object
             )
 
@@ -332,8 +333,7 @@ def test_call_tree_local_dispatch_cls_object(f_dispatch):
 
 
 def test_call_tree_local_dispatch_cls_subclass(f_dispatch):
-    ctl = CallTreeLocal(
-            {'f_a': lambda self: self},
+    ctl = ExecutionValidatorVisitor(
             dispatch_cls = SomeClass
             )
 
@@ -372,3 +372,36 @@ def test_call_tree_local_dispatch_fail(f_dispatch_strict):
     new_call = ctl.enter(call)
     with pytest.raises(TypeError):
         new_call('na')
+
+
+# Codatavisitor ===============================================================
+from siuba.siu.visitors import CodataVisitor
+
+def test_codata_visitor_enclosed_call(_):
+    class Alternative: pass
+
+    @symbolic_dispatch
+    def n(col):
+        return f"n({col})"
+
+    @symbolic_dispatch
+    def mean(col):
+        str_n = n(col)
+        return f"sum({col}) / {str_n}"
+
+    @n.register(Alternative)
+    def _f(self, col):
+        return f"n_alternative({col})"
+
+    @mean.register(Alternative)
+    def _f(self, col):
+        str_n = n(self, col)
+        return f"sum_alternative({col}) / {str_n}"
+
+    codata = CodataVisitor(dispatch_cls = Alternative)
+
+    expr = strip_symbolic(mean(_))
+    new_expr = codata.visit(expr)
+
+    assert new_expr("a") == "sum_alternative(a) / n_alternative(a)"
+

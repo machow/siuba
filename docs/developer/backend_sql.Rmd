@@ -5,9 +5,9 @@ jupyter:
       extension: .Rmd
       format_name: rmarkdown
       format_version: '1.2'
-      jupytext_version: 1.4.2
+      jupytext_version: 1.13.7
   kernelspec:
-    display_name: Python 3
+    display_name: Python 3 (ipykernel)
     language: python
     name: python3
 ---
@@ -15,9 +15,15 @@ jupyter:
 ```{python nbsphinx=hidden}
 import pandas as pd
 pd.set_option("display.max_rows", 5)
+
+from siuba.siu.format import Formatter
+
+show_tree = lambda x: print(Formatter().format(x))
 ```
 
 # SQL backend
+
+> ⚠️: This document is being revised (though the code runs correctly!).
 
 
 ## Step 1: Column Translation
@@ -28,7 +34,8 @@ Column translation requires three pieces:
 1. **Locals:** Functions for creating the sqlalchemy clause corresponding to an 
    operation.
 2. **Column Data:** Classes representing columns under normal and aggregate settings.   
-3. **Translator:** A class that can take a symbolic expression (e.g. `_.x.mean()`) and return the correct sqlachemy clause.
+3. **Translator:** A class that can take a symbolic expression (e.g. `_.x.mean()`) and return it in call form: `mean(_.x)`.
+4. **Codata visitor:** A class that takes the above call, and swaps in the sql dialect version of each call.
 
 
 ```{python}
@@ -77,9 +84,10 @@ aggregation = {
 from siuba.sql.translate import SqlTranslator
 
 translator = SqlTranslator.from_mappings(
-    scalar, window, aggregation,
     WowSqlColumn, WowSqlColumnAgg
 )
+
+# TODO: how to work in codata visitor?
 ```
 
 ## Column Data
@@ -96,7 +104,7 @@ The entries of each local dictionary are functions that take a sqlalchemy.sql.Cl
 ```{python}
 from sqlalchemy import sql
 
-expr_rank = window["rank"](sql.column("a_col"))
+expr_rank = window["rank"](WowSqlColumn(), sql.column("a_col"))
 expr_rank
 ```
 
@@ -111,6 +119,8 @@ Below, we set up a sqlalchemy select statement in order to demonstrate the trans
 
 ```{python}
 from siuba import _
+
+
 from sqlalchemy.sql import column, select
 
 sel = select([column('x'), column('y')])
@@ -120,10 +130,20 @@ Then we feed the columns to the translated call.
 
 ```{python}
 call_add = translator.translate(_.x + _.y)
-call_add(sel.columns)
+
+show_tree(call_add)
 ```
 
 Note that behind the scenes, the translator goes down the call tree and swaps functions like `"__add__"` with the local translations.
+
+```{python}
+from siuba.siu.visitors import CodataVisitor
+codata = CodataVisitor(WowSqlColumn, object)
+
+call_add_final = codata.visit(call_add)
+
+show_tree(call_add_final)
+```
 
 ```{python}
 # the root node is __add__. shown as +.
@@ -132,14 +152,16 @@ _.x + _.y
 
 ```{python}
 # We can see this in action by calling the translation directly.
-scalar["__add__"](sel.columns.x, sel.columns.y)
+scalar["__add__"](WowSqlColumn(), sel.columns.x, sel.columns.y)
 ```
 
 By default the translate method assumes the expression is using window functions, so operations like `.mean()` return SqlAlchemy Over clauses.
 
 ```{python}
 f_translate = translator.translate(_.x.mean())
-expr = f_translate(sel.columns)
+
+f_translate_co = codata.visit(f_translate)
+expr = f_translate_co(sel.columns)
 
 expr
 ```
@@ -166,7 +188,7 @@ from siuba.siu import _, symbolic_dispatch
 from sqlalchemy import sql
 
 @symbolic_dispatch(cls = WowSqlColumn)
-def round(col):
+def round(self, col):
     print("running round function")
     
     return sql.function.round(col)
@@ -224,8 +246,8 @@ tbl_cars
 Note that you can access a number of useful attributes.
 
 ```{python}
-# the underlying translator
-f_add = tbl_cars.translator.translate(_.mpg + _.hp)
+# calls the underlying translator and codata
+f_add = tbl_cars.shape_call(_.mpg + _.hp)
 f_add(tbl_cars.last_op.columns)
 ```
 

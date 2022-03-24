@@ -109,6 +109,9 @@ DATA = data = {
 
 def get_spec_no_mutate(entry, backend):
     return "no_mutate" in entry['backends'].get(backend.name, {}).get('flags', [])
+
+def get_spec_no_summarize(entry, backend):
+    return "no_aggregate" in entry['backends'].get(backend.name, {}).get('flags', [])
     
 def get_spec_backend_is_supported(entry, backend):
     return entry['backends'].get(backend.name, {}).get('is_supported')
@@ -125,6 +128,13 @@ def get_data(entry, data, backend = None):
 
     return data['bool'] if req_bool else data[entry['accessor']]
 
+def skip_no_mutate(entry, backend):
+    if "no_mutate" in entry['backends'].get(backend.name, {}).get('flags', []):
+        pytest.skip("No support for mutate in backend: %s" %backend.name)
+
+def skip_no_summarize(entry, backend):
+    if "no_aggregate" in entry['backends'].get(backend.name, {}).get('flags', []):
+        pytest.skip("No support for summarize in backend: %s" %backend.name)
 
 def do_test_missing_implementation(entry, backend):
     # Check whether test should xfail, skip, or -------------------------------
@@ -133,8 +143,8 @@ def do_test_missing_implementation(entry, backend):
     if not supported:
         pytest.skip("Spec'd failure")
 
-    if get_spec_no_mutate(entry, backend):
-        pytest.skip("Spec'd failure")
+    #if get_spec_no_mutate(entry, backend):
+    #    pytest.skip("Spec'd failure")
 
     ## case: Needs to be implmented
     ## TODO(table): uses xfail
@@ -224,6 +234,8 @@ def test_pandas_grouped_frame_fast_not_implemented(notimpl_entry):
 @pytest.mark.skip_backend('sqlite')
 def test_frame_mutate(skip_backend, backend, entry):
     do_test_missing_implementation(entry, backend)
+    skip_no_mutate(entry, backend)
+
 
     # Prepare input data ------------------------------------------------------
     # case: inputs must be boolean
@@ -237,10 +249,17 @@ def test_frame_mutate(skip_backend, backend, entry):
     dst = crnt_data.assign(result = call_expr(crnt_data))
     dst['result'] = cast_result_type(entry, backend, dst['result'])
 
+    result_type = get_spec_sql_type(entry, backend)
+    if result_type == "variable":
+        kwargs = {"check_dtype": False, "atol": 1e-03}
+    else:
+        kwargs = {}
+
     assert_equal_query(
             df,
             arrange(_.id) >> mutate(result = call_expr),
-            dst
+            dst,
+            **kwargs
             )
 
     # Run test for equality w/ grouped pandas ----
@@ -249,7 +268,8 @@ def test_frame_mutate(skip_backend, backend, entry):
     assert_equal_query(
             df,
             arrange(_.id) >> group_by(_.g) >> mutate(result = call_expr),
-            g_dst
+            g_dst,
+            **kwargs
             )
 
 
@@ -279,7 +299,9 @@ def test_pandas_grouped_frame_fast_mutate(entry):
 @pytest.mark.skip_backend('sqlite')
 def test_frame_summarize(skip_backend, backend, agg_entry):
     entry = agg_entry
+
     do_test_missing_implementation(entry, backend)
+    skip_no_summarize(entry, backend)
 
     # Prepare input data ------------------------------------------------------
     # case: inputs must be boolean
@@ -295,12 +317,19 @@ def test_frame_summarize(skip_backend, backend, agg_entry):
     # case: output is of a different type than w/ pandas
     dst['result'] = cast_result_type(entry, backend, dst['result'])
 
+    result_type = get_spec_sql_type(entry, backend)
+    if result_type == "variable":
+        kwargs = {"check_dtype": False, "atol": 1e-03}
+    else:
+        kwargs = {}
+
     # Run test for equality w/ pandas ----
     # otherwise, verify returns same result as mutate
     assert_equal_query(
             df,
             summarize(result = call_expr),
-            dst
+            dst,
+            **kwargs
             )
 
     dst_g = crnt_data.groupby('g').apply(call_expr).reset_index().rename(columns = {0: 'result'})
@@ -308,7 +337,8 @@ def test_frame_summarize(skip_backend, backend, agg_entry):
     assert_equal_query(
             df,
             group_by(_.g) >> summarize(result = call_expr),
-            dst_g
+            dst_g,
+            **kwargs
             )
 
 
