@@ -63,6 +63,8 @@ def _sql_rank_over(rank_func, col, partition, nulls_last):
     return sql.case({col.isnot(None): over_clause})
 
 def _sql_rank(func_name, partition = False, nulls_last = False):
+    # partition controls whether to make partition by NOT NULL
+
     rank_func = getattr(sql.func, func_name)
 
     def f(_, col, na_option = None) -> RankOver:
@@ -82,10 +84,10 @@ cume_dist   .register(SqlColumn, _sql_rank("cume_dist", partition = True))
 min_rank    .register(SqlColumn, _sql_rank("rank", partition = True))
 
 
-dense_rank  .register(SqliteColumn, win_absent("DENSE_RANK"))
-percent_rank.register(SqliteColumn, win_absent("PERCENT_RANK"))
-cume_dist   .register(SqliteColumn, win_absent("CUME_DIST"))
-min_rank    .register(SqliteColumn, win_absent("MIN_RANK"))
+dense_rank  .register(SqliteColumn, _sql_rank("dense_rank", nulls_last=True))
+percent_rank.register(SqliteColumn, _sql_rank("percent_rank", nulls_last=True))
+cume_dist   .register(SqliteColumn, _sql_rank("cume_dist", nulls_last=True))
+min_rank    .register(SqliteColumn, _sql_rank("min_rank", nulls_last=True))
 
 # partition everything, since MySQL puts NULLs first
 # see: https://stackoverflow.com/q/1498648/1144523
@@ -94,8 +96,6 @@ percent_rank.register(MysqlColumn, _sql_rank("percent_rank", partition = True))
 cume_dist   .register(MysqlColumn, _sql_rank("cume_dist", partition = True))
 min_rank    .register(MysqlColumn, _sql_rank("rank", partition = True))
 
-# partition everything, since MySQL puts NULLs first
-# see: https://stackoverflow.com/q/1498648/1144523
 dense_rank  .register(BigqueryColumn, _sql_rank("dense_rank", nulls_last = True))
 percent_rank.register(BigqueryColumn, _sql_rank("percent_rank", nulls_last = True))
 
@@ -112,8 +112,6 @@ def _row_number_sql(codata: SqlColumn, col: ClauseElement) -> CumlOver:
         
     """
     return CumlOver(sql.func.row_number())
-
-row_number.register(SqliteColumn, win_absent("ROW_NUMBER"))
 
 # between ---------------------------------------------------------------------
 
@@ -204,7 +202,6 @@ def _n_sql_agg(codata: SqlColumnAgg, x) -> ClauseElement:
 
 
 n.register(SqliteColumn, win_absent("N"))
-row_number.register(SqliteColumn, win_absent("ROW_NUMBER"))
 
 # n_distinct ------------------------------------------------------------------
 
