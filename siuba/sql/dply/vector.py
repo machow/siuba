@@ -86,8 +86,8 @@ min_rank    .register(SqlColumn, _sql_rank("rank", partition = True))
 
 dense_rank  .register(SqliteColumn, _sql_rank("dense_rank", nulls_last=True))
 percent_rank.register(SqliteColumn, _sql_rank("percent_rank", nulls_last=True))
-cume_dist   .register(SqliteColumn, _sql_rank("cume_dist", nulls_last=True))
-min_rank    .register(SqliteColumn, _sql_rank("min_rank", nulls_last=True))
+cume_dist   .register(SqliteColumn, _sql_rank("cume_dist", partition = True))
+min_rank    .register(SqliteColumn, _sql_rank("rank", nulls_last=True))
 
 # partition everything, since MySQL puts NULLs first
 # see: https://stackoverflow.com/q/1498648/1144523
@@ -201,7 +201,6 @@ def _n_sql_agg(codata: SqlColumnAgg, x) -> ClauseElement:
     return sql.func.count()
 
 
-n.register(SqliteColumn, win_absent("N"))
 
 # n_distinct ------------------------------------------------------------------
 
