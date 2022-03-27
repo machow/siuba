@@ -231,7 +231,6 @@ def test_pandas_grouped_frame_fast_not_implemented(notimpl_entry):
 
 
 #@backend_pandas
-#@pytest.mark.skip_backend('sqlite')
 def test_frame_mutate(skip_backend, backend, entry):
     do_test_missing_implementation(entry, backend)
     skip_no_mutate(entry, backend)
@@ -296,7 +295,6 @@ def test_pandas_grouped_frame_fast_mutate(entry):
     assert_frame_equal(res_obj, dst.obj)
 
 
-@pytest.mark.skip_backend('sqlite')
 def test_frame_summarize(skip_backend, backend, agg_entry):
     entry = agg_entry
 
