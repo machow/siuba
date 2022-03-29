@@ -243,7 +243,7 @@ def copy_to_sql(df, name, engine):
         df.to_gbq(qual_name, project_id, if_exists="replace") 
 
     else:
-        df.to_sql(name, engine, index = False, if_exists = "replace")
+        df.to_sql(name, engine, index = False, if_exists = "replace", method="multi")
 
     # manually create table, so we can be explicit about boolean columns.
     # this is necessary because MySQL reflection reports them as TinyInts,

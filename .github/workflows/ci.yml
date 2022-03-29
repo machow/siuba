@@ -98,7 +98,10 @@ jobs:
           export_default_credentials: true
       - name: Test with pytest
         run: |
-          pytest siuba -m bigquery --workers auto --tests-per-worker 2
+          # tests are mostly waiting on http requests to bigquery api
+          # note that test backends can cache data, so more processes
+          # is not always faster
+          pytest siuba -m bigquery --workers 2 --tests-per-worker 20
         env:
           SB_TEST_BQDATABASE: "ci_github"
 
