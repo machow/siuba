@@ -29,7 +29,15 @@ from siuba.dply.verbs import (
         )
 
 from .translate import CustomOverClause, SqlColumn, SqlColumnAgg
-from .utils import get_dialect_translator, _FixedSqlDatabase, _sql_select, _sql_column_collection, _sql_add_columns, _sql_with_only_columns
+from .utils import (
+    get_dialect_translator,
+    _FixedSqlDatabase,
+    _sql_select,
+    _sql_column_collection,
+    _sql_add_columns,
+    _sql_with_only_columns,
+    MockConnection
+)
 
 from sqlalchemy import sql
 import sqlalchemy
@@ -466,6 +474,12 @@ def _collect(__data, as_df = True):
     #    dialect = __data.source.dialect,
     #    compile_kwargs = {"literal_binds": True}
     #)
+
+    if isinstance(__data.source, MockConnection):
+        # a mock sqlalchemy is being used to show_query, and echo queries.
+        # it doesn't return a result object or have a context handler, so
+        # we need to bail out early
+        return
 
     with __data.source.connect() as conn:
         if as_df:

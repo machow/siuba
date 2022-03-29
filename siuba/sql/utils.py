@@ -1,5 +1,14 @@
 import importlib
 
+try:
+    # once we drop sqlalchemy 1.2, can use create_mock_engine function
+    from sqlalchemy.engine.mock import MockConnection
+except ImportError:
+    # monkey patch old sqlalchemy mock, so it can be a context handler
+    from sqlalchemy.engine.strategies import MockEngineStrategy
+    MockConnection = MockEngineStrategy.MockConnection
+
+
 def get_dialect_translator(name):
     mod = importlib.import_module('siuba.sql.dialects.{}'.format(name))
     return mod.translator
@@ -37,11 +46,13 @@ def mock_sqlalchemy_engine(dialect):
         show_query(query)
 
     """
+
     from sqlalchemy.engine import Engine
     from sqlalchemy.dialects import registry
 
-    dialect_cls = registry.load('postgresql')   
-    return Engine(None, dialect_cls(), '')  
+    dialect_cls = registry.load(dialect)
+    
+    return MockConnection(dialect_cls(), lambda *args, **kwargs: None)
 
 
 # Temporary fix for pandas bug (https://github.com/pandas-dev/pandas/issues/35484)
