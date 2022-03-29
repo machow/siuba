@@ -9,6 +9,7 @@ from ..translate import (
 import sqlalchemy.sql.sqltypes as sa_types
 from sqlalchemy import sql
 from sqlalchemy.sql import func as fn
+from . import _dt_generics as _dt
 
 # Custom dispatching in call trees ============================================
 
@@ -23,30 +24,24 @@ def sql_floordiv(_, x, y):
 
 # datetime ----
 
-def _date_trunc(_, col, name):
+@_dt.date_trunc.register
+def _date_trunc(_: BigqueryColumn, col, name):
     return fn.datetime_trunc(col, sql.text(name))
+
+
+@_dt.sql_func_last_day_in_period.register
+def sql_func_last_day_in_period(_: BigqueryColumn, col, period):
+    return fn.last_day(col, sql.text(period))
+
+
+@_dt.sql_is_last_day_of.register
+def sql_is_last_day_of(codata: BigqueryColumn, col, period):
+    last_day = sql_func_last_day_in_period(codata, col, period)
+    return _date_trunc(codata, col, "DAY") == last_day
+
 
 def sql_extract(field):
     return lambda _, col: fn.extract(field, col)
-
-def sql_is_first_of(name, reference):
-    def f(codata, col):
-        return _date_trunc(codata, col, name) == _date_trunc(codata, col, reference)
-
-    return f
-
-def sql_func_last_day_in_period(_, col, period):
-    return fn.last_day(col, sql.text(period))
-
-def sql_func_days_in_month(_, col):
-    return fn.extract('DAY', sql_func_last_day_in_period(col, 'MONTH'))
-
-def sql_is_last_day_of(period):
-    def f(codata, col):
-        last_day = sql_func_last_day_in_period(codata, col, period)
-        return _date_trunc(codata, col, "DAY") == last_day
-
-    return f
 
 
 # string ----
@@ -115,13 +110,6 @@ scalar = extend_base(
       # bigquery has Sunday as 1, pandas wants Monday as 0
       "dt.dayofweek":        lambda _, col: fn.extract("DAYOFWEEK", col) - 2,
       "dt.dayofyear":        sql_extract("DAYOFYEAR"),
-      "dt.daysinmonth":      sql_func_days_in_month,
-      "dt.days_in_month":    sql_func_days_in_month,
-      "dt.is_month_end":     sql_is_last_day_of("MONTH"),
-      "dt.is_month_start":   sql_is_first_of("DAY", "MONTH"),
-      "dt.is_quarter_start": sql_is_first_of("DAY", "QUARTER"),
-      "dt.is_year_end":      sql_is_last_day_of("YEAR"),
-      "dt.is_year_start":    sql_is_first_of("DAY", "YEAR"),
       "dt.month_name":       lambda _, col: fn.format_date("%B", col),
       "dt.week":             sql_extract("ISOWEEK"),
       "dt.weekday":          lambda _, col: fn.extract("DAYOFWEEK", col) - 2,
@@ -154,7 +142,7 @@ window = extend_base(
     all      = sql_all(window = True),
     count    = lambda _, col: AggOver(fn.count(col)),
     cumsum   = win_cumul("sum"),
-    median   = lambda _, col: RankOver(sql_median(col)),
+    median   = lambda _, col: RankOver(fn.percentile_cont(col, .5)),
     nunique  = lambda _, col: AggOver(fn.count(fn.distinct(col))),
     quantile = lambda _, col, q: RankOver(fn.percentile_cont(col, q)),
     std       = win_agg("stddev"),
