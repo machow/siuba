@@ -49,7 +49,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install $REQUIREMENTS
           python -m pip install -r requirements-test.txt
-          python -m pip install snowflake-sqlalchemy==1.3.3
           python -m pip install .
         env:
           REQUIREMENTS: ${{ matrix.requirements }}
@@ -59,8 +58,6 @@ jobs:
         env:
           SB_TEST_PGPORT: 5432
           PYTEST_FLAGS: ${{ matrix.pytest_flags }}
-          SB_TEST_SNOWFLAKEPASSWORD: ${{ secrets.SB_TEST_SNOWFLAKEPASSWORD }}
-          SB_TEST_SNOWFLAKEHOST: ${{ secrets.SB_TEST_SNOWFLAKEHOST }}
 
       # optional step for running bigquery tests ----
       - name: Set up Cloud SDK
@@ -78,19 +75,20 @@ jobs:
   test-bigquery:
     name: "Test BigQuery"
     runs-on: ubuntu-latest
-    if: contains(github.ref, 'bigquery') || contains(github.ref, 'refs/tags')
+    if: ${{ contains('bigquery', github.ref) || !github.event.pull_request.draft }}
     steps:
       - uses: actions/checkout@v2
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python 
         uses: actions/setup-python@v2
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.8"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
           python -m pip install -r requirements-test.txt
-          python -m pip install git+https://github.com/machow/pybigquery.git pandas-gbq==0.15.0
+          python -m pip install pytest-parallel
+          python -m pip install sqlalchemy-bigquery==1.3.0 pandas-gbq==0.15.0
           python -m pip install .
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v0
@@ -100,10 +98,37 @@ jobs:
           export_default_credentials: true
       - name: Test with pytest
         run: |
-          pytest siuba -m bigquery
+          # tests are mostly waiting on http requests to bigquery api
+          # note that test backends can cache data, so more processes
+          # is not always faster
+          pytest siuba -m bigquery --workers 2 --tests-per-worker 20
         env:
           SB_TEST_BQDATABASE: "ci_github"
 
+  test-snowflake:
+    name: "Test snowflake"
+    runs-on: ubuntu-latest
+    if: ${{ contains('snowflake', github.ref) || !github.event.pull_request.draft }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.8"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -r requirements-test.txt
+          python -m pip install pytest-parallel
+          python -m pip install snowflake-sqlalchemy==1.3.3
+          python -m pip install .
+      - name: Test with pytest
+        run: |
+          pytest siuba -m snowflake --workers 2 --tests-per-worker 20
+        env:
+          SB_TEST_SNOWFLAKEPASSWORD: ${{ secrets.SB_TEST_SNOWFLAKEPASSWORD }}
+          SB_TEST_SNOWFLAKEHOST: ${{ secrets.SB_TEST_SNOWFLAKEHOST }}
 
   build-docs:
     name: "Build Documentation"
@@ -185,7 +210,7 @@ jobs:
     name: "Deploy to PyPI"
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
-    needs: [checks, test-bigquery]
+    needs: [checks, test-bigquery, test-snowflake]
     steps:
       - uses: actions/checkout@v2
       - name: "Set up Python 3.8"

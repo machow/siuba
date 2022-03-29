@@ -39,7 +39,6 @@ def test_ungrouped_summarize_literal(df):
     assert_equal_query(df, summarize(y = 1), data_frame(y = 1)) 
 
 
-@backend_notimpl("sqlite")
 def test_summarize_after_mutate_cuml_win(backend, df_float):
     assert_equal_query(
             df_float,

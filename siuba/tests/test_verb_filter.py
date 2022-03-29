@@ -31,7 +31,6 @@ def test_filter_basic_two_args(backend):
 
     assert_equal_query(dfs, filter(_.x > 3, _.y < 2), df[lambda _: (_.x > 3) & (_.y < 2)])
 
-@backend_notimpl("sqlite")
 def test_filter_via_group_by(backend):
     df = data_frame(
             x = range(1, 11),
@@ -48,7 +47,6 @@ def test_filter_via_group_by(backend):
             )
 
 
-@backend_notimpl("sqlite")
 def test_filter_via_group_by_agg(backend):
     dfs = backend.load_df(x = range(1,11), g = [1]*5 + [2]*5)
 
@@ -59,7 +57,6 @@ def test_filter_via_group_by_agg(backend):
             )
 
 
-@backend_notimpl("sqlite")
 def test_filter_via_group_by_agg_two_args(backend):
     dfs = backend.load_df(x = range(1,11), g = [1]*5 + [2]*5)
 
@@ -71,7 +68,6 @@ def test_filter_via_group_by_agg_two_args(backend):
 
 
 @backend_sql("TODO: pandas - implement arrange over group by")
-@backend_notimpl("sqlite")
 def test_filter_via_group_by_arrange(backend):
     dfs = backend.load_df(x = [3,2,1] + [2,3,4], g = [1]*3 + [2]*3)
 
@@ -82,7 +78,6 @@ def test_filter_via_group_by_arrange(backend):
             )
 
 @backend_sql("TODO: pandas - implement arrange over group by")
-@backend_notimpl("sqlite")
 def test_filter_via_group_by_desc_arrange(backend):
     dfs = backend.load_df(x = [3,2,1] + [2,3,4], g = [1]*3 + [2]*3)
 
@@ -103,7 +98,6 @@ def test_filter_before_summarize(backend):
             check_dtype=False
             )
 
-@backend_notimpl("sqlite")
 def test_filter_before_summarize_grouped(backend):
     dfs = backend.load_df(x = [1,2,3], g = ["a", "a", "b"])
 

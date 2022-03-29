@@ -19,7 +19,7 @@ def dfs(backend):
 
 @pytest.mark.parametrize("query, output", [
     (mutate(x = _.a + _.b), DATA.assign(x = [10, 10, 10])),
-    pytest.param( mutate(x = _.a + _.b) >> summarize(ttl = _.x.sum()), data_frame(ttl = 30.0), marks = pytest.mark.skip("TODO: failing sqlite?")),
+    (mutate(x = _.a + _.b) >> summarize(ttl = _.x.sum().astype(float)), data_frame(ttl = 30.0)),
     (mutate(x = _.a + 1, y = _.b - 1), DATA.assign(x = [2,3,4], y = [8,7,6])),
     (mutate(x = _.a + 1) >> mutate(y = _.b - 1), DATA.assign(x = [2,3,4], y = [8,7,6])),
     (mutate(x = _.a + 1, y = _.x + 1), DATA.assign(x = [2,3,4], y = [3,4,5]))
@@ -75,7 +75,6 @@ def test_mutate_reassign_all_cols_keeps_rowsize(dfs):
             )
 
 @backend_sql
-@backend_notimpl("sqlite")
 def test_mutate_window_funcs(backend):
     data = data_frame(idx = range(0, 4), x = range(1, 5), g = [1,1,2,2])
     dfs = backend.load_df(data)
@@ -86,7 +85,6 @@ def test_mutate_window_funcs(backend):
             )
 
 
-@backend_notimpl("sqlite")
 def test_mutate_using_agg_expr(backend):
     data = data_frame(x = range(1, 5), g = [1,1,2,2])
     dfs = backend.load_df(data)
@@ -97,7 +95,6 @@ def test_mutate_using_agg_expr(backend):
             )
 
 @backend_sql # TODO: pandas outputs a int column
-@backend_notimpl("sqlite")
 def test_mutate_using_cuml_agg(backend):
     data = data_frame(idx = range(0, 4), x = range(1, 5), g = [1,1,2,2])
     dfs = backend.load_df(data)

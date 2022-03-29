@@ -73,9 +73,6 @@ def simple_data(request):
 
 @pytest.mark.parametrize('func', OMNIBUS_VECTOR_FUNCS)
 def test_mutate_vector(backend, func, simple_data):
-    if backend.name == 'sqlite':
-        pytest.skip()
-
     df = backend.load_cached_df(simple_data)
     
     assert_equal_query(
@@ -96,9 +93,6 @@ def test_mutate_vector(backend, func, simple_data):
 
 @pytest.mark.parametrize('func', VECTOR_AGG_FUNCS)
 def test_agg_vector(backend, func, simple_data):
-    if backend.name == 'sqlite':
-        pytest.skip()
-
     df = backend.load_cached_df(simple_data)
 
     res = data_frame(y = func(simple_data))
@@ -120,9 +114,6 @@ def test_agg_vector(backend, func, simple_data):
 @backend_sql
 @pytest.mark.parametrize('func', VECTOR_FILTER_FUNCS)
 def test_filter_vector(backend, func, simple_data):
-    if backend.name == 'sqlite':
-        pytest.skip()
-
     df = backend.load_cached_df(simple_data)
 
     res = data_frame(y = func(simple_data))
@@ -147,8 +138,6 @@ def test_filter_vector(backend, func, simple_data):
 #@given(DATA_SPEC)
 #@settings(max_examples = 50, deadline = 1000)
 #def test_hypothesis_mutate_vector_funcs(backend, data):
-#    if backend.name == 'sqlite':
-#        pytest.skip()
 #
 #    df = backend.load_df(data)
 #    
