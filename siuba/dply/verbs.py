@@ -1044,6 +1044,44 @@ full_join = partial(join, how = "full")
 inner_join = partial(join, how = "inner")
 
 
+# Binding =====================================================================
+
+@singledispatch2(pd.DataFrame)
+def bind_rows(*args, **kwargs):
+    """Concatenate DataFrames by index/rows.
+    Similar to join, you must specify all involved DataFrames (including _).
+
+    Args:
+        *args: the DataFrames to concatenate
+
+    """
+    if not all(isinstance(x, DataFrame) for x in args):
+        raise Exception("All elements must be type DataFrame.")
+
+    if len(kwargs):
+        raise NotImplementedError("extra arguments not currently supported")
+
+    return pd.concat(args, axis=0)
+
+
+@singledispatch2(pd.DataFrame)
+def bind_cols(*args, **kwargs):
+    """Concatenate DataFrames by columns.
+    Similar to join, you must specify all involved DataFrames (including _).
+
+    Args:
+        *args: the DataFrames to concatenate
+
+    """
+    if not all(isinstance(x, DataFrame) for x in args):
+        raise Exception("All elements must be type DataFrame.")
+
+    if len(kwargs):
+        raise NotImplementedError("extra arguments not currently supported")
+
+    return pd.concat(args, axis=1)
+
+
 # Head ========================================================================
 
 @singledispatch2(pd.DataFrame)
