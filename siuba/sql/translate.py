@@ -57,12 +57,23 @@ from sqlalchemy.sql.elements import Over
 class CustomOverClause(Over):
     """Base class for custom window clauses in SQL translation."""
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
     def set_over(self, group_by, order_by):
         raise NotImplementedError()
+
+    def has_over(self):
+        return self.order_by is not None or self.group_by is not None
+
 
     @classmethod
     def func(cls, name):
         raise NotImplementedError()
+
+
+    
 
 
 class AggOver(CustomOverClause):
@@ -70,6 +81,8 @@ class AggOver(CustomOverClause):
 
     Note that this class does not set order by, which is how these functions
     generally become their cumulative versions.
+
+    E.g. mean(x) -> AVG(x) OVER (partition_by <group vars>)
     """
 
     def set_over(self, group_by, order_by = None):
@@ -90,6 +103,8 @@ class RankOver(CustomOverClause):
 
     Note that in python we might call rank(col), but in SQL the ranking column
     is defined using order by.
+
+    E.g. rank(y) -> rank() OVER (partition by <group vars> order by y)
     """
     def set_over(self, group_by, order_by = None):
         crnt_partition = getattr(self.partition_by, 'clauses', tuple())
@@ -110,6 +125,9 @@ class CumlOver(CustomOverClause):
 
     Note that this class is also currently used for aggregates that might require
     ordering, like nth, first, etc..
+
+    e.g. cumsum(x) -> SUM(x) OVER (partition by <group vars> order by <order vars>)
+    e.g. nth(0) -> NTH_VALUE(1) OVER (partition by <group vars> order by <order vars>)
 
     """
     def set_over(self, group_by, order_by):
@@ -164,7 +182,15 @@ def sql_colmeth(meth, *outerargs):
     return f
 
 def sql_ordered_set(name, is_analytic=False):
-    # Ordered and theoretical set aggregates
+    """Generate function for ordered and hypothetical set aggregates.
+
+    Hypothetical-set aggregates take an argument, and return a value for each
+    element of the argument. For example: rank(2) WITHIN GROUP (order by x).
+    In this case, the hypothetical ranks 2 relative to x.
+
+    Ordered set aggregates are like percentil_cont(.5) WITHIN GROUP (order by x),
+    which calculates the median of x.
+    """
     sa_func = getattr(sql.func, name)
 
     if is_analytic:
