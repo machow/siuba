@@ -27,3 +27,7 @@ cars_sql = _LazyTbl(
         ["cyl", "mpg", "hp"]
         )
 
+
+# Starwars --------------------------------------------------------------------
+_fname_sw = pkg_resources.resource_filename("siuba.data", "starwars.csv")
+starwars = pd.read_csv(_fname_sw)

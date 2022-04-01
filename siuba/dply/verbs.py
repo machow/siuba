@@ -20,6 +20,7 @@ DPLY_FUNCTIONS = (
         "count", "add_count",
         "head",
         "top_n",
+        "bind_cols", "bind_rows",
         # Tidy ----
         "spread", "gather",
         "nest", "unnest",
