@@ -154,6 +154,44 @@ def track_call_windows(call, columns, group_by, order_by, window_cte = None):
     return col, listener.windows, listener.window_cte
 
 
+def track_call_windows2(call, columns, group_by, order_by, window_cte = None):
+    col_expr = call(columns)
+
+    if not isinstance(col_expr, sql.elements.ClauseElement):
+        return col_expr
+
+    over_clauses = WindowReplacer._get_over_clauses(col_expr)
+
+    for over in over_clauses:
+        # TODO: shouldn't mutate these over clauses
+        group_by = sql.elements.ClauseList(
+                *[columns[name] for name in group_by]
+                )
+        order_by = sql.elements.ClauseList(
+                *_create_order_by_clause(columns, *order_by)
+                )
+
+        over.set_over(group_by, order_by)
+
+    if len(over_clauses) and window_cte is not None:
+        # custom name, or parameters like "%(...)s" may nest and break psycopg2
+        # with columns you can set a key to fix this, but it doesn't seem to 
+        # be an option with labels
+        name = WindowReplacer._get_unique_name('win', lift_inner_cols(window_cte))
+        label = col_expr.label(name)
+
+        # put into CTE, and return its resulting column, so that subsequent
+        # operations will refer to the window column on window_cte. Note that
+        # the operations will use the actual column, so may need to use the
+        # ClauseAdaptor to make it a reference to the label
+        window_cte = _sql_add_columns(window_cte, [label])
+        win_col = lift_inner_cols(window_cte).values()[-1]
+
+        return win_col
+            
+    return col_expr, over_clauses, window_cte
+
+
 def lift_inner_cols(tbl):
     cols = list(tbl.inner_columns)
     data = {col.key: col for col in cols}
