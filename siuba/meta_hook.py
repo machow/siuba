@@ -11,10 +11,15 @@ from importlib.util import find_spec
 import importlib
 from types import ModuleType
 import sys
+import warnings
 
 from functools import wraps
 import pdb
 import readline
+
+warnings.warn(
+    "The siuba.meta_hook module is DEPRECATED and will be removed in a future release."
+)
 
 
 
