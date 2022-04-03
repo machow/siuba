@@ -10,11 +10,10 @@ from .calls import (
 )
 from .symbolic import Symbolic, strip_symbolic, create_sym_call, explain
 from .visitors import CallTreeLocal, CallVisitor, FunctionLookupBound, FunctionLookupError, ExecutionValidatorVisitor
-from .dispatchers import symbolic_dispatch, singledispatch2, pipe_no_args, Pipeable
+from .dispatchers import symbolic_dispatch, singledispatch2, pipe_no_args, Pipeable, pipe
 
 Lam = Lazy
 
 _ = Symbolic()
 
-pipe = Pipeable
 

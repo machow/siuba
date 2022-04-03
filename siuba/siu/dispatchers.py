@@ -274,3 +274,79 @@ def create_pipe_call(obj, *args, **kwargs) -> Pipeable:
             **{k: Lazy(strip_symbolic(v)) for k,v in kwargs.items()}
             ))
 
+def create_eager_pipe_call(obj, *args, **kwargs) -> Pipeable:
+    first, *rest = args
+    return Pipeable(Call(
+            "__call__",
+            strip_symbolic(obj),
+            strip_symbolic(first),
+            *(strip_symbolic(x) for x in rest),
+            **{k: strip_symbolic(v) for k,v in kwargs.items()}
+            ))
+
+
+def pipe(__func: "callable | Call | Symbolic", *args, **kwargs):
+    """Allow a function call to be used in a pipe (with >>).
+
+    Parameters
+    ----------
+    __func:
+        A function to be called as part of a pipe.
+    *args:
+        Additional position arguments to pass to the function.
+    **kwargs:
+        Additional keyword arguments to pass to the function.
+
+    Examples
+    --------
+
+    The simplest use of the pipe is passing just the to-be-called function.
+
+    >>> s = "a string"
+    >>> s >> pipe(print)
+    a string
+
+    This is equivalent to explicitly passing ``_`` as a placeholder.
+
+    >>> from siuba import _
+    >>> s >> pipe(print, _)
+    a string
+
+    The explicit syntax is useful, because it allows us to pass more arguments.
+    For example, the code below passes additional arguments to print.
+
+    >>> "a" >> pipe(print, _, "string", sep=" ")
+    a string
+
+    You can transform the input data. For example, the code below passes "shout".upper()
+    to print.
+
+    >>> "shout" >> pipe(print, _.upper())
+    SHOUT
+
+    Since ``_`` is just a placeholder for the data on the left-hand-side of >>, you
+    can pass it multiple times to the to-be-called function (e.g. print).
+
+    >>> "nice" >> pipe(print, _, _, sep=" ")
+    nice nice
+
+    Alternatively, you can pass a siu expression straight to pipe.
+
+    >>> "abc" >> pipe(_[0].upper())
+    'A'
+        
+    """
+
+    if isinstance(__func, (Symbolic, Call)):
+        if args or kwargs:
+            raise NotImplementedError(
+                "If a siu expression (_) is the first argument to pipe, it must "
+                "be the only argument. You can pass arguments using the form, "
+                "pipe(_.some_method(1, 2, c = 3))."
+            )
+        return Pipeable(strip_symbolic(__func))
+    if not args and not kwargs:
+        # handle implicit case, pipe(some_func) -> pipe(some_func, _)
+        return create_eager_pipe_call(__func, MetaArg("_"))
+
+    return create_eager_pipe_call(__func, *args, **kwargs)
