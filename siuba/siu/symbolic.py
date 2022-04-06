@@ -1,3 +1,5 @@
+from functools import singledispatch
+
 from .calls import BINARY_OPS, UNARY_OPS, Call, BinaryOp, BinaryRightOp, MetaArg, UnaryOp, SliceOp, FuncArg
 from .format import Formatter
 
@@ -9,6 +11,12 @@ class Symbolic(object):
         self.__source = MetaArg("_") if source is None else source
         self.__ready_to_call = ready_to_call
 
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        """Handle numpy universal functions. E.g. np.sqrt(_)."""
+        return array_ufunc(self, ufunc, method, *inputs, **kwargs)
+
+    #def __array_function__(self, *args, **kwargs):
+    #    raise NotImplementedError()
 
     # allowed methods ----
 
@@ -108,7 +116,38 @@ def explain(symbol):
     return str(symbol)
 
 
-# Do some gnarly method setting -----------------------------------------------
+# Special numpy ufunc dispatcher
+# =============================================================================
+# note that this is essentially what dispatchers.symbolic_dispatch does...
+
+@singledispatch
+def array_ufunc(self, ufunc, method, *inputs, **kwargs):
+    return getattr(ufunc, method)(*inputs, **kwargs)
+
+
+@array_ufunc.register(Call)
+def _array_ufunc_call(self, ufunc, method, *inputs, **kwargs):
+
+    return Call("__call__", FuncArg(array_ufunc), self, ufunc, method, *inputs, **kwargs)
+
+
+@array_ufunc.register(Symbolic)
+def _array_ufunc_sym(self, ufunc, method, *inputs, **kwargs):
+    f_concrete = array_ufunc.dispatch(Call)
+
+    call = f_concrete(
+        strip_symbolic(self),
+        ufunc,
+        method, 
+        *map(strip_symbolic, inputs),
+        **{k: strip_symbolic(v) for k, v in kwargs.items()}
+    )
+
+    return Symbolic(call)
+
+
+# Do some gnarly method setting on Symbolic -----------------------------------
+# =============================================================================
 
 def create_binary_op(op_name, left_op = True):
     def _binary_op(self, x):
