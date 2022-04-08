@@ -1048,19 +1048,48 @@ inner_join = partial(join, how = "inner")
 # Binding =====================================================================
 
 @singledispatch2(pd.DataFrame)
-def bind_rows(*args, **kwargs):
+def bind_rows(*args, _id=None, **kwargs):
     """Concatenate DataFrames by index/rows.
     Similar to join, you must specify all involved DataFrames (including _).
 
     Args:
-        *args: the DataFrames to concatenate
+        *args: the DataFrames to concatenate. If a dictionary, scheme {_id: DataFrame} is used.
+        _id: a list of names for each DataFrame, added as an _id column. If True or length doesn't match, defaults to 0..* numbering scheme.
 
     """
+
+    if len(args) == 0:
+        raise Exception("no arguments were passed")
+    
+    if isinstance(args[0], dict):
+        _id = list(args[0].keys())
+        args = list(args[0].values())
+
     if not all(isinstance(x, DataFrame) for x in args):
-        raise Exception("All elements must be type DataFrame.")
+        raise Exception("all elements must be type DataFrame")
 
     if len(kwargs):
         raise NotImplementedError("extra arguments not currently supported")
+
+    if _id:
+        if _id == True:
+            _id = list(range(len(args)))
+
+        elif len(_id) != len(args):
+            warnings.warn("bind_rows: length of _id does not match number of DataFrames. Defaulting to numerical sequencing.")
+            _id = list(range(len(args)))
+
+        if not isinstance(_id, list):
+            raise Exception("_id argument must be type bool or list")
+
+        if any("_id" in df for df in args):
+            # may want to generate a new name?
+            warnings.warn("_id column already exists in a listed DataFrame. This will be overwritten.")
+
+        args = [df.copy() for df in args]
+
+        for df, name in zip(args, _id):
+            df["_id"] = name
 
     return pd.concat(args, axis=0)
 
