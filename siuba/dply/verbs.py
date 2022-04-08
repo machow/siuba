@@ -1109,6 +1109,8 @@ def bind_cols(*args, **kwargs):
     if len(kwargs):
         raise NotImplementedError("extra arguments not currently supported")
 
+    args = [df.copy().reset_index(drop=True, inplace=True) for df in args]
+
     return pd.concat(args, axis=1)
 
 
