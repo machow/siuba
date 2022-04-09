@@ -166,11 +166,11 @@ def mutate(__data, **kwargs):
     """
     
     orig_cols = __data.columns
-    result = __data.assign(**kwargs)
+    df_result = __data.assign(**kwargs)
 
-    new_cols = result.columns[~result.columns.isin(orig_cols)]
+    new_cols = df_result.columns[~df_result.columns.isin(orig_cols)]
 
-    return result.loc[:, [*orig_cols, *new_cols]]
+    return df_result.loc[:, [*orig_cols, *new_cols]]
 
 
 
@@ -252,11 +252,11 @@ def filter(__data, *args):
     # and iloc can't use a boolean series
     if isinstance(crnt_indx, bool) or isinstance(crnt_indx, np.bool_):
         # iloc can do slice, but not a bool series
-        result = __data.iloc[slice(None) if crnt_indx else slice(0),:]
+        df_result = __data.iloc[slice(None) if crnt_indx else slice(0),:]
     else:
-        result = __data.loc[crnt_indx,:]
+        df_result = __data.loc[crnt_indx,:]
 
-    return result
+    return df_result
 
 @filter.register(DataFrameGroupBy)
 def _filter(__data, *args):
@@ -304,11 +304,11 @@ def summarize(__data, **kwargs):
     for k, v in kwargs.items():
         res = v(__data) if callable(v) else v
 
-        # validate operations returned single result
+        # validate operations returned single df_result
         if not is_scalar(res) and len(res) > 1:
-            raise ValueError("Summarize argument, %s, must return result of length 1 or a scalar." % k)
+            raise ValueError("Summarize argument, %s, must return df_result of length 1 or a scalar." % k)
 
-        # keep result, but use underlying array to avoid crazy index issues
+        # keep df_result, but use underlying array to avoid crazy index issues
         # on DataFrame construction (#138)
         results[k] = res.array if isinstance(res, pd.Series) else res
         
@@ -682,11 +682,11 @@ def _if_else(__data, *args, **kwargs):
 
 @if_else.register(pd.Series)
 def _if_else(cond, true_vals, false_vals):
-    result = np.where(cond.fillna(False), true_vals, false_vals)
+    df_result = np.where(cond.fillna(False), true_vals, false_vals)
 
     # TODO: should functions that take a Series, return a Series?
     #       for now, just return "O" type. Sort out once better research.
-    return result
+    return df_result
 
 
 # case_when ----------------
@@ -719,8 +719,8 @@ def case_when(__data, cases):
     out = np.repeat(None, n)
     for k, v in reversed(list(stripped_cases.items())):
         if callable(k):
-            result = _val_call(k, __data, n)
-            indx = np.where(result)[0]
+            df_result = _val_call(k, __data, n)
+            indx = np.where(df_result)[0]
 
             val_res = _val_call(v, __data, n, indx)
             out[indx] = val_res
@@ -834,7 +834,7 @@ def _fast_split_df(g_df):
     from pandas._libs import lib
     splitter = g_df.grouper._get_splitter(g_df.obj)
 
-    starts, ends = lib.generate_slices(splitter.slabels, splitter.ngroups)
+    starts, ends = lib.generate_slices(splitter.sdfs, splitter.ngroups)
 
     # TODO: reset index
     sdata = splitter._get_sorted_data()
@@ -1054,44 +1054,38 @@ def bind_rows(*args, _id=None, **kwargs):
 
     Args:
         *args: the DataFrames to concatenate. If a dictionary, scheme {_id: DataFrame} is used.
-        _id: a list of names for each DataFrame, added as an _id column. If True or length doesn't match, defaults to 0..* numbering scheme.
+        _id: column name of identifiers to link each row to its original DataFrame. 
+             Labels are taken from named arguments (kwargs). 
+             If labels are not supplied, a numerical sequence is used instead.
 
     """
-
-    if len(args) == 0:
-        raise Exception("no arguments were passed")
     
-    if isinstance(args[0], dict):
-        _id = list(args[0].keys())
-        args = list(args[0].values())
+    dfs = []
 
-    if not all(isinstance(x, DataFrame) for x in args):
-        raise Exception("all elements must be type DataFrame")
+    if args:
+        if not all(isinstance(x, DataFrame) or isinstance(x, dict) for x in args):
+            raise Exception("all elements must be type DataFrame or dict")
+        args = [df.copy() if isinstance(df, DataFrame) else DataFrame(df).copy() for df in args]
+        dfs += args
 
-    if len(kwargs):
-        raise NotImplementedError("extra arguments not currently supported")
+    if kwargs:
+        if not all(isinstance(x, DataFrame) or isinstance(x, dict) for x in kwargs.values()):
+            raise Exception("all named elements must be type DataFrame or dict")
+        kwargs = {label: df.copy() if isinstance(df, DataFrame) else DataFrame(df).copy() for label, df in kwargs.items()}
+        dfs += kwargs.values()
 
     if _id:
-        if _id == True:
-            _id = list(range(len(args)))
+        dfs = dict(zip(range(len(args)), args)) or {}
+        
+        for label, df in kwargs.items():
+            dfs[label] = df
 
-        elif len(_id) != len(args):
-            warnings.warn("bind_rows: length of _id does not match number of DataFrames. Defaulting to numerical sequencing.")
-            _id = list(range(len(args)))
+        for label, df in dfs.items():
+            df.insert(0, _id, label)
 
-        if not isinstance(_id, list):
-            raise Exception("_id argument must be type bool or list")
-
-        if any("_id" in df for df in args):
-            # may want to generate a new name?
-            warnings.warn("_id column already exists in a listed DataFrame. This will be overwritten.")
-
-        args = [df.copy() for df in args]
-
-        for df, name in zip(args, _id):
-            df["_id"] = name
-
-    return pd.concat(args, axis=0)
+        return pd.concat(dfs.values(), axis=0)
+    
+    return pd.concat(dfs, axis=0)
 
 
 @singledispatch2(pd.DataFrame)
