@@ -1053,11 +1053,11 @@ def bind_rows(*args, _id=None, **kwargs):
     Similar to join, you must specify all involved DataFrames (including _).
 
     Args:
-        *args: the DataFrames to concatenate. If a dictionary, scheme {_id: DataFrame} is used.
+        *args: the DataFrame/dict-equivalents to concatenate.
         _id: column name of identifiers to link each row to its original DataFrame. 
              Labels are taken from named arguments (kwargs). 
              If labels are not supplied, a numerical sequence is used instead.
-
+        **kwargs: labels with DataFrame/dict-equivalents.
     """
 
     if not all(isinstance(x, DataFrame) or isinstance(x, dict) for x in args):
