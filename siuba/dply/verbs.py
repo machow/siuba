@@ -1059,31 +1059,23 @@ def bind_rows(*args, _id=None, **kwargs):
              If labels are not supplied, a numerical sequence is used instead.
 
     """
-    
-    dfs = []
 
-    if args:
-        if not all(isinstance(x, DataFrame) or isinstance(x, dict) for x in args):
-            raise Exception("all elements must be type DataFrame or dict")
-        args = [df.copy() if isinstance(df, DataFrame) else DataFrame(df).copy() for df in args]
-        dfs += args
+    if not all(isinstance(x, DataFrame) or isinstance(x, dict) for x in args):
+        raise Exception("all elements must be type DataFrame or dict")
 
-    if kwargs:
-        if not all(isinstance(x, DataFrame) or isinstance(x, dict) for x in kwargs.values()):
-            raise Exception("all named elements must be type DataFrame or dict")
-        kwargs = {label: df.copy() if isinstance(df, DataFrame) else DataFrame(df).copy() for label, df in kwargs.items()}
-        dfs += kwargs.values()
+    if not all(isinstance(x, DataFrame) or isinstance(x, dict) for x in kwargs.values()):
+        raise Exception("all named elements must be type DataFrame or dict")
+
+    args = [df.copy() if isinstance(df, DataFrame) else DataFrame(df).copy() for df in args]
+    kwargs = {label: df.copy() if isinstance(df, DataFrame) else DataFrame(df).copy() for label, df in kwargs.items()}
 
     if _id:
-        dfs = dict(zip(range(len(args)), args)) or {}
-        
-        for label, df in kwargs.items():
-            dfs[label] = df
-
+        dfs = {**(dict(zip(range(len(args)), args)) or {}), **kwargs}
         for label, df in dfs.items():
             df.insert(0, _id, label)
-
-        return pd.concat(dfs.values(), axis=0)
+        dfs = dfs.values()
+    else:
+        dfs = (args or []) + kwargs.values()
     
     return pd.concat(dfs, axis=0)
 
