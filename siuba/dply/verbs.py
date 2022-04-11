@@ -6,14 +6,14 @@ import numpy as np
 from pandas.core.groupby import DataFrameGroupBy
 from pandas.core.dtypes.inference import is_scalar
 from siuba.siu import (
-    Symbolic, Call, strip_symbolic, create_sym_call, 
+    Symbolic, Call, strip_symbolic, create_sym_call,
     MetaArg, BinaryOp, _SliceOpIndex, Lazy,
     singledispatch2, pipe_no_args, Pipeable, pipe
     )
 
 DPLY_FUNCTIONS = (
         # Dply ----
-        "group_by", "ungroup", 
+        "group_by", "ungroup",
         "select", "rename",
         "mutate", "transmute", "filter", "summarize",
         "arrange", "distinct",
@@ -68,7 +68,7 @@ def install_pd_siu():
 
 def _repr_grouped_df_html_(self):
     obj_repr = self.obj._repr_html_()
-    
+
     # user can config pandas not to return html representation, in which case
     # the ipython behavior should fall back to repr
     if obj_repr is None:
@@ -162,9 +162,9 @@ def mutate(__data, **kwargs):
     ::
         from siuba.data import mtcars
         mtcars >> mutate(cyl2 = _.cyl * 2, cyl4 = _.cyl2 * 2)
-        
+
     """
-    
+
     orig_cols = __data.columns
     result = __data.assign(**kwargs)
 
@@ -180,7 +180,7 @@ def _mutate(__data, **kwargs):
     orig_index = __data.obj.index
 
     df = __data.apply(lambda d: d.assign(**kwargs))
-    
+
     # will drop all but original index
     group_by_lvls = list(range(df.index.nlevels - 1))
     g_df = df.reset_index(group_by_lvls, drop = True).loc[orig_index].groupby(groupings)
@@ -240,7 +240,7 @@ def filter(__data, *args):
     ::
         from siuba.data import mtcars
         # keep rows where cyl is 4 and mpg is less than 25
-        mtcars >> filter(mtcars, _.cyl ==  4, _.mpg < 25) 
+        mtcars >> filter(mtcars, _.cyl ==  4, _.mpg < 25)
 
     """
     crnt_indx = True
@@ -298,7 +298,7 @@ def summarize(__data, **kwargs):
     ::
         from siuba.data import mtcars
         mtcars >> summarize(mean = _.disp.mean(), n = n(_))
-        
+
     """
     results = {}
     for k, v in kwargs.items():
@@ -311,17 +311,17 @@ def summarize(__data, **kwargs):
         # keep result, but use underlying array to avoid crazy index issues
         # on DataFrame construction (#138)
         results[k] = res.array if isinstance(res, pd.Series) else res
-        
+
     # must pass index, or raises error when using all scalar values
     return DataFrame(results, index = [0])
 
-    
+
 @summarize.register(DataFrameGroupBy)
 def _summarize(__data, **kwargs):
     df_summarize = summarize.registry[pd.DataFrame]
 
     df = __data.apply(df_summarize, **kwargs)
-        
+
     group_by_lvls = list(range(df.index.nlevels - 1))
     out = df.reset_index(group_by_lvls)
     out.index = pd.RangeIndex(df.shape[0])
@@ -340,7 +340,7 @@ def transmute(__data, *args, **kwargs):
 
     f_mutate = mutate.registry[pd.DataFrame]
 
-    df = f_mutate(__data, **kwargs) 
+    df = f_mutate(__data, **kwargs)
 
     return df[[*arg_vars, *kwargs.keys()]]
 
@@ -442,7 +442,7 @@ def var_slice(colnames, x):
 def var_put_cols(name, var, cols):
     if isinstance(name, list) and var.alias is not None:
         raise Exception("Cannot assign name to multiple columns")
-    
+
     names = [name] if not isinstance(name, list) else name
 
     for name in names:
@@ -454,9 +454,9 @@ def var_put_cols(name, var, cols):
 def flatten_var(var):
     if isinstance(var, Var) and isinstance(var.name, (tuple, list)):
         return [var.to_copy(name = x) for x in var.name]
-    
+
     return [var]
-            
+
 
 
 
@@ -512,7 +512,7 @@ def var_create(*args):
             all_vars.append(arg(vl))
         else:
             all_vars.append(arg)
-     
+
     return all_vars
 
 @singledispatch2(DataFrame)
@@ -529,7 +529,7 @@ def select(__data, *args, **kwargs):
     to_rename = {k: v for k,v in od.items() if v is not None}
 
     return __data[list(od)].rename(columns = to_rename)
-    
+
 @select.register(DataFrameGroupBy)
 def _select(__data, *args, **kwargs):
     raise Exception("Selecting columns of grouped DataFrame currently not allowed")
@@ -568,12 +568,12 @@ def _call_strip_ascending(f):
 def arrange(__data, *args):
     # TODO:
     #   - add arguments to pass to sort_values (e.g. ascending, kind)
-    # 
+    #
     # basically need some (1) select behavior, (2) mutate-like behavior
     # df.sort_values is the obvious candidate, but only takes names, not expressions
     # to work around this, we make a shallow copy of data, and add sorting columns
     # then drop them at the end
-    # 
+    #
     # sort order is determined by using a unary w/ Call e.g. -_.repo
 
     df = __data.copy(deep = False)
@@ -646,7 +646,7 @@ def distinct(__data, *args, _keep_all = False, **kwargs):
         return tmp_data[list(cols)]
 
     return tmp_data
-        
+
 @distinct.register(DataFrameGroupBy)
 def _distinct(__data, *args, _keep_all = False, **kwargs):
     df = __data.apply(lambda x: distinct(x, *args, _keep_all = _keep_all, **kwargs))
@@ -751,7 +751,7 @@ def _count_group(data, *args):
     out_col = "n"
     while out_col in crnt_cols: out_col = out_col + "n"
 
-    return 
+    return
 
 
 @singledispatch2((pd.DataFrame, DataFrameGroupBy))
@@ -769,7 +769,7 @@ def count(__data, *args, wt = None, sort = False, **kwargs):
     no_grouping_vars = not args and not kwargs and isinstance(__data, pd.DataFrame)
 
     if wt is None:
-        if no_grouping_vars: 
+        if no_grouping_vars:
             # no groups, just use number of rows
             counts = pd.DataFrame({'tmp': [__data.shape[0]]})
         else:
@@ -808,7 +808,7 @@ def add_count(__data, *args, wt = None, sort = False, **kwargs):
 
     on = list(counts.columns)[:-1]
     return __data.merge(counts, on = on)
-    
+
 
 
 # Tally =======================================================================
@@ -849,7 +849,7 @@ def _fast_split_df(g_df):
 @singledispatch2(pd.DataFrame)
 def nest(__data, *args, key = "data"):
     """Nest columns within a DataFrame.
-    
+
 
     Args:
         ___data: a DataFrame
@@ -863,7 +863,7 @@ def nest(__data, *args, key = "data"):
     ::
         from siuba.data import mtcars
         mtcars >> nest(-_.cyl)
-        
+
     """
     # TODO: copied from select function
     var_list = var_create(*args)
@@ -910,7 +910,7 @@ def _nest(__data, *args, key = "data"):
 @singledispatch2(pd.DataFrame)
 def unnest(__data, key = "data"):
     """Unnest a column holding nested data (e.g. Series of lists or DataFrames).
-    
+
     Args:
         ___data: a DataFrame
         key: the name of the column to be unnested.
@@ -922,7 +922,7 @@ def unnest(__data, key = "data"):
         import pandas as pd
         df = pd.DataFrame({'id': [1,2], 'data': [['a', 'b'], ['c', 'd']]})
         df >> unnest()
-        
+
     """
     # TODO: currently only takes key, not expressions
     nrows_nested = __data[key].apply(len, convert_dtype = True)
@@ -937,13 +937,13 @@ def unnest(__data, key = "data"):
 
     # may be a better approach using a multi-index
     long_grp = __data.loc[indx_nested, grp_keys].reset_index(drop = True)
-    
+
     return long_grp.join(long_data)
 
 def _convert_nested_entry(x):
     if isinstance(x, (tuple, list)):
         return pd.Series(x)
-    
+
     return x
 
 
@@ -1028,13 +1028,13 @@ def anti_join(left, right = None, on = None):
     # copied from semi_join
     if isinstance(on, Mapping):
         left_on, right_on = zip(*on.items())
-    else: 
+    else:
         left_on = right_on = on
 
     # manually perform merge, up to getting pieces need for indexing
     merger = _MergeOperation(left, right, left_on = left_on, right_on = right_on)
     _, l_indx, _ = merger._get_join_info()
-    
+
     # use the left table's indexer to exclude those rows
     range_indx = pd.RangeIndex(len(left))
     return left.iloc[range_indx.difference(l_indx),:]
@@ -1053,45 +1053,31 @@ def bind_rows(*args, _id=None, **kwargs):
     Similar to join, you must specify all involved DataFrames (including _).
 
     Args:
-        *args: the DataFrames to concatenate. If a dictionary, scheme {_id: DataFrame} is used.
-        _id: a list of names for each DataFrame, added as an _id column. If True or length doesn't match, defaults to 0..* numbering scheme.
-
+        *args: the DataFrame/dict-equivalents to concatenate.
+        _id: column name of identifiers to link each row to its original DataFrame.
+             Labels are taken from named arguments (kwargs).
+             If labels are not supplied, a numerical sequence is used instead.
+        **kwargs: labels with DataFrame/dict-equivalents.
     """
 
-    if len(args) == 0:
-        raise Exception("no arguments were passed")
-    
-    if isinstance(args[0], dict):
-        _id = list(args[0].keys())
-        args = list(args[0].values())
+    if not all(isinstance(x, DataFrame) or isinstance(x, dict) for x in args):
+        raise Exception("all elements must be type DataFrame or dict")
 
-    if not all(isinstance(x, DataFrame) for x in args):
-        raise Exception("all elements must be type DataFrame")
+    if not all(isinstance(x, DataFrame) or isinstance(x, dict) for x in kwargs.values()):
+        raise Exception("all named elements must be type DataFrame or dict")
 
-    if len(kwargs):
-        raise NotImplementedError("extra arguments not currently supported")
+    args = [df.copy() if isinstance(df, DataFrame) else DataFrame(df).copy() for df in args]
+    kwargs = {label: df.copy() if isinstance(df, DataFrame) else DataFrame(df).copy() for label, df in kwargs.items()}
 
     if _id:
-        if _id == True:
-            _id = list(range(len(args)))
+        dfs = {**(dict(zip(range(len(args)), args)) or {}), **kwargs}
+        for label, df in dfs.items():
+            df.insert(0, _id, label)
+        dfs = dfs.values()
+    else:
+        dfs = (args or []) + kwargs.values()
 
-        elif len(_id) != len(args):
-            warnings.warn("bind_rows: length of _id does not match number of DataFrames. Defaulting to numerical sequencing.")
-            _id = list(range(len(args)))
-
-        if not isinstance(_id, list):
-            raise Exception("_id argument must be type bool or list")
-
-        if any("_id" in df for df in args):
-            # may want to generate a new name?
-            warnings.warn("_id column already exists in a listed DataFrame. This will be overwritten.")
-
-        args = [df.copy() for df in args]
-
-        for df, name in zip(args, _id):
-            df["_id"] = name
-
-    return pd.concat(args, axis=0)
+    return pd.concat(dfs, axis=0)
 
 
 @singledispatch2(pd.DataFrame)
@@ -1153,12 +1139,12 @@ def top_n(__data, n, wt = None):
 
     """
     # NOTE: using min_rank, since it can return a lazy expr for min_rank(ing)
-    #       but I would rather not have it imported in verbs. will be more 
+    #       but I would rather not have it imported in verbs. will be more
     #       reasonable if each verb were its own file? need abstract verb / vector module.
     #       vector imports experimental right now, so we need to invert deps
-    # TODO: 
+    # TODO:
     #   * what if wt is a string? should remove all str -> expr in verbs like group_by etc..
-    #   * verbs like filter allow lambdas, but this func breaks with that   
+    #   * verbs like filter allow lambdas, but this func breaks with that
     from .vector import min_rank
     if wt is None:
         sym_wt = getattr(Symbolic(MetaArg("_")), __data.columns[-1])
@@ -1214,15 +1200,15 @@ def spread(__data, key, value, fill = None, reset_index = True):
 
     id_cols = [col for col in __data.columns if col not in (key_col, val_col)]
     wide = __data.set_index(id_cols + [key_col]).unstack(level = -1)
-    
+
     if fill is not None:
         wide.fillna(fill, inplace = True)
-    
+
     # remove multi-index from both rows and cols
     wide.columns = wide.columns.droplevel().rename(None)
     if reset_index:
         wide.reset_index(inplace = True)
-    
+
     return wide
 
 
@@ -1267,13 +1253,13 @@ def complete(__data, *args, fill = None):
     #       e.g. NAs will turn int -> float
     on_cols = list(expanded.columns)
     df = __data.merge(expanded, how = "right", on = on_cols)
-    
+
     if fill is not None:
         for col_name, val in fill.items():
             df[col_name].fillna(val, inplace = True)
 
     return df
-    
+
 # Separate/Unit/Extract ============================================================
 
 import warnings
@@ -1318,11 +1304,11 @@ def separate(__data, col, into, sep = r"[^a-zA-Z0-9]",
 
     n_into = len(into)
     col_name = simple_varname(col)
-    
+
     # splitting column ----
     all_splits = __data[col_name].str.split(sep, expand = True)
     n_split_cols = len(all_splits.columns)
-    
+
     # handling too many or too few splits ----
     if  n_split_cols < n_into:
         # too few columns
@@ -1341,12 +1327,12 @@ def separate(__data, col, into, sep = r"[^a-zA-Z0-9]",
     # end up with only the into columns, correctly named ----
     new_names = dict(zip(range(n_into), into))
     keep_splits = all_splits.iloc[:, :n_into].rename(columns = new_names)
-    
+
     out = pd.concat([__data, keep_splits], axis = 1)
 
     # attempt to convert columns to numeric ----
     if convert:
-        # TODO: better strategy here? 
+        # TODO: better strategy here?
         for k in into:
             try:
                 out[k] = pd.to_numeric(out[k])
@@ -1475,14 +1461,14 @@ def extract(
 
     # attempt to convert columns to numeric ----
     if convert:
-        # TODO: better strategy here? 
+        # TODO: better strategy here?
         for k in keep_splits:
             try:
                 keep_splits[k] = pd.to_numeric(keep_splits[k])
             except ValueError:
                 pass
 
-    
+
     out = pd.concat([__data, keep_splits], axis = 1)
 
     if remove:
