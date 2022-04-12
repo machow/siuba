@@ -148,13 +148,13 @@ class WindowReplacer(CallListener):
         return windows
 
 
+#def track_call_windows(call, columns, group_by, order_by, window_cte = None):
+#    listener = WindowReplacer(columns, group_by, order_by, window_cte)
+#    col = listener.enter(call)
+#    return col, listener.windows, listener.window_cte
+
+
 def track_call_windows(call, columns, group_by, order_by, window_cte = None):
-    listener = WindowReplacer(columns, group_by, order_by, window_cte)
-    col = listener.enter(call)
-    return col, listener.windows, listener.window_cte
-
-
-def track_call_windows2(call, columns, group_by, order_by, window_cte = None):
     col_expr = call(columns)
 
     if not isinstance(col_expr, sql.elements.ClauseElement):
@@ -162,16 +162,16 @@ def track_call_windows2(call, columns, group_by, order_by, window_cte = None):
 
     over_clauses = WindowReplacer._get_over_clauses(col_expr)
 
+    crnt_group_by = sql.elements.ClauseList(
+            *[columns[name] for name in group_by]
+            )
+    crnt_order_by = sql.elements.ClauseList(
+            *_create_order_by_clause(columns, *order_by)
+            )
+
     for over in over_clauses:
         # TODO: shouldn't mutate these over clauses
-        group_by = sql.elements.ClauseList(
-                *[columns[name] for name in group_by]
-                )
-        order_by = sql.elements.ClauseList(
-                *_create_order_by_clause(columns, *order_by)
-                )
-
-        over.set_over(group_by, order_by)
+        over.set_over(crnt_group_by, crnt_order_by)
 
     if len(over_clauses) and window_cte is not None:
         # custom name, or parameters like "%(...)s" may nest and break psycopg2
@@ -187,7 +187,7 @@ def track_call_windows2(call, columns, group_by, order_by, window_cte = None):
         window_cte = _sql_add_columns(window_cte, [label])
         win_col = lift_inner_cols(window_cte).values()[-1]
 
-        return win_col
+        return win_col, over_clauses, window_cte
             
     return col_expr, over_clauses, window_cte
 
@@ -497,6 +497,7 @@ def _show_query(tbl, simplify = False):
         print(compile_query())
 
     return tbl
+
 
 # collect ----------
 
