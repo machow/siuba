@@ -26,7 +26,7 @@ BACKEND_CONFIG = {
             "dialect": "postgresql",
             "driver": "",
             "dbname": ["SB_TEST_PGDATABASE", "postgres"],
-            "port": ["SB_TEST_PGPORT", "5432"],
+            "port": ["SB_TEST_PGPORT", "5433"],
             "user": ["SB_TEST_PGUSER", "postgres"],
             "password": ["SB_TEST_PGPASSWORD", ""],
             "host": ["SB_TEST_PGHOST", "localhost"],

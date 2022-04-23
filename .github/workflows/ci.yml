@@ -56,7 +56,7 @@ jobs:
         run: |
           make test-travis
         env:
-          SB_TEST_PGPORT: 5432
+          SB_TEST_PGPORT: 5433
           PYTEST_FLAGS: ${{ matrix.pytest_flags }}
 
       # optional step for running bigquery tests ----
