@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from siuba.siu import strip_symbolic, FunctionLookupError, Symbolic, MetaArg, Call
+from siuba.siu import strip_symbolic, FunctionLookupError, Symbolic, MetaArg, Call, _ as D
 
 
 # Note that currently tests are split across the test_siu.py, and this module.
@@ -84,14 +84,40 @@ def test_siu_symbolic_array_ufunc_sql_raises(_, func):
     assert "Numpy function sql translation" in exc_info.value.args[0]
     assert "not supported" in exc_info.value.args[0]
 
-def test_siu_symbolic_array_ufunc_pandas(_):
-    import pandas as pd
-    lhs = pd.Series([1,2])
 
-    sym = np.add(_, 1)
+
+@pytest.mark.parametrize("sym, res", [
+    (np.sqrt(D), lambda ser: np.sqrt(ser)),    # ufunc
+    (np.add(D, 1), lambda ser: np.add(ser, 1)),
+    (np.add(1, D), lambda ser : np.add(1, ser)),
+    (np.add(D, D), lambda ser : np.add(ser, ser)),
+])
+def test_siu_symbolic_array_ufunc_pandas(_, sym, res):
+    import pandas as pd
+    ser = pd.Series([1,2])
+
     expr = strip_symbolic(sym)
 
-    src = expr(lhs)
-    assert isinstance(src, pd.Series)
-    assert src.equals(lhs + 1)
+    src = expr(ser)
+    dst = res(ser)
 
+    assert isinstance(src, pd.Series)
+    assert src.equals(dst)
+
+
+@pytest.mark.parametrize("sym, res", [
+    (np.mean(D), lambda ser : np.mean(ser)),     # __array_function__
+    (np.sum(D), lambda ser: np.sum(ser)), 
+    (np.sqrt(np.mean(D)), lambda ser: np.sqrt(np.mean(ser))), 
+])
+def test_siu_symbolic_array_function_pandas(_, sym, res):
+    import pandas as pd
+    ser = pd.Series([1,2])
+
+    expr = strip_symbolic(sym)
+
+    src = expr(ser)
+    dst = res(ser)
+
+    # note that all examples currently are aggregates
+    assert src == dst

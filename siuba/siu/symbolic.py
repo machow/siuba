@@ -15,7 +15,7 @@ class Symbolic(object):
         """Handle numpy universal functions. E.g. np.sqrt(_)."""
         return array_ufunc(self, ufunc, method, *inputs, **kwargs)
 
-    def __array_function__(self, func, types, *args, **kwargs):
+    def __array_function__(self, func, types, args, kwargs):
         return array_function(self, func, types, *args, **kwargs)
 
     # allowed methods ----
@@ -128,7 +128,7 @@ def array_function(self, func, types, *args, **kwargs):
 
 @array_function.register(Call)
 def _array_function_call(self, func, types, *args, **kwargs):
-    return Call("__call__", FuncArg(array_function), self, func, *args, **kwargs)
+    return Call("__call__", FuncArg(array_function), self, func, types, *args, **kwargs)
 
 
 @array_function.register(Symbolic)
