@@ -23,10 +23,40 @@ BINARY_OPS = [
 def _():
     return Symbolic()
 
-def test_source_attr(_):
-    sym = _.source
+
+# Symbolic class ==============================================================
+
+def test_symbolic_source_attr(_):
+    sym = _.__source
     assert isinstance(sym, Symbolic)
-    assert explain(sym) == "_.source"
+    assert explain(sym) == "_.__source"
+
+
+def test_symbolic_numpy_ufunc(_):
+    from siuba.siu.symbolic import array_ufunc
+    import numpy as np
+    
+    # should have form...
+    # █─'__call__'
+    # ├─█─'__custom_func__'
+    # │ └─<function array_ufunc at ...>
+    # ├─_
+    # ├─<ufunc 'sqrt'>
+    # ├─'__call__'
+    # └─_
+
+    sym = np.sqrt(_)
+    expr = strip_symbolic(sym)
+
+    assert isinstance(sym, Symbolic)
+
+    # check we are doing a call over a custom dispatch function ----
+    assert expr.func == "__call__"
+
+    dispatcher = expr.args[0]
+    assert isinstance(dispatcher, FuncArg)
+    assert dispatcher.args[0] is array_ufunc    # could check .dispatch() method
+
 
 def test_op_vars_slice(_):
     assert strip_symbolic(_.a[_.b:_.c]).op_vars() == {'a', 'b', 'c'}
