@@ -15,8 +15,8 @@ class Symbolic(object):
         """Handle numpy universal functions. E.g. np.sqrt(_)."""
         return array_ufunc(self, ufunc, method, *inputs, **kwargs)
 
-    #def __array_function__(self, *args, **kwargs):
-    #    raise NotImplementedError()
+    def __array_function__(self, func, types, *args, **kwargs):
+        return array_function(self, func, types, *args, **kwargs)
 
     # allowed methods ----
 
@@ -119,11 +119,36 @@ def explain(symbol):
 # Special numpy ufunc dispatcher
 # =============================================================================
 # note that this is essentially what dispatchers.symbolic_dispatch does...
+# details on numpy array dispatch: https://github.com/numpy/numpy/issues/21387
+
+@singledispatch
+def array_function(self, func, types, *args, **kwargs):
+    return func(*args, **kwargs)
+
+
+@array_function.register(Call)
+def _array_function_call(self, func, types, *args, **kwargs):
+    return Call("__call__", FuncArg(array_function), self, func, *args, **kwargs)
+
+
+@array_function.register(Symbolic)
+def _array_function_sym(self, func, types, *args, **kwargs):
+    f_concrete = array_function.dispatch(Call)
+
+    call = f_concrete(
+        strip_symbolic(self),
+        func,
+        types, 
+        *map(strip_symbolic, args),
+        **{k: strip_symbolic(v) for k, v in kwargs.items()}
+    )
+
+    return Symbolic(call)
+
 
 @singledispatch
 def array_ufunc(self, ufunc, method, *inputs, **kwargs):
     return getattr(ufunc, method)(*inputs, **kwargs)
-
 
 @array_ufunc.register(Call)
 def _array_ufunc_call(self, ufunc, method, *inputs, **kwargs):

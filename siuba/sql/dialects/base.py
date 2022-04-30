@@ -39,7 +39,8 @@ from siuba.sql.translate import (
         annotate,
         RankOver,
         CumlOver,
-        SqlTranslator
+        SqlTranslator,
+        FunctionLookupBound
         )
 
 
@@ -120,6 +121,19 @@ def sql_func_capitalize(_, col):
     first_char = fn.upper(fn.left(col, 1)) 
     rest = fn.right(col, fn.length(col) - 1)
     return sql.functions.concat(first_char, rest)
+
+
+# Numpy ufuncs ----------------------------------------------------------------
+# symbolic objects have a generic dispatch for when _.__array_ufunc__ is called,
+# in order to support things like np.sqrt(_.x). In theory this wouldn't be crazy
+# to support, but most ufuncs have existing pandas methods already.
+
+from siuba.siu.symbolic import array_ufunc, array_function
+
+_f_err = FunctionLookupBound("Numpy function sql translation (e.g. np.sqrt) not supported.")
+
+array_ufunc.register(SqlColumn, _f_err)
+array_function.register(SqlColumn, _f_err)
 
 
 # Misc implementations --------------------------------------------------------

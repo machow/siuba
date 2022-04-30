@@ -362,6 +362,7 @@ def test_pandas_grouped_frame_fast_summarize(agg_entry):
 
 # Edge Cases ==================================================================
 
+@pytest.mark.postgresql
 def test_frame_set_aggregates_postgresql():
     # TODO: probably shouldn't be creating backend here
     backend = SqlBackend("postgresql")

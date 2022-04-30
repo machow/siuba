@@ -69,7 +69,7 @@ def _register_series_default(generic):
 
     generic.register(pd.Series, partial(_default_pd_series, generic.operation))
 
-def _default_pd_series(__op, self, args = tuple(), kwargs = {}):
+def _default_pd_series(__op, self, *args, **kwargs):
     # Once we drop python 3.7 dependency, could make __op position only
     if __op.accessor is not None:
         method = getattr(getattr(self, __op.accessor), __op.name)

@@ -9,7 +9,7 @@ class FunctionLookupBound:
     def __init__(self, msg):
         self.msg = msg
 
-    def __call__(self):
+    def __call__(self, *args, **kwargs):
         raise NotImplementedError(self.msg)
 
 

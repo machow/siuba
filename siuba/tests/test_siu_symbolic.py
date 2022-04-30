@@ -59,7 +59,7 @@ def test_siu_symbolic_np_array_ufunc_inputs_rhs(_):
 
 
 @pytest.mark.xfail
-def test_siu_symbolic_np_non_ufunc(_):
+def test_siu_symbolic_np_array_function(_):
     # Note that np.sum is not a ufunc, but sort of reduces on a ufunc under the
     # hood, so fails when called on a symbol
     sym = np.sum(_)
@@ -68,16 +68,20 @@ def test_siu_symbolic_np_non_ufunc(_):
     assert expr(np.array([1,2])) == 3
 
 
-def test_siu_symbolic_array_ufunc_sql_raises(_):
+@pytest.mark.parametrize("func", [
+    np.absolute,   # a ufunc
+    np.sum         # dispatched by __array_function__
+    ])
+def test_siu_symbolic_array_ufunc_sql_raises(_, func):
     from siuba.sql.utils import mock_sqlalchemy_engine
     from siuba.sql import LazyTbl
     from siuba.sql import SqlFunctionLookupError
 
     lazy_tbl = LazyTbl(mock_sqlalchemy_engine("postgresql"), "somedata", ["x", "y"])
     with pytest.raises(SqlFunctionLookupError) as exc_info:
-        lazy_tbl.shape_call(strip_symbolic(np.add(_.x, 1)))
+        lazy_tbl.shape_call(strip_symbolic(func(_.x)))
 
-    assert "Numpy ufunc sql translation" in exc_info.value.args[0]
+    assert "Numpy function sql translation" in exc_info.value.args[0]
     assert "not supported" in exc_info.value.args[0]
 
 def test_siu_symbolic_array_ufunc_pandas(_):
