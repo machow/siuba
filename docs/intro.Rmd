@@ -173,7 +173,7 @@ Under the hood siuba's summarize function is converting the lazy expression show
 Fortnuately, plotnine supports siuba's style of piping, so is easy to plug in to!
 
 ```{python}
-from siuba import mutate
+from siuba import mutate, _
 from plotnine import ggplot, aes, geom_point
 
 (mtcars
