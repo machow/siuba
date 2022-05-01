@@ -1048,6 +1048,13 @@ inner_join = partial(join, how = "inner")
 
 @singledispatch2(pd.DataFrame)
 def head(__data, n = 5):
+    """Return the first n rows of the data.
+
+    Args:
+        __data: a DataFrame.
+        n: the number of rows of data to keep.
+    """
+
     return __data.head(n)
 
 
