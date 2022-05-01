@@ -1051,6 +1051,15 @@ def head(__data, n = 5):
     return __data.head(n)
 
 
+@head.register(DataFrameGroupBy)
+def _head_gdf(__data, n = 5):
+    groupings = __data.grouper.groupings
+    group_cols = [ping.name for ping in groupings]
+
+    df_subset = __data.obj.head(n)
+    return df_subset.groupby(group_cols)
+
+
 # Top N =======================================================================
 
 # TODO: should dispatch to filter, no need to specify pd.DataFrame?
