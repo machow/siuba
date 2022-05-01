@@ -1,7 +1,7 @@
 import pytest
 from .helpers import assert_equal_query, data_frame
 
-from siuba import _, head, group_by
+from siuba import _, head, group_by, arrange
 
 
 DATA = data_frame(a = [1,2,3,4,5,6], g = ["x", "y"] * 3)
@@ -9,7 +9,9 @@ DATA = data_frame(a = [1,2,3,4,5,6], g = ["x", "y"] * 3)
 
 @pytest.fixture
 def df(backend):
-    return backend.load_df(DATA)
+    # Note that we use arrange the data, so that cloud backends that do not
+    # guarantee order without ORDER BY will return the right thing
+    return backend.load_df(DATA) >> arrange(_.a)
 
 
 def test_head_default(df):
