@@ -293,6 +293,60 @@ class SqlTranslator:
 
         return self.aggregate.translate(expr)
 
+
+    def shape_call(
+            self,
+            call, window = True, str_accessors = False,
+            verb_name = None, arg_name = None,
+            ):
+
+        from siuba.siu import Call, MetaArg, strip_symbolic
+        from siuba.siu.visitors import CodataVisitor
+
+        call = strip_symbolic(call)
+
+        if isinstance(call, Call):
+            pass
+        elif str_accessors and isinstance(call, str):
+            # verbs that can use strings as accessors, like group_by, or
+            # arrange, need to convert those strings into a getitem call
+            return str_to_getitem_call(call)
+        elif isinstance(call, sql.elements.ColumnClause):
+            return Lazy(call)
+        elif callable(call):
+            #TODO: should not happen here
+            return Call("__call__", call, MetaArg('_'))
+
+        else:
+            # verbs that use literal strings, need to convert them to a call
+            # that returns a sqlalchemy "literal" object
+            return Lazy(sql.literal(call))
+
+        # raise informative error message if missing translation
+        try:
+            # TODO: MC-NOTE -- scaffolding in to verify prior behavior works
+            shaped_call = self.translate(call, window = window)
+            if window:
+                trans = self.window
+            else:
+                trans = self.aggregate
+
+            # TODO: MC-NOTE - once all sql singledispatch funcs are annotated
+            # with return types, then switch object back out
+            # alternatively, could register a bounding class, and remove
+            # the result type check
+            v = CodataVisitor(trans.dispatch_cls, object)
+            return v.visit(shaped_call)
+            
+        except FunctionLookupError as err:
+            raise SqlFunctionLookupError.from_verb(
+                    verb_name or "Unknown",
+                    arg_name or "Unknown",
+                    err,
+                    short = True
+                    )
+
+
     def from_mappings(WinCls, AggCls):
         from siuba.ops import ALL_OPS
 
