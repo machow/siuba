@@ -70,10 +70,22 @@ BACKEND_CONFIG = {
             "password": "",
             "host": "",
             "options": ""
-            }
+            },
+        "duckdb": {
+            "dialect": "duckdb",
+            "driver": "",
+            "dbname": ":memory:",
+            "port": "",
+            "user": "",
+            "password": "",
+            "host": "",
+            },
         }
 
 class Backend:
+    # TODO: use abstract base class
+    kind = "pandas"
+
     def __init__(self, name):
         self.name = name
 
@@ -91,19 +103,26 @@ class Backend:
     def load_cached_df(self, df):
         return df
 
+    def matches_test_qualifier(self, s):
+        return self.name == s or self.kind == s
+
     def __repr__(self):
         return "{0}({1})".format(self.__class__.__name__, repr(self.name))
 
 class PandasBackend(Backend):
-    pass
+    kind = "pandas"
 
 class SqlBackend(Backend):
+    kind = "sql"
+    
     table_name_indx = 0
 
     # if there is a :, sqlalchemy tries to parse the port number.
     # since backends like bigquery do not specify a port, we'll insert it
     # later on the port value passed in.
     sa_conn_fmt = "{dialect}://{user}:{password}@{host}{port}/{dbname}?{options}"
+
+    sa_conn_memory_fmt = "{dialect}:///{dbname}"
 
     def __init__(self, name):
         from urllib.parse import quote_plus
@@ -117,8 +136,13 @@ class SqlBackend(Backend):
         if params["password"]:
             params["password"] = quote_plus(params["password"])
 
+        if params["dbname"] == ":memory:":
+            sa_conn_uri = self.sa_conn_memory_fmt.format(**params)
+        else:
+            sa_conn_uri = self.sa_conn_fmt.format(**params)
+
         self.name = name
-        self.engine = sqla.create_engine(self.sa_conn_fmt.format(**params))
+        self.engine = sqla.create_engine(sa_conn_uri)
         self.cache = {}
 
     def dispose(self):
@@ -265,7 +289,7 @@ def backend_notimpl(*names):
     def outer(f):
         @wraps(f)
         def wrapper(backend, *args, **kwargs):
-            if backend.name in names:
+            if any(map(backend.matches_test_qualifier, names)):
                 with pytest.raises((NotImplementedError, FunctionLookupError)):
                     f(backend, *args, **kwargs)
                 pytest.xfail("Not implemented!")

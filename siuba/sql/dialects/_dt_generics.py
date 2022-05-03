@@ -14,7 +14,7 @@ def date_trunc(_, col, period):
 
 @symbolic_dispatch(cls = SqlColumn)
 def sql_func_last_day_in_period(codata, col, period):
-    return date_trunc(codata, col, period) + sql.text("interval '1 %s - 1 day'" % period)
+    return date_trunc(codata, col, period) + sql.text("INTERVAL '1 %s' - INTERVAL '1 day'" % period)
 
 
 # TODO: RENAME TO GEN
