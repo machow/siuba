@@ -49,8 +49,15 @@ def mock_sqlalchemy_engine(dialect):
 
     from sqlalchemy.engine import Engine
     from sqlalchemy.dialects import registry
+    from types import ModuleType
 
     dialect_cls = registry.load(dialect)
+
+    # there is probably a better way to do this, but for some reason duckdb
+    # returns a module, rather than the dialect class itself. By convention,
+    # dialect modules expose a variable named dialect, so we grab that.
+    if isinstance(dialect_cls, ModuleType):
+        dialect_cls = dialect_cls.dialect
     
     return MockConnection(dialect_cls(), lambda *args, **kwargs: None)
 

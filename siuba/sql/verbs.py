@@ -471,11 +471,16 @@ def _collect(__data, as_df = True):
     # psycopg2 completes about incomplete template.
     # see https://stackoverflow.com/a/47193568/1144523
 
-    #query = __data.last_op
-    #compiled = query.compile(
-    #    dialect = __data.source.dialect,
-    #    compile_kwargs = {"literal_binds": True}
-    #)
+    # TODO: can be removed once next release of duckdb fixes:
+    # https://github.com/duckdb/duckdb/issues/2972
+    if __data.source.engine.dialect.name == "duckdb":
+        query = __data.last_op
+        compiled = query.compile(
+            dialect = __data.source.dialect,
+            compile_kwargs = {"literal_binds": True}
+        )
+    else:
+        compiled = __data.last_op
 
     if isinstance(__data.source, MockConnection):
         # a mock sqlalchemy is being used to show_query, and echo queries.
@@ -487,9 +492,9 @@ def _collect(__data, as_df = True):
         if as_df:
             sql_db = _FixedSqlDatabase(conn)
 
-            return sql_db.read_sql(__data.last_op)
+            return sql_db.read_sql(compiled)
 
-        return conn.execute(__data.last_op)
+        return conn.execute(compiled)
 
 
 @select.register(LazyTbl)

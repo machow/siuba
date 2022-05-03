@@ -17,6 +17,7 @@ params_backend = [
     pytest.param(lambda: SqlBackend("postgresql"), id = "postgresql", marks=pytest.mark.postgresql),
     pytest.param(lambda: SqlBackend("mysql"), id = "mysql", marks=pytest.mark.mysql),
     pytest.param(lambda: SqlBackend("sqlite"), id = "sqlite", marks=pytest.mark.sqlite),
+    pytest.param(lambda: SqlBackend("duckdb"), id = "duckdb", marks=pytest.mark.duckdb),
     pytest.param(lambda: BigqueryBackend("bigquery"), id = "bigquery", marks=pytest.mark.bigquery),
     pytest.param(lambda: CloudBackend("snowflake"), id = "snowflake", marks=pytest.mark.snowflake),
     pytest.param(lambda: PandasBackend("pandas"), id = "pandas", marks=pytest.mark.pandas)
