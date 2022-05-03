@@ -219,7 +219,8 @@ jobs:
           python-version: "3.8"
       - name: "Build Package"
         run:
-          python setup.py build sdist
+          pip install wheel
+          python setup.py build sdist bdist_wheel
 
       # test deploy ----
       - name: "Test Deploy to PyPI"
