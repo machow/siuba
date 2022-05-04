@@ -41,7 +41,7 @@ from .utils import (
 
 from sqlalchemy import sql
 import sqlalchemy
-from siuba.siu import Call, str_to_getitem_call, Lazy, FunctionLookupError, singledispatch2
+from siuba.siu import Call, Lazy, FunctionLookupError, singledispatch2
 # TODO: currently needed for select, but can we remove pandas?
 from pandas import Series
 

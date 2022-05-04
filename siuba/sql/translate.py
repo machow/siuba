@@ -308,7 +308,7 @@ class SqlTranslator:
             ):
         """Return a siu Call that creates dialect specific SQL when called."""
 
-        from siuba.siu import Call, MetaArg, strip_symbolic, Lazy
+        from siuba.siu import Call, MetaArg, strip_symbolic, Lazy, str_to_getitem_call
         from siuba.siu.visitors import CodataVisitor
 
         call = strip_symbolic(call)
