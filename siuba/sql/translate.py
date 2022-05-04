@@ -293,6 +293,8 @@ class SqlTranslator:
         self.aggregate = aggregate
 
     def translate(self, expr, window = True):
+        """Convert an AST of method chains to an AST of function calls."""
+
         if window:
             return self.window.translate(expr)
 
@@ -304,6 +306,7 @@ class SqlTranslator:
             call, window = True, str_accessors = False,
             verb_name = None, arg_name = None,
             ):
+        """Return a siu Call that creates dialect specific SQL when called."""
 
         from siuba.siu import Call, MetaArg, strip_symbolic, Lazy
         from siuba.siu.visitors import CodataVisitor
