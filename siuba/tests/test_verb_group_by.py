@@ -20,13 +20,20 @@ def df(backend):
     return backend.load_df(DATA)
 
 
-def test_group_by_no_add(df):
+def test_group_by_two(df):
     gdf = group_by(df, _.x, _.y)
     assert gdf.group_by == ("x", "y")
 
 def test_group_by_override(df):
     gdf = df >> group_by(_.x, _.y) >> group_by(_.g)
     assert gdf.group_by == ("g",)
+
+def test_group_by_no_add(df):
+    # without add argument, group_by overwrites prev grouping
+    gdf1 = group_by(df, _.x)
+    gdf2 = group_by(gdf1, _.y)
+
+    assert gdf2.group_by == ("y",)
 
 def test_group_by_add(df):
     gdf = group_by(df, _.x) >> group_by(_.y, add = True)
@@ -40,6 +47,9 @@ def test_group_by_ungroup(df):
     q2 = q1 >> ungroup()
     assert q2.group_by == tuple()
 
+def test_group_by_using_string(df):
+    gdf = group_by(df, "g") >> summarize(res = _.x.mean())
+    
 
 @pytest.mark.skip("TODO: need to test / validate joins first")
 def test_group_by_before_joins(df):
