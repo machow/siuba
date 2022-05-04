@@ -18,10 +18,14 @@ It is broken into 5 sections:
 
 from sqlalchemy import sql
 
-from siuba.siu import FunctionLookupBound
+from siuba.siu import FunctionLookupBound, FunctionLookupError
+
 
 # warning for when sql defaults differ from pandas ============================
 import warnings
+
+
+class SqlFunctionLookupError(FunctionLookupError): pass
 
 
 class SiubaSqlRuntimeWarning(UserWarning): pass
@@ -243,14 +247,15 @@ def wrap_annotate(f, **kwargs):
 
 #  Translator =================================================================
 
+from siuba.ops.translate import create_pandas_translator
+
+
 def extend_base(cls, **kwargs):
     """Register concrete methods onto generic functions for pandas Series methods."""
     from siuba.ops import ALL_OPS
     for meth_name, f in kwargs.items():
         ALL_OPS[meth_name].register(cls, f)
 
-
-from siuba.ops.translate import create_pandas_translator
 
 # TODO: should inherit from a ITranslate class (w/ abstract translate method)
 class SqlTranslator:
@@ -300,7 +305,7 @@ class SqlTranslator:
             verb_name = None, arg_name = None,
             ):
 
-        from siuba.siu import Call, MetaArg, strip_symbolic
+        from siuba.siu import Call, MetaArg, strip_symbolic, Lazy
         from siuba.siu.visitors import CodataVisitor
 
         call = strip_symbolic(call)
