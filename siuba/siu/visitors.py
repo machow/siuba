@@ -320,5 +320,6 @@ class CodataVisitor(ExecutionValidatorVisitor):
                     *node.args[1:],
                     **node.kwargs
                     )
+        return node
 
 

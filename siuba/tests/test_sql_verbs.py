@@ -73,6 +73,16 @@ def test_lazy_tbl_shape_call_error(db):
         assert err.__suppress_context__ == True
 
 
+# track_call_windows ----------------------------------------------------------
+
+from siuba.sql.verbs import track_call_windows
+from siuba.sql.translate import win_over
+
+def test_track_call_windows_basic():
+    pass
+
+
+    
 
 # TODO: remove these old tests? should be redundant ===========================
 

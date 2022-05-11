@@ -41,7 +41,7 @@ from .utils import (
 
 from sqlalchemy import sql
 import sqlalchemy
-from siuba.siu import Call, str_to_getitem_call, Lazy, FunctionLookupError, singledispatch2
+from siuba.siu import Call, Lazy, FunctionLookupError, singledispatch2
 # TODO: currently needed for select, but can we remove pandas?
 from pandas import Series
 
@@ -148,10 +148,53 @@ class WindowReplacer(CallListener):
         return windows
 
 
+#def track_call_windows(call, columns, group_by, order_by, window_cte = None):
+#    listener = WindowReplacer(columns, group_by, order_by, window_cte)
+#    col = listener.enter(call)
+#    return col, listener.windows, listener.window_cte
+
+
 def track_call_windows(call, columns, group_by, order_by, window_cte = None):
-    listener = WindowReplacer(columns, group_by, order_by, window_cte)
-    col = listener.enter(call)
-    return col, listener.windows, listener.window_cte
+    col_expr = call(columns)
+
+    crnt_group_by = sql.elements.ClauseList(
+            *[columns[name] for name in group_by]
+            )
+    crnt_order_by = sql.elements.ClauseList(
+            *_create_order_by_clause(columns, *order_by)
+            )
+    return replace_call_windows(col_expr, crnt_group_by, crnt_order_by, window_cte)
+
+
+
+def replace_call_windows(col_expr, group_by, order_by, window_cte = None):
+
+    if not isinstance(col_expr, sql.elements.ClauseElement):
+        return col_expr
+
+    over_clauses = WindowReplacer._get_over_clauses(col_expr)
+
+    for over in over_clauses:
+        # TODO: shouldn't mutate these over clauses
+        over.set_over(group_by, order_by)
+
+    if len(over_clauses) and window_cte is not None:
+        # custom name, or parameters like "%(...)s" may nest and break psycopg2
+        # with columns you can set a key to fix this, but it doesn't seem to 
+        # be an option with labels
+        name = WindowReplacer._get_unique_name('win', lift_inner_cols(window_cte))
+        label = col_expr.label(name)
+
+        # put into CTE, and return its resulting column, so that subsequent
+        # operations will refer to the window column on window_cte. Note that
+        # the operations will use the actual column, so may need to use the
+        # ClauseAdaptor to make it a reference to the label
+        window_cte = _sql_add_columns(window_cte, [label])
+        win_col = lift_inner_cols(window_cte).values()[-1]
+
+        return win_col, over_clauses, window_cte
+            
+    return col_expr, over_clauses, window_cte
 
 
 def lift_inner_cols(tbl):
@@ -263,49 +306,7 @@ class LazyTbl:
             call, window = True, str_accessors = False,
             verb_name = None, arg_name = None,
             ):
-        if isinstance(call, Call):
-            pass
-        elif str_accessors and isinstance(call, str):
-            # verbs that can use strings as accessors, like group_by, or
-            # arrange, need to convert those strings into a getitem call
-            return str_to_getitem_call(call)
-        elif isinstance(call, sql.elements.ColumnClause):
-            return Lazy(call)
-        elif callable(call):
-            #TODO: should not happen here
-            from siuba.siu import MetaArg
-            return Call("__call__", call, MetaArg('_'))
-
-        else:
-            # verbs that use literal strings, need to convert them to a call
-            # that returns a sqlalchemy "literal" object
-            return Lazy(sql.literal(call))
-
-        # raise informative error message if missing translation
-        try:
-            # TODO: MC-NOTE -- scaffolding in to verify prior behavior works
-            from siuba.siu.visitors import CodataVisitor
-            shaped_call = self.translator.translate(call, window = window)
-            if window:
-                trans = self.translator.window
-            else:
-                trans = self.translator.aggregate
-
-            # TODO: MC-NOTE - once all sql singledispatch funcs are annotated
-            # with return types, then switch object back out
-            # alternatively, could register a bounding class, and remove
-            # the result type check
-            v = CodataVisitor(trans.dispatch_cls, object)
-            return v.visit(shaped_call)
-            
-        except FunctionLookupError as err:
-            raise SqlFunctionLookupError.from_verb(
-                    verb_name or "Unknown",
-                    arg_name or "Unknown",
-                    err,
-                    short = True
-                    )
-
+        return self.translator.shape_call(call, window, str_accessors, verb_name, arg_name)
 
     def track_call_windows(self, call, columns = None, window_cte = None):
         """Returns tuple of (new column expression, list of window exprs)"""
@@ -459,6 +460,7 @@ def _show_query(tbl, simplify = False):
         print(compile_query())
 
     return tbl
+
 
 # collect ----------
 

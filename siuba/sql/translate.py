@@ -18,10 +18,14 @@ It is broken into 5 sections:
 
 from sqlalchemy import sql
 
-from siuba.siu import FunctionLookupBound
+from siuba.siu import FunctionLookupBound, FunctionLookupError
+
 
 # warning for when sql defaults differ from pandas ============================
 import warnings
+
+
+class SqlFunctionLookupError(FunctionLookupError): pass
 
 
 class SiubaSqlRuntimeWarning(UserWarning): pass
@@ -57,12 +61,23 @@ from sqlalchemy.sql.elements import Over
 class CustomOverClause(Over):
     """Base class for custom window clauses in SQL translation."""
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
     def set_over(self, group_by, order_by):
         raise NotImplementedError()
+
+    def has_over(self):
+        return self.order_by is not None or self.group_by is not None
+
 
     @classmethod
     def func(cls, name):
         raise NotImplementedError()
+
+
+    
 
 
 class AggOver(CustomOverClause):
@@ -70,6 +85,8 @@ class AggOver(CustomOverClause):
 
     Note that this class does not set order by, which is how these functions
     generally become their cumulative versions.
+
+    E.g. mean(x) -> AVG(x) OVER (partition_by <group vars>)
     """
 
     def set_over(self, group_by, order_by = None):
@@ -90,6 +107,8 @@ class RankOver(CustomOverClause):
 
     Note that in python we might call rank(col), but in SQL the ranking column
     is defined using order by.
+
+    E.g. rank(y) -> rank() OVER (partition by <group vars> order by y)
     """
     def set_over(self, group_by, order_by = None):
         crnt_partition = getattr(self.partition_by, 'clauses', tuple())
@@ -110,6 +129,9 @@ class CumlOver(CustomOverClause):
 
     Note that this class is also currently used for aggregates that might require
     ordering, like nth, first, etc..
+
+    e.g. cumsum(x) -> SUM(x) OVER (partition by <group vars> order by <order vars>)
+    e.g. nth(0) -> NTH_VALUE(1) OVER (partition by <group vars> order by <order vars>)
 
     """
     def set_over(self, group_by, order_by):
@@ -164,7 +186,15 @@ def sql_colmeth(meth, *outerargs):
     return f
 
 def sql_ordered_set(name, is_analytic=False):
-    # Ordered and theoretical set aggregates
+    """Generate function for ordered and hypothetical set aggregates.
+
+    Hypothetical-set aggregates take an argument, and return a value for each
+    element of the argument. For example: rank(2) WITHIN GROUP (order by x).
+    In this case, the hypothetical ranks 2 relative to x.
+
+    Ordered set aggregates are like percentil_cont(.5) WITHIN GROUP (order by x),
+    which calculates the median of x.
+    """
     sa_func = getattr(sql.func, name)
 
     if is_analytic:
@@ -217,14 +247,15 @@ def wrap_annotate(f, **kwargs):
 
 #  Translator =================================================================
 
+from siuba.ops.translate import create_pandas_translator
+
+
 def extend_base(cls, **kwargs):
     """Register concrete methods onto generic functions for pandas Series methods."""
     from siuba.ops import ALL_OPS
     for meth_name, f in kwargs.items():
         ALL_OPS[meth_name].register(cls, f)
 
-
-from siuba.ops.translate import create_pandas_translator
 
 # TODO: should inherit from a ITranslate class (w/ abstract translate method)
 class SqlTranslator:
@@ -262,10 +293,67 @@ class SqlTranslator:
         self.aggregate = aggregate
 
     def translate(self, expr, window = True):
+        """Convert an AST of method chains to an AST of function calls."""
+
         if window:
             return self.window.translate(expr)
 
         return self.aggregate.translate(expr)
+
+
+    def shape_call(
+            self,
+            call, window = True, str_accessors = False,
+            verb_name = None, arg_name = None,
+            ):
+        """Return a siu Call that creates dialect specific SQL when called."""
+
+        from siuba.siu import Call, MetaArg, strip_symbolic, Lazy, str_to_getitem_call
+        from siuba.siu.visitors import CodataVisitor
+
+        call = strip_symbolic(call)
+
+        if isinstance(call, Call):
+            pass
+        elif str_accessors and isinstance(call, str):
+            # verbs that can use strings as accessors, like group_by, or
+            # arrange, need to convert those strings into a getitem call
+            return str_to_getitem_call(call)
+        elif isinstance(call, sql.elements.ColumnClause):
+            return Lazy(call)
+        elif callable(call):
+            #TODO: should not happen here
+            return Call("__call__", call, MetaArg('_'))
+
+        else:
+            # verbs that use literal strings, need to convert them to a call
+            # that returns a sqlalchemy "literal" object
+            return Lazy(sql.literal(call))
+
+        # raise informative error message if missing translation
+        try:
+            # TODO: MC-NOTE -- scaffolding in to verify prior behavior works
+            shaped_call = self.translate(call, window = window)
+            if window:
+                trans = self.window
+            else:
+                trans = self.aggregate
+
+            # TODO: MC-NOTE - once all sql singledispatch funcs are annotated
+            # with return types, then switch object back out
+            # alternatively, could register a bounding class, and remove
+            # the result type check
+            v = CodataVisitor(trans.dispatch_cls, object)
+            return v.visit(shaped_call)
+            
+        except FunctionLookupError as err:
+            raise SqlFunctionLookupError.from_verb(
+                    verb_name or "Unknown",
+                    arg_name or "Unknown",
+                    err,
+                    short = True
+                    )
+
 
     def from_mappings(WinCls, AggCls):
         from siuba.ops import ALL_OPS
