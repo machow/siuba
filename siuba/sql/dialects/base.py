@@ -368,7 +368,7 @@ extend_base(SqlColumn,
     cummax                  = win_cumul("max"),
     cummin                  = win_cumul("min"),
     #cumprod                 = 
-    cumsum                  = annotate(win_cumul("sum"), result_type = "float"),
+    cumsum                  = annotate(win_cumul("sum"), result_type = "variable"),
     diff                    = sql_func_diff,
     #is_monotonic            = 
     #is_monotonic_decreasing = 
@@ -397,7 +397,7 @@ extend_base(SqlColumn,
     #sem = 
     #skew = 
     #std =  # TODO(pg)
-    sum = annotate(win_agg("sum"), result_type = "float"),
+    sum = annotate(win_agg("sum"), result_type = "variable"),
     #var = # TODO(pg)
 
 

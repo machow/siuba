@@ -92,8 +92,6 @@ returns_int([
 
 extend_base(
     DuckdbColumn,
-    cumsum = win_cumul("sum"),
-    sum = win_agg("sum"),
     rank = sql_func_rank,
     #quantile = sql_quantile(is_analytic=True),
 )
@@ -103,7 +101,6 @@ extend_base(
 
 extend_base(
     DuckdbColumnAgg,
-    sum = sql_agg("sum"),
     quantile = sql_quantile(),
 )
 

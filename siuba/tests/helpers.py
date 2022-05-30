@@ -226,6 +226,16 @@ def assert_equal_query(tbl, lazy_query, target, **kwargs):
 
     out = collect(lazy_query(tbl))
 
+    if isinstance(tbl, LazyTbl) and tbl.source.dialect.name == "duckdb":
+        # TODO: find a nice way to remove duckdb specific code from here
+        # duckdb does not use pandas.DataFrame.to_sql method, which coerces
+        # everything to 64 bit. So we need to coerce any results it returns
+        # as 32 bit to 64 bit, to match to_sql.
+        int_cols = out.select_dtypes('int').columns
+        flt_cols = out.select_dtypes('float').columns
+        out[int_cols] = out[int_cols].astype('int64')
+        out[flt_cols] = out[flt_cols].astype('float64')
+
     if isinstance(tbl, (pd.DataFrame, DataFrameGroupBy)):
         df_a = ungroup(out).reset_index(drop = True)
         df_b = ungroup(target).reset_index(drop = True)
