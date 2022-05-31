@@ -46,9 +46,13 @@ def mock_sqlalchemy_engine(dialect):
 
     """
 
-    from sqlalchemy.engine import Engine, URL
+    from sqlalchemy.engine import Engine
     from sqlalchemy.dialects import registry
     from types import ModuleType
+
+    #  TODO: can be removed once v1.3.18 support dropped
+    from sqlalchemy.engine.url import URL
+
 
     dialect_cls = registry.load(dialect)
 
@@ -59,7 +63,15 @@ def mock_sqlalchemy_engine(dialect):
         dialect_cls = dialect_cls.dialect
     
     conn = MockConnection(dialect_cls(), lambda *args, **kwargs: None)
-    conn.url = URL.create(drivername=dialect)
+
+    # set a url on it, so that LazyTbl can read the backend name.
+    if is_sqla_12() or is_sqla_13():
+        url = URL(drivername=dialect)
+    else:
+        url = URL.create(drivername=dialect)
+
+    conn.url = url
+
     return conn
 
 
