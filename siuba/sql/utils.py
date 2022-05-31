@@ -4,7 +4,6 @@ try:
     # once we drop sqlalchemy 1.2, can use create_mock_engine function
     from sqlalchemy.engine.mock import MockConnection
 except ImportError:
-    # monkey patch old sqlalchemy mock, so it can be a context handler
     from sqlalchemy.engine.strategies import MockEngineStrategy
     MockConnection = MockEngineStrategy.MockConnection
 
@@ -47,7 +46,7 @@ def mock_sqlalchemy_engine(dialect):
 
     """
 
-    from sqlalchemy.engine import Engine
+    from sqlalchemy.engine import Engine, URL
     from sqlalchemy.dialects import registry
     from types import ModuleType
 
@@ -59,7 +58,9 @@ def mock_sqlalchemy_engine(dialect):
     if isinstance(dialect_cls, ModuleType):
         dialect_cls = dialect_cls.dialect
     
-    return MockConnection(dialect_cls(), lambda *args, **kwargs: None)
+    conn = MockConnection(dialect_cls(), lambda *args, **kwargs: None)
+    conn.url = URL.create(drivername=dialect)
+    return conn
 
 
 # Temporary fix for pandas bug (https://github.com/pandas-dev/pandas/issues/35484)
@@ -69,6 +70,11 @@ class _FixedSqlDatabase(_pd_sql.SQLDatabase):
     def execute(self, *args, **kwargs):
         return self.connectable.execute(*args, **kwargs)
 
+
+# Detect duckdb for temporary workarounds -------------------------------------
+
+def _is_dialect_duckdb(engine):
+    return engine.url.get_backend_name() == "duckdb"
 
 # Backwards compatibility for sqlalchemy 1.3 ----------------------------------
 

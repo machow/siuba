@@ -2,6 +2,7 @@ import sqlalchemy as sqla
 import uuid
 
 from siuba.sql import LazyTbl
+from siuba.sql.utils import _is_dialect_duckdb
 from siuba.dply.verbs import ungroup, collect
 from siuba.siu import FunctionLookupError
 from pandas.testing import assert_frame_equal
@@ -226,7 +227,7 @@ def assert_equal_query(tbl, lazy_query, target, **kwargs):
 
     out = collect(lazy_query(tbl))
 
-    if isinstance(tbl, LazyTbl) and tbl.source.dialect.name == "duckdb":
+    if isinstance(tbl, LazyTbl) and _is_dialect_duckdb(tbl.source):
         # TODO: find a nice way to remove duckdb specific code from here
         # duckdb does not use pandas.DataFrame.to_sql method, which coerces
         # everything to 64 bit. So we need to coerce any results it returns

@@ -32,6 +32,7 @@ from .translate import CustomOverClause, SqlColumn, SqlColumnAgg
 from .utils import (
     get_dialect_translator,
     _FixedSqlDatabase,
+    _is_dialect_duckdb,
     _sql_select,
     _sql_column_collection,
     _sql_add_columns,
@@ -281,7 +282,8 @@ class LazyTbl:
         # connection and dialect specific functions
         self.source = sqlalchemy.create_engine(source) if isinstance(source, str) else source
 
-        dialect = self.source.dialect.name
+        # get dialect name
+        dialect = self.source.url.get_backend_name()
         self.translator = get_dialect_translator(dialect)
 
         self.tbl = self._create_table(tbl, columns, self.source)
@@ -476,7 +478,7 @@ def _collect(__data, as_df = True):
 
     # compile query ----
 
-    if __data.source.engine.dialect.name == "duckdb":
+    if _is_dialect_duckdb(__data.source):
         # TODO: can be removed once next release of duckdb fixes:
         # https://github.com/duckdb/duckdb/issues/2972
         query = __data.last_op
@@ -493,7 +495,7 @@ def _collect(__data, as_df = True):
         if as_df:
             sql_db = _FixedSqlDatabase(conn)
 
-            if __data.source.engine.dialect.name == "duckdb":
+            if _is_dialect_duckdb(__data.source):
                 # TODO: pandas read_sql is very slow with duckdb.
                 # see https://github.com/pandas-dev/pandas/issues/45678
                 # going to handle here for now. address once LazyTbl gets
