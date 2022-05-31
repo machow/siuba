@@ -31,7 +31,7 @@ class PostgresqlColumnAgg(SqlColumnAgg, PostgresqlColumn): pass
 
 @annotate(return_type="float")
 def sql_is_quarter_end(_, col):
-    last_day = fn.date_trunc("quarter", col) + sql.text("interval '3 month - 1 day'")
+    last_day = fn.date_trunc("quarter", col) + sql.text("INTERVAL '3 month' - INTERVAL '1 day'")
     return fn.date_trunc("day", col) == last_day
 
 

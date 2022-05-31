@@ -2,6 +2,7 @@ import sqlalchemy as sqla
 import uuid
 
 from siuba.sql import LazyTbl
+from siuba.sql.utils import _is_dialect_duckdb
 from siuba.dply.verbs import ungroup, collect
 from siuba.siu import FunctionLookupError
 from pandas.testing import assert_frame_equal
@@ -70,10 +71,22 @@ BACKEND_CONFIG = {
             "password": "",
             "host": "",
             "options": ""
-            }
+            },
+        "duckdb": {
+            "dialect": "duckdb",
+            "driver": "",
+            "dbname": ":memory:",
+            "port": "",
+            "user": "",
+            "password": "",
+            "host": "",
+            },
         }
 
 class Backend:
+    # TODO: use abstract base class
+    kind = "pandas"
+
     def __init__(self, name):
         self.name = name
 
@@ -91,19 +104,26 @@ class Backend:
     def load_cached_df(self, df):
         return df
 
+    def matches_test_qualifier(self, s):
+        return self.name == s or self.kind == s
+
     def __repr__(self):
         return "{0}({1})".format(self.__class__.__name__, repr(self.name))
 
 class PandasBackend(Backend):
-    pass
+    kind = "pandas"
 
 class SqlBackend(Backend):
+    kind = "sql"
+    
     table_name_indx = 0
 
     # if there is a :, sqlalchemy tries to parse the port number.
     # since backends like bigquery do not specify a port, we'll insert it
     # later on the port value passed in.
     sa_conn_fmt = "{dialect}://{user}:{password}@{host}{port}/{dbname}?{options}"
+
+    sa_conn_memory_fmt = "{dialect}:///{dbname}"
 
     def __init__(self, name):
         from urllib.parse import quote_plus
@@ -117,8 +137,13 @@ class SqlBackend(Backend):
         if params["password"]:
             params["password"] = quote_plus(params["password"])
 
+        if params["dbname"] == ":memory:":
+            sa_conn_uri = self.sa_conn_memory_fmt.format(**params)
+        else:
+            sa_conn_uri = self.sa_conn_fmt.format(**params)
+
         self.name = name
-        self.engine = sqla.create_engine(self.sa_conn_fmt.format(**params))
+        self.engine = sqla.create_engine(sa_conn_uri)
         self.cache = {}
 
     def dispose(self):
@@ -202,6 +227,16 @@ def assert_equal_query(tbl, lazy_query, target, **kwargs):
 
     out = collect(lazy_query(tbl))
 
+    if isinstance(tbl, LazyTbl) and _is_dialect_duckdb(tbl.source):
+        # TODO: find a nice way to remove duckdb specific code from here
+        # duckdb does not use pandas.DataFrame.to_sql method, which coerces
+        # everything to 64 bit. So we need to coerce any results it returns
+        # as 32 bit to 64 bit, to match to_sql.
+        int_cols = out.select_dtypes('int32').columns
+        flt_cols = out.select_dtypes('float32').columns
+        out[int_cols] = out[int_cols].astype('int64')
+        out[flt_cols] = out[flt_cols].astype('float64')
+
     if isinstance(tbl, (pd.DataFrame, DataFrameGroupBy)):
         df_a = ungroup(out).reset_index(drop = True)
         df_b = ungroup(target).reset_index(drop = True)
@@ -265,7 +300,7 @@ def backend_notimpl(*names):
     def outer(f):
         @wraps(f)
         def wrapper(backend, *args, **kwargs):
-            if backend.name in names:
+            if any(map(backend.matches_test_qualifier, names)):
                 with pytest.raises((NotImplementedError, FunctionLookupError)):
                     f(backend, *args, **kwargs)
                 pytest.xfail("Not implemented!")

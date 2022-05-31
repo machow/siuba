@@ -32,6 +32,7 @@ from .translate import CustomOverClause, SqlColumn, SqlColumnAgg
 from .utils import (
     get_dialect_translator,
     _FixedSqlDatabase,
+    _is_dialect_duckdb,
     _sql_select,
     _sql_column_collection,
     _sql_add_columns,
@@ -281,7 +282,8 @@ class LazyTbl:
         # connection and dialect specific functions
         self.source = sqlalchemy.create_engine(source) if isinstance(source, str) else source
 
-        dialect = self.source.dialect.name
+        # get dialect name
+        dialect = self.source.url.get_backend_name()
         self.translator = get_dialect_translator(dialect)
 
         self.tbl = self._create_table(tbl, columns, self.source)
@@ -467,15 +469,6 @@ def _show_query(tbl, simplify = False):
 @collect.register(LazyTbl)
 def _collect(__data, as_df = True):
     # TODO: maybe remove as_df options, always return dataframe
-    # normally can just pass the sql objects to execute, but for some reason
-    # psycopg2 completes about incomplete template.
-    # see https://stackoverflow.com/a/47193568/1144523
-
-    #query = __data.last_op
-    #compiled = query.compile(
-    #    dialect = __data.source.dialect,
-    #    compile_kwargs = {"literal_binds": True}
-    #)
 
     if isinstance(__data.source, MockConnection):
         # a mock sqlalchemy is being used to show_query, and echo queries.
@@ -483,13 +476,37 @@ def _collect(__data, as_df = True):
         # we need to bail out early
         return
 
+    # compile query ----
+
+    if _is_dialect_duckdb(__data.source):
+        # TODO: can be removed once next release of duckdb fixes:
+        # https://github.com/duckdb/duckdb/issues/2972
+        query = __data.last_op
+        compiled = query.compile(
+            dialect = __data.source.dialect,
+            compile_kwargs = {"literal_binds": True}
+        )
+    else:
+        compiled = __data.last_op
+
+    # execute query ----
+
     with __data.source.connect() as conn:
         if as_df:
             sql_db = _FixedSqlDatabase(conn)
 
-            return sql_db.read_sql(__data.last_op)
+            if _is_dialect_duckdb(__data.source):
+                # TODO: pandas read_sql is very slow with duckdb.
+                # see https://github.com/pandas-dev/pandas/issues/45678
+                # going to handle here for now. address once LazyTbl gets
+                # subclassed per backend.
+                duckdb_con = conn.connection.c
+                return duckdb_con.query(str(compiled)).to_df()
+            else:
+                #
+                return sql_db.read_sql(compiled)
 
-        return conn.execute(__data.last_op)
+        return conn.execute(compiled)
 
 
 @select.register(LazyTbl)

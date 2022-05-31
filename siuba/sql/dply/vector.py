@@ -12,6 +12,7 @@ from ..translate import (
 from ..dialects.sqlite import SqliteColumn
 from ..dialects.mysql import MysqlColumn
 from ..dialects.bigquery import BigqueryColumn
+from ..dialects.duckdb import DuckdbColumn
 
 from siuba.dply.vector import (
         #cumall, cumany, cummean,
@@ -99,7 +100,7 @@ min_rank    .register(MysqlColumn, _sql_rank("rank", partition = True))
 dense_rank  .register(BigqueryColumn, _sql_rank("dense_rank", nulls_last = True))
 percent_rank.register(BigqueryColumn, _sql_rank("percent_rank", nulls_last = True))
 
-
+dense_rank  .register(DuckdbColumn, _sql_rank("dense_rank", nulls_last = True))
 
 # row_number ------------------------------------------------------------------
 
