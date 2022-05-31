@@ -32,15 +32,16 @@ def db():
 
     metadata.create_all(engine)
 
-    conn = engine.connect()
+    with engine.connect() as conn:
 
-    ins = users.insert().values(name='jack', fullname='Jack Jones')
-    result = conn.execute(ins)
+        ins = users.insert().values(name='jack', fullname='Jack Jones')
+        result = conn.execute(ins)
 
 
-    ins = users.insert()
-    conn.execute(ins, id=2, name='wendy', fullname='Wendy Williams')
-    yield conn
+        ins = users.insert()
+        conn.execute(ins, id=2, name='wendy', fullname='Wendy Williams')
+
+    yield engine
 
 # LazyTbl ---------------------------------------------------------------------
 

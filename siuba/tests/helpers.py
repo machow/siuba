@@ -232,8 +232,8 @@ def assert_equal_query(tbl, lazy_query, target, **kwargs):
         # duckdb does not use pandas.DataFrame.to_sql method, which coerces
         # everything to 64 bit. So we need to coerce any results it returns
         # as 32 bit to 64 bit, to match to_sql.
-        int_cols = out.select_dtypes('int').columns
-        flt_cols = out.select_dtypes('float').columns
+        int_cols = out.select_dtypes('int32').columns
+        flt_cols = out.select_dtypes('float32').columns
         out[int_cols] = out[int_cols].astype('int64')
         out[flt_cols] = out[flt_cols].astype('float64')
 
