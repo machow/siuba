@@ -221,7 +221,7 @@ jobs:
         with:
           python-version: "3.8"
       - name: "Build Package"
-        run:
+        run: |
           pip install wheel
           python setup.py build sdist bdist_wheel
 
