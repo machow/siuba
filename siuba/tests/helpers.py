@@ -269,6 +269,9 @@ def copy_to_sql(df, name, engine):
     bool_cols = [k for k, v in df.iteritems() if v.dtype.kind == "b"]
     columns = [sqla.Column(name, sqla.types.Boolean) for name in bool_cols]
 
+
+    # Create table in database ------------------------------------------------
+
     # TODO: clean up dialect specific work (if it grows out of control)
     if engine.dialect.name == "bigquery" and df.isna().any().any():
         # TODO: to_gbq makes all datetimes UTC, so does not round trip well, 
@@ -276,9 +279,20 @@ def copy_to_sql(df, name, engine):
         project_id = engine.url.host
         qual_name = f"{engine.url.database}.{name}"
         df.to_gbq(qual_name, project_id, if_exists="replace") 
-
     else:
         df.to_sql(name, engine, index = False, if_exists = "replace", method="multi")
+
+
+    # LazyTbl creation --------------------------------------------------------
+
+    if engine.dialect.name == "snowflake":
+        # snowflake reflection is *incredibly* slow. it could take almost 10 seconds
+        # to reflect column names / types. to work around this, we tell it the 
+        # column names in advance
+        autoload_with = None
+        columns = [sqla.Column(name) for name in df]
+    else:
+        autoload_with = engine
 
     # manually create table, so we can be explicit about boolean columns.
     # this is necessary because MySQL reflection reports them as TinyInts,
@@ -287,7 +301,7 @@ def copy_to_sql(df, name, engine):
             name,
             sqla.MetaData(bind = engine),
             *columns,
-            autoload_with = engine
+            autoload_with = autoload_with
             )
     
     return LazyTbl(engine, table)
