@@ -15,7 +15,6 @@
     :caption: Reference
 
     api_user_index
-    api_developer/index
     api_extra/index
 
 
