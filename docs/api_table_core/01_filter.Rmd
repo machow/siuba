@@ -57,8 +57,10 @@ In order to keep a row when one of several conditions is met, use the bar (`|`) 
 mtcars >> filter((_.cyl == 4) | (_.gear == 5))
 ```
 
-Be sure to explicitly put parentheses around both sides. Otherwise, python will
-group the operation like `_.cyl == (4 | _.gear) == 5`.
+The code above keeps rows where `cyl` is equal to 4 OR `gear` is equal to 5.
+
+Be sure to explicitly put parentheses around both sides.
+Otherwise, python will group the operation like `_.cyl == (4 | _.gear) == 5`.
 
 ### Dropping NAs
 
