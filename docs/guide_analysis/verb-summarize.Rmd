@@ -1,0 +1,50 @@
+---
+jupyter:
+  jupytext:
+    formats: ipynb,Rmd
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.13.8
+  kernelspec:
+    display_name: venv-siuba
+    language: python
+    name: venv-siuba
+---
+
+```{python}
+import pandas as pd
+
+pd.set_option("display.max_rows", 5)
+
+from siuba.data import penguins
+from siuba import _, summarize, group_by
+```
+
+# Summarize
+
+
+## Selecting by name or position
+
+```{python}
+select(penguins, _.species, _.island, 7)
+```
+
+## Excluding columns
+
+
+## Renaming columns
+
+
+## Selecting by slice
+
+```{python}
+select(penguins, _[0:2], _["sex":"year"])
+```
+
+## Selecting by methods like startswith
+
+```{python}
+select(penguins, _.startswith("bill"))
+```

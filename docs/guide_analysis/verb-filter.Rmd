@@ -1,0 +1,50 @@
+---
+jupyter:
+  jupytext:
+    formats: ipynb,Rmd
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.13.8
+  kernelspec:
+    display_name: venv-siuba
+    language: python
+    name: venv-siuba
+---
+
+```{python}
+import pandas as pd
+
+pd.set_option("display.max_rows", 5)
+
+from siuba.data import penguins, penguins_raw
+from siuba import filter
+```
+
+## Basics
+
+
+This function keeps rows of data that meet all specified conditions.
+
+For example, the code below keeps rows where species is "Adelie" and year is 2007.
+
+```{python}
+filter(penguins, _.species == "Adelie", _.year == 2007)
+```
+
+## OR conditions
+
+```{python}
+filter(penguins, (_.species == "Adelie") | (_.year == 2007))
+```
+
+## Missing values
+
+```{python}
+filter(penguins, _.sex.isna())
+```
+
+```{python}
+filter(penguins, ~_.sex.isna())
+```

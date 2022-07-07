@@ -1,0 +1,41 @@
+---
+jupyter:
+  jupytext:
+    formats: ipynb,Rmd
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.13.8
+  kernelspec:
+    display_name: venv-siuba
+    language: python
+    name: venv-siuba
+---
+
+```{python}
+import pandas as pd
+
+pd.set_option("display.max_rows", 5)
+
+from siuba.data import penguins
+from siuba import _, arrange
+```
+
+## Ascending order
+
+```{python}
+arrange(penguins, _.year, _.bill_length_mm)
+```
+
+## Descending order
+
+```{python}
+arrange(penguins, _.year, -_.bill_length_mm)
+```
+
+## Sorting by expression
+
+```{python}
+arrange(penguins, _.bill_length_mm / _.bill_depth_mm)
+```
