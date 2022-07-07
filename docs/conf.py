@@ -72,7 +72,8 @@ html_theme_options = {
     "github_banner": True,
     "github_button": False,
     "fixed_sidebar": True,
-    "sidebar_width": "260px"
+    "sidebar_width": "260px",
+    "show_relbar_bottom": True,
     }
 
 html_static_path = ['_static']
