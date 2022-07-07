@@ -2,7 +2,8 @@ __all__ = [
         "mtcars",
         "cars",
         "penguins",
-        "penguins_raw"
+        "penguins_raw",
+        "cars_sql",
         ]
 
 def __dir__():

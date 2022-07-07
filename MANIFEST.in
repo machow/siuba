@@ -1,2 +1,3 @@
 include siuba/data/*.csv
+include siuba/data/*.csv.gz
 include siuba/spec/series.yml
