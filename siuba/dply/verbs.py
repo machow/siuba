@@ -379,6 +379,10 @@ class Var:
     def __neg__(self):
         return self.to_copy(negated = not self.negated)
 
+
+    def __invert__(self):
+        return self.to_copy(negated = not self.negated)
+
     def __eq__(self, x):
         name = x.name if isinstance(x, Var) else x
         return self.to_copy(name = name, negated = False, alias = self.name)
@@ -452,7 +456,11 @@ def var_put_cols(name, var, cols):
 
 def flatten_var(var):
     if isinstance(var, Var) and isinstance(var.name, (tuple, list)):
-        return [var.to_copy(name = x) for x in var.name]
+        out = []
+        for x in var.name:
+            out.append(x.to_copy() if isinstance(x, Var) else x)
+
+        return out
     
     return [var]
             
@@ -463,26 +471,24 @@ def var_select(colnames, *args):
     # TODO: don't erase named column if included again
     colnames = colnames if isinstance(colnames, pd.Series) else pd.Series(colnames)
     cols = OrderedDict()
-    everything = None
 
     #flat_args = var_flatten(args)
     all_vars = chain(*map(flatten_var, args))
 
     # Add entries in pandas.rename style {"orig_name": "new_name"}
-    for arg in all_vars:
+    for ii, arg in enumerate(all_vars):
         # strings are added directly
         if isinstance(arg, str):
             cols[arg] = None
         # integers add colname at corresponding index
         elif isinstance(arg, int):
-            cols[colnames[arg]] = None
+            cols[colnames.iloc[arg]] = None
         # general var handling
         elif isinstance(arg, Var):
             # remove negated Vars, otherwise include them
-            if arg.negated and everything is None:
-                # first time using negation, apply an implicit everything
-                everything = True
-                cols.update((k, None) for k in colnames if k not in cols)
+            if ii == 0 and arg.negated:
+                # if negation used as first arg apply an implicit everything
+                cols.update((k, None) for k in colnames)
 
             # slicing can refer to single, or range of columns
             if isinstance(arg.name, slice):
@@ -496,6 +502,8 @@ def var_select(colnames, *args):
                 indx = arg.name(colnames.str)
                 var_put_cols(colnames[indx].tolist(), arg, cols)
                 #cols.update((x, None) for x in set(colnames[indx]) - set(cols))
+            elif isinstance(arg.name, int):
+                var_put_cols(colnames.iloc[arg.name], arg, cols)
             else:
                 var_put_cols(arg.name, arg, cols)
         else:
