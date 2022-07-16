@@ -5,8 +5,8 @@ from collections import OrderedDict
 from itertools import chain
 
 class Var:
-    def __init__(self, name: "str | int | slice", negated = False, alias = None):
-        if not isinstance(name, (str, int, slice)):
+    def __init__(self, name: "str | int | slice | Call", negated = False, alias = None):
+        if not isinstance(name, (str, int, slice, Call)):
             raise TypeError(f"Var name cannot be type: {type(name)}.")
         self.name = name
         self.negated = negated
