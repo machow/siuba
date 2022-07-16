@@ -6,6 +6,8 @@ from itertools import chain
 
 class Var:
     def __init__(self, name: "str | int | slice", negated = False, alias = None):
+        if not isinstance(name, (str, int, slice)):
+            raise TypeError(f"Var name cannot be type: {type(name)}.")
         self.name = name
         self.negated = negated
         self.alias = alias
@@ -68,8 +70,16 @@ class VarAnd(Var):
     def __call__(self, *args, **kwargs):
         raise NotImplementedError()
 
-    def flatten(self):
-        return tuple(x if not self.negated else ~x for x in self.name)
+    def flatten(self) -> "tuple[Var]":
+        res = []
+        for var in self.name:
+            neg_var = ~var if self.negated else var
+            if isinstance(neg_var, VarAnd):
+                res.extend(neg_var.flatten())
+            else:
+                res.append(neg_var)
+
+        return tuple(res)
 
 
 
@@ -79,9 +89,10 @@ class VarList:
 
     def __getitem__(self, x):
         if not isinstance(x, tuple):
-            return Var(x)
-
-        return VarAnd(tuple(Var(entry) for entry in x))
+            return Var(x) if not isinstance(x, Var) else x
+        else:
+            res = [el if isinstance(el, Var) else Var(el) for el in x]
+            return VarAnd(tuple(res))
 
 
 def var_slice(colnames, x):
@@ -170,14 +181,19 @@ def var_select(colnames, *args):
 
     return cols
 
-def var_create(*args):
+
+def var_create(*args) -> "tuple[Var]":
     vl = VarList()
     all_vars = []
     for arg in args:
         if callable(arg) and not isinstance(arg, Var):
-            all_vars.append(arg(vl))
-        else:
+            res = arg(vl)
+            if isinstance(res, VarList):
+                raise ValueError("Must select specific column. Did you pass `_` to select?")
+            all_vars.append(res)
+        elif isinstance(arg, Var):
             all_vars.append(arg)
+        else:
+            all_vars.append(Var(arg))
      
-    return all_vars
-
+    return tuple(all_vars)
