@@ -1,47 +1,140 @@
 ---
 jupyter:
   jupytext:
-    formats: ipynb,Rmd
+    formats: Rmd
     text_representation:
       extension: .Rmd
       format_name: rmarkdown
       format_version: '1.2'
-      jupytext_version: 1.13.8
+      jupytext_version: 1.13.6
   kernelspec:
-    display_name: venv-siuba
+    display_name: venv-siuba-docs
     language: python
-    name: venv-siuba
+    name: venv-siuba-docs
 ---
+
+# Select columns
+
+
+This function lets you select specific columns of your data to keep.
+
+There are three different building blocks that can used in a selection:
+
+* **including** columns using a name, slice, or position).
+* **excluding** columns by putting `-` beforehand.
+* **matching** based on a pattern, like all columns that start with `"ttl_"`.
 
 ```{python}
 import pandas as pd
 
 pd.set_option("display.max_rows", 5)
 
-from siuba.data import penguins
 from siuba import _, select
+from siuba.data import penguins
+
+penguins
 ```
 
-## Selecting by name or position
+## Select by name or position
+
+The simplest way to select a column to keep is to refer to it by name or position.
 
 ```{python}
-select(penguins, _.species, _.island, 7)
+select(penguins, _.species, _.island, 6, -1)
+```
+
+The code above does the following:
+
+* selects by name the `mpg` and `cyl` columns.
+* selects by position the index `6` and `-1` columns (the last item).
+
+Note that selecting by position should produce the same results as indexing a list of names.
+
+```{python}
+penguins.columns[6]
+```
+
+```{python}
+penguins.columns[-1]
 ```
 
 ## Excluding columns
 
 
+You can remove a column from the data by putting a tilde operator (`~`) in front of it.
+
+
+```{python}
+penguins >> select(~_.body_mass_g, ~_.sex, ~_.year)
+```
+
+The code above keeps all columns except `body_mass_g`, `sex`, and `year`.
+
+Note that the `~` operator flips the value of True and False in pandas, and is called the "invert operator".
+
+```{python}
+~pd.Series([True, False])
+```
+
 ## Renaming columns
 
+You can rename a specified column by using the equality operator (`==`).
+This operation takes the following form.
 
-## Selecting by slice
-
-```{python}
-select(penguins, _[0:2], _["sex":"year"])
-```
-
-## Selecting by methods like startswith
+* `_.new_name == _.old_name`
 
 ```{python}
-select(penguins, _.startswith("bill"))
+penguins >> select(_.species_name == _.species)
 ```
+
+Note that expressing the new column name on the left is similar to how creating a python dictionary works. For example...
+
+* `select(_.a == _.x, _.b == _.y)`
+* `dict(a = "x", b = "y")`
+
+both create new entries named "a" and "b".
+
+
+## Select by slice
+
+When the columns are adjacent to each other, you can select them using `_["start_col":"end_col"]`.
+
+```{python}
+penguins >> select(_.species, _["bill_length_mm":"body_mass_g"])
+```
+
+You can use three methods to specify a column in a slice:
+
+* `_.some_col`
+* `"some_col"`
+* a position number
+
+
+You can **exclude slice selections** using the `~` operator.
+
+```{python}
+penguins >> select(~_["bill_length_mm":"body_mass_g"])
+```
+
+Note that when **position number** is used to slice columns, the end position is not included in the selection.
+
+```{python}
+# these are equivalent
+
+penguins >> select(0, 1)
+penguins >> select(_[0:2])
+```
+
+<!-- #region tags=[] -->
+## Select by pattern (e.g. endswith)
+<!-- #endregion -->
+
+```{python}
+penguins >> select(_.species, _.endswith("mm"))
+```
+
+```{python}
+penguins >> select(_.contains("length"))
+```
+
+🚧: list out methods or link to them

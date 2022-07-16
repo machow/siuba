@@ -1,0 +1,24 @@
+---
+jupyter:
+  jupytext:
+    formats: Rmd
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.13.6
+  kernelspec:
+    display_name: venv-siuba
+    language: python
+    name: venv-siuba
+---
+
+# Flexible pipes
+
+# Across column apply
+
+# Over groups & order
+
+# Custom verbs
+
+# Custom column ops

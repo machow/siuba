@@ -1,0 +1,78 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.13.6
+  kernelspec:
+    display_name: venv-siuba-docs
+    language: python
+    name: venv-siuba-docs
+---
+
+## Mutate to transform
+
+```{python nbsphinx=hidden}
+import pandas as pd
+pd.set_option("display.max_rows", 5)
+```
+
+```{python}
+from siuba import _, group_by, mutate, select
+from siuba.data import mtcars
+
+small_cars = mtcars[["mpg", "cyl", "hp"]]
+```
+
+### Basics
+
+```{python}
+mutate(small_cars, cyl2 = _.cyl * 2)
+```
+
+### Referring to previous arguments
+
+```{python}
+mutate(small_cars, cyl2 = _.cyl * 2, cyl4 = _.cyl2 * 2)
+```
+
+```{python}
+mutate(small_cars, misc = "hey")
+```
+
+### Used with group_by
+
+```{python}
+(small_cars
+  >> group_by(_.cyl)
+  >> mutate(
+       hp_mean = _.hp.mean(),
+       demeaned_hp = _.hp - _.hp_mean
+     )
+  )
+```
+
+```{python}
+(small_cars
+  >> group_by(_.cyl)
+  >> mutate(
+       hp_per_cyl = _.hp / _.cyl,
+       diff = _.hp_per_cyl - _.hp_per_cyl.shift(1)
+     )
+  )
+```
+
+### With if_else and case_when
+
+TODO
+
+```{python}
+from siuba import _, mutate, if_else, case_when
+from siuba.data import mtcars
+```
+
+```{python}
+case_when(mtcars, {_.mpg < 20: "low", _.mpg >= 20: "medium", _.mpg > 30: "high"})
+```

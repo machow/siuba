@@ -8,12 +8,12 @@ jupyter:
       format_version: '1.2'
       jupytext_version: 1.13.6
   kernelspec:
-    display_name: venv-siuba-docs
+    display_name: venv-siuba
     language: python
-    name: venv-siuba-docs
+    name: venv-siuba
 ---
 
-# Summarize to aggregate
+# Group by columns
 
 ```{python}
 import pandas as pd
@@ -21,5 +21,5 @@ import pandas as pd
 pd.set_option("display.max_rows", 5)
 
 from siuba.data import penguins
-from siuba import _, summarize, group_by, select
+from siuba import _, summarize, group_by
 ```

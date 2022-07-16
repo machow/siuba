@@ -4,10 +4,61 @@
 
     intro
     key_features
-    guide_analysis
-    guide_programming
-    examples
-    developer/index
+
+.. toctree::
+   :hidden:
+   :caption: Overview
+
+   guide_analysis/basics
+
+.. toctree::
+   :hidden:
+   :caption: Common table verbs
+
+   guide_analysis/verb-filter
+   guide_analysis/verb-arrange
+   guide_analysis/verb-select
+   guide_analysis/verb-mutate
+   guide_analysis/verb-summarize
+   guide_analysis/verb-group-by
+
+.. toctree::
+   :hidden:
+   :caption: Column operations
+
+   guide_analysis/ops-siu-expr
+   guide_analysis/ops-strings
+   guide_analysis/ops-datetime
+   guide_analysis/ops-autocomplete
+
+
+.. toctree::
+   :hidden:
+   :caption: Wrangling
+
+   guide_analysis/wrangle-joins
+
+   
+.. toctree::
+   :hidden:
+   :caption: Programming
+
+   guide_analysis/programming
+
+.. toctree::
+   :hidden:
+   :caption: Workflows
+
+   guide_analysis/workflows
+
+.. toctree::
+   :maxdepth: 3
+   :hidden:
+   :caption: Misc
+
+   guide_programming.Rmd
+   examples
+   developer/index
 
 .. toctree::
     :hidden:

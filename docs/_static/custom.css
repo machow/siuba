@@ -96,3 +96,12 @@ table.align-default td, table.align-left td {
 dl {
     margin-bottom: 15px !important;
 }
+
+
+/* the "headers" in our sidebar are actually sphinx captions */
+
+.sphinxsidebar .caption {
+  font-size: 16px;
+  font-weight: bold;
+  color: black;
+}
