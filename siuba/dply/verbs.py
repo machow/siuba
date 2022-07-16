@@ -371,7 +371,7 @@ from collections import OrderedDict
 from itertools import chain
 
 class Var:
-    def __init__(self, name, negated = False, alias = None):
+    def __init__(self, name: "str | int | slice", negated = False, alias = None):
         self.name = name
         self.negated = negated
         self.alias = alias
@@ -398,8 +398,9 @@ class Var:
 
 
     def __repr__(self):
-        return "Var('{self.name}', negated = {self.negated}, alias = {self.alias})" \
-                    .format(self = self)
+        cls_name = self.__class__.__name__
+        sig = f"{repr(self.name)}, negated={self.negated}, alias={self.alias}"
+        return f"{cls_name}({sig})"
 
     def __str__(self):
         op = "-" if self.negated else ""
@@ -410,12 +411,43 @@ class Var:
         return self.__class__(**{**self.__dict__, **kwargs})
 
 
+class VarAnd(Var):
+    name: "tuple[Var]"
+
+    def __init__(self, name: "tuple[Var]", negated=False, alias=None):
+        self.name = name
+        self.negated = negated
+
+        bad_var = [x for x in name if not isinstance(x, Var)]
+
+        if any(bad_var):
+            raise TypeError(f"VarAnd expects a tuple of Var, but saw entries: {bad_var}")
+
+        if alias is not None:
+            raise TypeError("alias must be none for VarAnd (extended slice syntax)")
+
+        self.alias = None
+
+    def __eq__(self, x):
+        raise NotImplementedError()
+
+    def __call__(self, *args, **kwargs):
+        raise NotImplementedError()
+
+    def flatten(self):
+        return tuple(x if not self.negated else ~x for x in self.name)
+
+
+
 class VarList:
     def __getattr__(self, x):
         return Var(x)
 
     def __getitem__(self, x):
-        return Var(x)
+        if not isinstance(x, tuple):
+            return Var(x)
+
+        return VarAnd(tuple(Var(entry) for entry in x))
 
 
 def var_slice(colnames, x):
@@ -455,16 +487,9 @@ def var_put_cols(name, var, cols):
         else: cols[name] = var.alias
 
 def flatten_var(var):
-    if isinstance(var, Var) and isinstance(var.name, (tuple, list)):
-        out = []
-        for x in var.name:
-            out.append(x.to_copy() if isinstance(x, Var) else x)
-
-        return out
-    
+    if isinstance(var, VarAnd):
+        return var.flatten()
     return [var]
-            
-
 
 
 def var_select(colnames, *args):
