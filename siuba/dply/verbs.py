@@ -750,11 +750,14 @@ def nest(__data, *args, key = "data"):
 
 @nest.register(DataFrameGroupBy)
 def _nest(__data, *args, key = "data"):
+    from siuba.dply.tidyselect import VarAnd
+
     grp_keys = [x.name for x in __data.grouper.groupings]
     if None in grp_keys:
         raise NotImplementedError("All groupby variables must be named when using nest")
 
-    return nest(__data.obj, -Var(grp_keys), *args, key = key)
+    sel_vars = var_create(*grp_keys)
+    return nest(__data.obj, -VarAnd(sel_vars), *args, key = key)
 
 
 
