@@ -72,7 +72,7 @@ def test_dply_mutate_sym(df1):
 
 # VarList and friends ------
 
-from siuba.dply.verbs import flatten_var, Var, VarAnd, VarList
+from siuba.dply.tidyselect import flatten_var, Var, VarAnd, VarList
 
 def test_flatten_vars():
     v_a, v_b = flatten_var(-VarAnd([Var("a"), Var("b")]))
