@@ -12,7 +12,7 @@ import warnings
 from siuba.dply.verbs import (
         show_query, collect,
         simple_varname,
-        select, VarList, var_select,
+        select,
         mutate,
         transmute,
         filter,
@@ -27,6 +27,8 @@ from siuba.dply.verbs import (
         distinct,
         if_else
         )
+
+from siuba.dply.tidyselect import VarList, var_select
 
 from .translate import CustomOverClause, SqlColumn, SqlColumnAgg
 from .utils import (
