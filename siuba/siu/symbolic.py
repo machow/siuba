@@ -75,6 +75,17 @@ class Symbolic(object):
     def __op_invert(self):
         return Symbolic(UnaryOp('__invert__', self.__source), ready_to_call = True)
 
+    def __rshift__(self, x):
+        # strip_symbolic(self)(x)
+        # x is a symbolic
+        raise NotImplementedError("Symbolic may only be used on right-hand side of >> operator.")
+
+    def __rrshift__(self, x):
+        if isinstance(x, (Symbolic, Call)):
+            raise NotImplementedError()
+
+        return strip_symbolic(self)(x)
+
 
     # banned methods ----
 

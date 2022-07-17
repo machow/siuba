@@ -189,6 +189,13 @@ class Call:
         f_op = getattr(operator, self.func)
         return f_op(inst, *rest, **kwargs)
 
+    def __rrshift__(self, x):
+        from .symbolic import strip_symbolic
+        if isinstance(strip_symbolic(x), (Call)):
+            raise TypeError()
+ 
+        return self(x)
+
     @staticmethod
     def evaluate_calls(arg, x):
         if isinstance(arg, Call): return arg(x)
