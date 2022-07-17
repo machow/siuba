@@ -593,4 +593,37 @@ class FuncArg(Call):
         return self.args[0]
 
 
+# Pipe ===================================================================================
 
+class PipeCall(Call):
+    """
+    pipe(df, a, b, c)
+    pipe(_, a, b, c)
+
+    should options for first arg be only MetaArg or a non-call?
+    """
+
+    def __init__(self, func, *args, **kwargs):
+        self.func = "__siu_pipe_call__"
+        self.args = (func, *args)
+        if kwargs:
+            raise ValueError("Keyword arguments are not allowed.")
+        self.kwargs = {}
+
+    def __call__(self, x=None):
+        # Note that most calls map_subcalls to pass in the same data for each argument.
+        # In contrast, PipeCall passes data from the prev step to the next.
+        crnt_data, *calls = self.args
+
+        if isinstance(crnt_data, MetaArg):
+            crnt_data = crnt_data(x)
+
+        for call in calls:
+            new_data = call(crnt_data)
+            crnt_data = new_data
+
+        return crnt_data
+    
+    def __repr__(self):
+        args_repr = ",".join(map(repr, self.args))
+        return f"{type(self).__name__}({args_repr})"
