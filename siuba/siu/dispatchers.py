@@ -291,13 +291,13 @@ def create_eager_pipe_call(obj, *args, **kwargs) -> Call:
             )
 
 
-def pipe(__func: "Callable | Call | Symbolic", *args, **kwargs):
-    """Allow a function call to be used in a pipe (with >>).
+def call(__func: "Callable | Call | Symbolic", *args, **kwargs):
+    """Allow a function call to be used in a call (with >>).
 
     Parameters
     ----------
     __func:
-        A function to be called as part of a pipe.
+        A function to be called as part of a call.
     *args:
         Additional position arguments to pass to the function.
     **kwargs:
@@ -306,39 +306,39 @@ def pipe(__func: "Callable | Call | Symbolic", *args, **kwargs):
     Examples
     --------
 
-    The simplest use of the pipe is passing just the to-be-called function.
+    The simplest use of the call is passing just the to-be-called function.
 
     >>> s = "a string"
-    >>> s >> pipe(print)
+    >>> s >> call(print)
     a string
 
     This is equivalent to explicitly passing ``_`` as a placeholder.
 
     >>> from siuba import _
-    >>> s >> pipe(print, _)
+    >>> s >> call(print, _)
     a string
 
     The explicit syntax is useful, because it allows us to pass more arguments.
     For example, the code below passes additional arguments to print.
 
-    >>> "a" >> pipe(print, _, "string", sep=" ")
+    >>> "a" >> call(print, _, "string", sep=" ")
     a string
 
     You can transform the input data. For example, the code below passes "shout".upper()
     to print.
 
-    >>> "shout" >> pipe(print, _.upper())
+    >>> "shout" >> call(print, _.upper())
     SHOUT
 
     Since ``_`` is just a placeholder for the data on the left-hand-side of >>, you
     can pass it multiple times to the to-be-called function (e.g. print).
 
-    >>> "nice" >> pipe(print, _, _, sep=" ")
+    >>> "nice" >> call(print, _, _, sep=" ")
     nice nice
 
-    Alternatively, you can pass a siu expression straight to pipe.
+    Alternatively, you can pass a siu expression straight to call.
 
-    >>> "abc" >> pipe(_[0].upper())
+    >>> "abc" >> call(_[0].upper())
     'A'
         
     """
@@ -346,19 +346,19 @@ def pipe(__func: "Callable | Call | Symbolic", *args, **kwargs):
     if isinstance(__func, (Symbolic, Call)):
         if args or kwargs:
             raise NotImplementedError(
-                "If a siu expression (e.g. _) is the first argument to pipe, it must "
+                "If a siu expression (e.g. _) is the first argument to call, it must "
                 "be the only argument. You can pass arguments using the form, "
-                "pipe(_.some_method(1, 2, c = 3))."
+                "call(_.some_method(1, 2, c = 3))."
             )
         return strip_symbolic(__func)
     if not args and not kwargs:
-        # handle implicit case, pipe(some_func) -> pipe(some_func, _)
+        # handle implicit case, call(some_func) -> call(some_func, _)
         return create_eager_pipe_call(__func, MetaArg("_"))
 
     return create_eager_pipe_call(__func, *args, **kwargs)
 
 
-def new_pipe(__data, *args: Callable):
+def pipe(__data, *args: Callable):
     """Pipe data through a chain of callables. Return the final result.
 
     Examples
@@ -366,24 +366,24 @@ def new_pipe(__data, *args: Callable):
 
     Case 1: pipe regular functions
 
-    >>> new_pipe({"a": 1}, lambda x: x["a"], lambda x: x + 1)
+    >>> pipe({"a": 1}, lambda x: x["a"], lambda x: x + 1)
     2
 
     Case 2: pipe to siu expressions
 
     >>> from siuba import _
-    >>> new_pipe({"a": 1}, _["a"], _ + 1)
+    >>> pipe({"a": 1}, _["a"], _ + 1)
     2
 
     Case 3: call external function on siu expression
 
     >>> from siuba.siu import call
-    >>> new_pipe({"a": 1}, call(isinstance, _["a"], int))
+    >>> pipe({"a": 1}, call(isinstance, _["a"], int))
     True
 
     Case 4: _ as first arg to delay
 
-    >>> f = new_pipe(_, lambda x: x["a"])
+    >>> f = pipe(_, lambda x: x["a"])
     >>> f
     PipeCall(...)
 
@@ -394,11 +394,21 @@ def new_pipe(__data, *args: Callable):
 
     >>> from siuba import _, summarize
     >>> from siuba.data import mtcars
-    >>> new_pipe(mtcars, summarize(res = _.hp.mean()))
+    >>> pipe(mtcars, summarize(res = _.hp.mean()))
     """
 
-    # When data is _, return a pipe call
     stripped = strip_symbolic(__data)
+
+    # Special case: support backwards compatibility with old pipe() behavior ----
+    # call() and Call.__rrshift__ now handle this behavior.
+    if len(args) == 0:
+        if isinstance(stripped, Call):
+            return stripped
+        else:
+            return call(stripped)
+        
+
+    # When data is _, return a pipe call
     pipe_call = PipeCall(stripped, *map(strip_symbolic, args))
 
     if isinstance(stripped, MetaArg):
