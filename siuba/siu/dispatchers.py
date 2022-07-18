@@ -395,6 +395,8 @@ def pipe(__data, *args: Callable):
     >>> from siuba import _, summarize
     >>> from siuba.data import mtcars
     >>> pipe(mtcars, summarize(res = _.hp.mean()))
+            res
+    0  146.6875
     """
 
     stripped = strip_symbolic(__data)
