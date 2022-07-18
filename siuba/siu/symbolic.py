@@ -37,6 +37,9 @@ class Symbolic(object):
     def __array_function__(self, func, types, args, kwargs):
         return array_function(self, func, types, *args, **kwargs)
 
+    # since we override __eq__, we must explicitly set the hash method back to default
+    __hash__ = object.__hash__
+
     # allowed methods ----
 
     def __getattr__(self, x):
