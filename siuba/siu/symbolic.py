@@ -79,6 +79,13 @@ class Symbolic(object):
         return Symbolic(UnaryOp('__invert__', self.__source), ready_to_call = True)
 
     def __rshift__(self, x):
+
+        # Note that this and __rrshift__ are copied from Call
+        stripped = strip_symbolic(x)
+
+        if isinstance(stripped, Call):
+            lhs_call = self.__source
+            return Call._construct_pipe(MetaArg("_"), lhs_call, stripped)
         # strip_symbolic(self)(x)
         # x is a symbolic
         raise NotImplementedError("Symbolic may only be used on right-hand side of >> operator.")

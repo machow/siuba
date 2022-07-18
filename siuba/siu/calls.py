@@ -117,6 +117,8 @@ class Call:
 
 
     """
+
+
     def __init__(self, func, *args, **kwargs):
         self.func = func
         self.args = args
@@ -189,9 +191,23 @@ class Call:
         f_op = getattr(operator, self.func)
         return f_op(inst, *rest, **kwargs)
 
+    # TODO: type checks will be very useful here. Will need to import symbolic.
+    # Let's do this once types are in a _typing.py submodule.
+    def __rshift__(self, x):
+        """Create a"""
+        from .symbolic import strip_symbolic
+
+        stripped = strip_symbolic(x)
+
+        if isinstance(stripped, Call):
+            return self._construct_pipe(MetaArg("_"), self, x)
+
+        raise TypeError()
+
     def __rrshift__(self, x):
         from .symbolic import strip_symbolic
         if isinstance(strip_symbolic(x), (Call)):
+            # only allow non-calls (i.e. data) on the left.
             raise TypeError()
  
         return self(x)
@@ -290,6 +306,10 @@ class Call:
             return obj.__name__
 
         return None
+
+    @classmethod
+    def _construct_pipe(cls, *args):
+        return PipeCall(*args)
 
 
 class Lazy(Call):
