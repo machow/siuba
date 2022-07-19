@@ -268,25 +268,35 @@ class Pipeable:
             res = f(res)
         return res
 
+def _prep_lazy_args(*args):
+    result = []
+    for ii, arg in enumerate(args):
+        if ii == 0:
+            result.append(strip_symbolic(arg))
+        else:
+            result.append(Lazy(strip_symbolic(arg)))
+
+    return result
+
 
 def create_pipe_call(obj, *args, **kwargs) -> Call:
     """Return a Call of a function on its args and kwargs, wrapped in a Pipeable."""
-    first, *rest = args
+
+    stripped_args = _prep_lazy_args(*args)
+
     return Call(
             "__call__",
             strip_symbolic(obj),
-            strip_symbolic(first),
-            *(Lazy(strip_symbolic(x)) for x in rest),
+            *stripped_args,
             **{k: Lazy(strip_symbolic(v)) for k,v in kwargs.items()}
             )
 
 def create_eager_pipe_call(obj, *args, **kwargs) -> Call:
-    first, *rest = args
+
     return Call(
             "__call__",
             strip_symbolic(obj),
-            strip_symbolic(first),
-            *(strip_symbolic(x) for x in rest),
+            *map(strip_symbolic, args),
             **{k: strip_symbolic(v) for k,v in kwargs.items()}
             )
 

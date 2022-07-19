@@ -3,13 +3,9 @@ import pytest
 from siuba.siu.dispatchers import call
 from siuba.siu import _
 
-# calls a function on data
-# calls a function with an arg
-# calls a function with a kwarg
-# calls a function with data in another spot
-# siu expr first arg not extra args allowed
-# siu expr first arg simple
-# "abc", 
+# TODO: direct test of lazy elements
+# TODO: NSECall - no map subcalls
+
 def test_siu_call_no_args():
     assert 1 >> call(range) == range(1)
 
@@ -24,6 +20,14 @@ def test_siu_call_kwarg():
     assert "," >> call("a,b,c".split, _, maxsplit=1) == ["a", "b,c"]
 
 
+def test_siu_call_onlykwargs():
+    def f(*, x):
+        return x
+
+    res = 1 >> call(f, x = _)
+    assert res == 1
+
+
 def test_siu_call_arg_kwarg():
     assert 1 >> call("{0}_{1}_{b}".format, _, 2, b=3) == "1_2_3"
 
@@ -36,6 +40,6 @@ def test_siu_call_underscore_method():
     assert "a,b" >> call(_.split(",")) == ["a", "b"]
 
 
-def test_siu_call_understcore_method_args():
+def test_siu_call_underscore_method_args():
     with pytest.raises(NotImplementedError):
         "a,b" >> call(_.split, _, ",")
