@@ -1,0 +1,73 @@
+project:
+  type: website
+  output-dir: _build
+  render:
+    - guide/*.qmd
+
+website:
+  title: "Siuba"
+  page-navigation: true
+  navbar:
+    search: true
+    left:
+      - text: "Guide"
+        file: guide/basics.qmd
+      - text: "API"
+        href: api/
+      - text: "Examples"
+        href: examples/
+      - text: "About"
+        menu:
+          - about/key_features.qmd
+    right:
+      - icon: github
+        href: https://github.com/machow/siuba/
+  sidebar:
+    - id: docs
+      style: "floating"
+      collapse-level: 2
+      align: left
+      contents:
+        - guide/introduction.qmd
+        - guide/core-concepts.qmd
+        - section: "Common table verbs"
+          contents:
+            - guide/verb-filter.qmd
+            - guide/verb-arrange.qmd
+            - guide/verb-select.qmd
+            - guide/verb-mutate.qmd
+            - guide/verb-summarize.qmd
+            - guide/verb-group-by.qmd
+        - section: "Column operations"
+          contents:
+            - guide/ops-siu-expr.qmd
+            - guide/ops-strings.qmd
+            - guide/ops-datetime.qmd
+            - guide/ops-autocomplete.qmd
+        - section: "Wrangling"
+          contents:
+            - guide/wrangle-joins.qmd
+            - guide/wrangle-reshape.qmd
+            - guide/wrangle-nested.qmd
+        - section: "Programming"
+          contents:
+            - guide/programming-pipes.qmd
+            - guide/programming-across.qmd
+            - guide/programming-over.qmd
+            - guide/programming-new-verbs.qmd
+            - guide/programming-new-ops.qmd
+        - section: "Workflows"
+          contents:
+            - guide/workflows.qmd
+        #- section: "Extra topics"
+        #  contents:
+        #    - guide/guide_programming.qmd
+
+format:
+  html:
+    theme: cosmo
+    css: styles.css
+    toc: true
+
+
+

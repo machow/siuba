@@ -1,0 +1,139 @@
+---
+title: Filter rows
+jupyter:
+  jupytext:
+    formats: 'qmd:quarto'
+    text_representation:
+      extension: .qmd
+      format_name: quarto
+      format_version: '1.0'
+      jupytext_version: 1.14.0
+  kernelspec:
+    display_name: Python 3 (ipykernel)
+    language: python
+    name: python3
+---
+
+
+```{python}
+#| include: false
+import pandas as pd
+pd.set_option("display.max_rows", 5)
+```
+
+
+The `filter()` function keeps rows of data that meet all specified conditions.
+
+
+# Basics
+
+Here is a simple `filter()`.
+
+```{python}
+from siuba import _, filter, group_by
+from siuba.data import mtcars
+
+mtcars >> filter(_.cyl == 4, _.gear == 5)
+```
+
+It keeps rows where the `cyl` column is equal to 4, **AND** the `gear` column is equal to five.
+
+# Filters with OR conditions
+
+In order to keep a row when one of several conditions is met, use the bar (`|`) operator.
+
+```{python}
+mtcars >> filter((_.cyl == 4) | (_.gear == 5))
+```
+
+The code above keeps rows where `cyl` is equal to 4 **OR** `gear` is equal to 5.
+
+Be sure to explicitly put parentheses around both sides.
+Otherwise, python will group the operation like `_.cyl == (4 | _.gear) == 5`.
+
+
+# Dropping NA values
+
+Filter drops rows where conditions return `False` or not available (`NA`) values.
+However, what the pandas library considers to be `NA` is a tricky topic.
+
+## What counts as NA?
+
+Use `pandas.isna()` to determine whether a value is considered to be `NA`.
+
+```{python}
+df = pd.DataFrame({
+    "x": [True, False, None],
+    })
+
+df.x
+
+```
+
+Notice in the code above that the last value is None.
+We can confirm pandas sees this as an NA with the code below.
+
+```{python}
+pd.isna(df.x)
+```
+
+Since `None` is considered an NA, its row gets removed in the filter below.
+
+
+```{python}
+df >> filter(_.x)
+```
+
+## Drop only by NA
+
+If you want to remove only by NA values from your data, use the pandas `.notna()` method.
+
+This effectively says, "keep any values of x that are not NA".
+
+```{python}
+df >> filter(_.x.notna())
+```
+
+# Keeping NA values
+
+In general, use an OR condition with `_.some_col.isna()` to keep rows with missing values.
+
+```{python}
+df = pd.DataFrame({
+    "some_number": [1.1, None],
+})
+
+df
+```
+
+This strategy should work almost all the time.
+
+```{python}
+(df.some_number > 1) | df.some_number.isna()
+```
+
+:::{.callout-warning}
+Be careful with columns that contain `None` values.
+In plain python `None or True` is True, but in pandas it's False.
+
+```{.python}
+None or True                 # True
+pd.Series([None]) | True     # False
+```
+:::
+
+
+# Grouped filters
+
+In the example below, we keep rows where the horsepower (hp) is above the median horsepower for each cylinder group. This means that the filter performas the following operations.
+
+* calculates the median `hp` for each `cyl` grouping.
+* for each row, based on the `cyl` group it belongs to, tests where the `hp` is greater than the median `hp`.
+* keeps only rows where this test passes.
+
+```{python}
+(mtcars
+  >> group_by(_.cyl)
+  >> filter(_.hp > _.hp.median())
+  )
+```

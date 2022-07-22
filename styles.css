@@ -1,0 +1,44 @@
+/* css styles */
+@import url('https://rsms.me/inter/inter.css');
+html { font-family: 'Inter', sans-serif; }
+@supports (font-variation-settings: normal) {
+  html { font-family: 'Inter var', sans-serif; }
+}
+
+:root {
+  --bs-body-font-family: inter
+}
+
+.sidebar-item-container .text-start {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.sidebar-item-text {
+  color: rgba(60, 60, 60, 0.7);
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.sidebar-item-section {
+  padding-top: 16px;
+}
+
+.dataframe {
+  font-size: 13px;
+}
+
+/*
+.dataframe tbody tr th:only-of-type {
+    vertical-align: middle;
+}
+
+.dataframe tbody tr th {
+    vertical-align: top;
+}
+
+.dataframe thead th {
+    text-align: right;
+}
+*/

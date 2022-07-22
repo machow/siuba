@@ -1,0 +1,101 @@
+---
+title: Arrange rows
+jupyter:
+  jupytext:
+    formats: 'qmd:quarto'
+    text_representation:
+      extension: .qmd
+      format_name: quarto
+      format_version: '1.0'
+      jupytext_version: 1.14.0
+  kernelspec:
+    display_name: Python 3 (ipykernel)
+    language: python
+    name: python3
+---
+
+```{python}
+#| include: false
+import pandas as pd
+pd.set_option("display.max_rows", 5)
+```
+
+This function lets you to arrange the rows of your data, through two steps...
+
+* choosing columns to arrange by
+* specifying an order (ascending or descending)
+
+Below, we'll illustrate this function with a single variable, multiple variables, and more general expressions.
+
+```{python}
+from siuba import _, arrange, select
+from siuba.data import mtcars
+
+small_mtcars = mtcars >> select(_.cyl, _.mpg, _.hp)
+
+small_mtcars
+```
+
+### Basics
+
+The simplest way to use arrange is to specify a column name. The `arrange` function uses `pandas.sort_values` under the hood, and arranges rows in ascending order.
+
+For example, the code below arranges the rows from least to greatest horsepower (`hp`).
+
+```{python}
+# simple arrange of 1 var
+small_mtcars >> arrange(_.hp)
+```
+
+### Sort in descending order
+
+If you add a `-` before a column or expression, `arrange` will sort the rows in descending order. This applies to all types of columns, including arrays of strings and categories!
+
+```{python}
+small_mtcars >> arrange(-_.hp)
+```
+
+### Arrange by multiple variables
+
+When arrange receives multiple arguments, it sorts so that the one specified first changes the slowest, followed by the second, and so on.
+
+```{python}
+small_mtcars >> arrange(_.cyl, -_.mpg)
+```
+
+Notice that in the result above, `cyl` values are sorted first. In other words, all of the `4`'s are bunched together, with mpg sorted in descending order within each bunch.
+
+### Using expressions
+
+You can also `arrange` the rows of your data using more complex expressions, similar to those you would use in a `mutate`.
+
+For example, the code below sorts by horsepower (`hp`) per cylinder (`cyl`).
+
+```{python}
+small_mtcars >> arrange(_.hp / _.cyl)
+```
+
+### Categorical series behavior
+
+Arrange uses `pd.sort_values()` behind the scenes, which sorts `pd.Categorical` series by their category order.
+
+```{python}
+ser = pd.Categorical(["a", "z"], categories=["z", "a"])
+
+ser
+```
+
+```{python}
+ser.sort_values()
+```
+
+Siuba contains a submodule called `forcats` that make it easy to change the category order.
+
+```{python}
+from siuba.dply.forcats import fct_rev
+
+# reverse the category order
+fct_rev(ser)
+```
+
+You can learn more in the [siuba forcats docs](../api_extra/forcats).

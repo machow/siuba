@@ -1,0 +1,52 @@
+---
+jupyter:
+  jupytext:
+    formats: 'qmd:quarto'
+    text_representation:
+      extension: .qmd
+      format_name: quarto
+      format_version: '1.0'
+      jupytext_version: 1.14.0
+  kernelspec:
+    display_name: Python 3 (ipykernel)
+    language: python
+    name: python3
+---
+
+# Flexible pipes
+
+* a pipe is...
+* Analysis code might involve some transformation with lib A, then plotting with lib B.
+
+Benefit of pipes:
+
+* easy to keep going
+* handles functions across all libraries
+* handles method chains
+
+```{python}
+from siuba.siu import _, pipe, call
+from siuba.data import mtcars
+```
+
+## Manual pipes
+
+```{python}
+import seaborn as sns
+
+(mtcars
+    >> _[_.mpg < 20]
+    >> call(sns.relplot, x="hp", y="mpg", data=_)
+)
+
+(mtcars
+    .loc[lambda d: d.mpg < 20]
+    .pipe((sns.relplot, "data"), x="hp", y="mpg")
+)
+
+pipe(mtcars
+    , _[_.mpg < 20]
+    , call(sns.relplot, x="hp", y="mpg", data=_)
+)
+```
+

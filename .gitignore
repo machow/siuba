@@ -1,0 +1,6 @@
+.*.sw[po]
+
+.ipynb_checkpoints
+.quarto
+_build
+_site
