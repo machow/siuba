@@ -454,7 +454,7 @@ def _show_query(tbl, simplify = False):
 
 
     if simplify:
-        # try to strip table names and labels where uneccessary
+        # try to strip table names and labels where unnecessary
         with use_simple_names():
             print(compile_query())
     else:

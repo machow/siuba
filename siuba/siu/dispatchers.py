@@ -237,7 +237,7 @@ class Pipeable:
 
         This function handles two cases:
             * callable >> pipe -> pipe
-            * otherewise, evaluate the pipe
+            * otherwise, evaluate the pipe
 
         """
         if isinstance(x, (Symbolic, Call)):

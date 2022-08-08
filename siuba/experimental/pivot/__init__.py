@@ -68,7 +68,7 @@ def pivot_longer(
 
         if not np.all(split_lengths == split_lengths[0]):
             raise ValueError(
-                    "Splitting by {} leads to unequal lenghts ({}).".format(
+                    "Splitting by {} leads to unequal lengths ({}).".format(
                         names_sep if names_sep is not None else names_pattern
                     )
                 )

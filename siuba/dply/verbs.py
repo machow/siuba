@@ -415,8 +415,8 @@ class VarList:
 
 
 def var_slice(colnames, x):
-    """Return indices in colnames correspnding to start and stop of slice."""
-    # TODO: produces bahavior similar to df.loc[:, "V1":"V3"], but can reverse
+    """Return indices in colnames corresponding to start and stop of slice."""
+    # TODO: produces behavior similar to df.loc[:, "V1":"V3"], but can reverse
     # TODO: make DRY
     # TODO: reverse not including end points
     if isinstance(x.start, Var):
@@ -1345,7 +1345,7 @@ def unite(__data, col, *args, sep = "_", remove = True):
         __data:  a DataFrame
         col: name of the to-be-created column (string).
         *args: names of each column to combine.
-        sep: separater joining each column being combined.
+        sep: separator joining each column being combined.
         remove: whether to remove the combined columns from the returned DataFrame.
 
     """
