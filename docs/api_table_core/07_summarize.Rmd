@@ -36,7 +36,7 @@ mtcars >> summarize(avg_mpg = _.mpg.mean())
 
 ### Summarizing per group
 
-When you use summarize with a grouped DataFrame, the result has the same number of rows as there are groups in the data. For example, there are 3 values of cylinders (`cyl`) a row can have (4, 6, or 8), so ther result will be 3 rows.
+When you use summarize with a grouped DataFrame, the result has the same number of rows as there are groups in the data. For example, there are 3 values of cylinders (`cyl`) a row can have (4, 6, or 8), so the result will be 3 rows.
 
 ```{python}
 (mtcars

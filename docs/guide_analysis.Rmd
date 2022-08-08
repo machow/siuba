@@ -270,4 +270,4 @@ Select works okay, now let's uncomment the next line.
 )
 ```
 
-We found our bug! Note that when working with SQL, siuba prints out the name of the verb where the error occured. This is very useful, and will be added to working with pandas in the future!
+We found our bug! Note that when working with SQL, siuba prints out the name of the verb where the error occurred. This is very useful, and will be added to working with pandas in the future!

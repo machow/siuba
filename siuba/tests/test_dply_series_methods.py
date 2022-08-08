@@ -146,10 +146,10 @@ def do_test_missing_implementation(entry, backend):
     #if get_spec_no_mutate(entry, backend):
     #    pytest.skip("Spec'd failure")
 
-    ## case: Needs to be implmented
+    ## case: Needs to be implemented
     ## TODO(table): uses xfail
     #if backend_status == "todo":
-    #    pytest.xfail("TODO: impelement this translation")
+    #    pytest.xfail("TODO: implement this translation")
     #
     ## case: Can't be used in a mutate (e.g. a SQL ordered set aggregate function)
     ## TODO(table): no_mutate

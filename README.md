@@ -17,7 +17,7 @@ siuba ([小巴](http://www.cantonese.sheik.co.uk/dictionary/words/9139/)) is a p
 * `summarize()` - reduce one or more columns down to a single number.
 * `arrange()` - reorder the rows of data.
 
-These actions can be preceeded by a `group_by()`, which causes them to be applied individually to grouped rows of data. Moreover, many SQL concepts, such as `distinct()`, `count()`, and joins are implemented.
+These actions can be preceded by a `group_by()`, which causes them to be applied individually to grouped rows of data. Moreover, many SQL concepts, such as `distinct()`, `count()`, and joins are implemented.
 Inputs to these functions can be a pandas `DataFrame` or SQL connection (currently postgres, redshift, or sqlite).
 
 For more on the rationale behind tools like dplyr, see this [tidyverse paper](https://tidyverse.tidyverse.org/articles/paper.html). 
