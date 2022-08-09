@@ -3,8 +3,10 @@
 from functools import singledispatch, update_wrapper, wraps
 import inspect
 
-from .calls import Call, FuncArg, MetaArg, Lazy
+from .calls import Call, FuncArg, MetaArg, Lazy, PipeCall
 from .symbolic import Symbolic, create_sym_call, strip_symbolic
+
+from typing import Callable
 
 def _dispatch_not_impl(func_name):
     def f(x, *args, **kwargs):
@@ -173,7 +175,9 @@ singledispatch2 = verb_dispatch
 # Pipe ========================================================================
 
 class Pipeable:
-    """Enable function composition through the right bitshift (>>) operator.
+    """DEPRECATED: please use the siuba.siu.call function.
+
+    Enable function composition through the right bitshift (>>) operator.
 
     Parameters
     ----------
@@ -210,6 +214,8 @@ class Pipeable:
     """
 
     def __init__(self, f = None, calls = None):
+        import warnings
+        warnings.warn("Pipeable is deprecated. Please use siuba.siu.call.")
         # symbolics like _.some_attr need to be stripped down to a call, because
         # calling _.some_attr() returns another symbolic.
         f = strip_symbolic(f)
@@ -262,15 +268,162 @@ class Pipeable:
             res = f(res)
         return res
 
+def _prep_lazy_args(*args):
+    result = []
+    for ii, arg in enumerate(args):
+        if ii == 0:
+            result.append(strip_symbolic(arg))
+        else:
+            result.append(Lazy(strip_symbolic(arg)))
 
-def create_pipe_call(obj, *args, **kwargs) -> Pipeable:
+    return result
+
+
+def create_pipe_call(obj, *args, **kwargs) -> Call:
     """Return a Call of a function on its args and kwargs, wrapped in a Pipeable."""
-    first, *rest = args
-    return Pipeable(Call(
+
+    stripped_args = _prep_lazy_args(*args)
+
+    return Call(
             "__call__",
             strip_symbolic(obj),
-            strip_symbolic(first),
-            *(Lazy(strip_symbolic(x)) for x in rest),
+            *stripped_args,
             **{k: Lazy(strip_symbolic(v)) for k,v in kwargs.items()}
-            ))
+            )
 
+def create_eager_pipe_call(obj, *args, **kwargs) -> Call:
+
+    return Call(
+            "__call__",
+            strip_symbolic(obj),
+            *map(strip_symbolic, args),
+            **{k: strip_symbolic(v) for k,v in kwargs.items()}
+            )
+
+
+def call(__func: "Callable | Call | Symbolic", *args, **kwargs):
+    """Allow a function call to be used in a call (with >>).
+
+    Parameters
+    ----------
+    __func:
+        A function to be called as part of a call.
+    *args:
+        Additional position arguments to pass to the function.
+    **kwargs:
+        Additional keyword arguments to pass to the function.
+
+    Examples
+    --------
+
+    The simplest use of the call is passing just the to-be-called function.
+
+    >>> s = "a string"
+    >>> s >> call(print)
+    a string
+
+    This is equivalent to explicitly passing ``_`` as a placeholder.
+
+    >>> from siuba import _
+    >>> s >> call(print, _)
+    a string
+
+    The explicit syntax is useful, because it allows us to pass more arguments.
+    For example, the code below passes additional arguments to print.
+
+    >>> "a" >> call(print, _, "string", sep=" ")
+    a string
+
+    You can transform the input data. For example, the code below passes "shout".upper()
+    to print.
+
+    >>> "shout" >> call(print, _.upper())
+    SHOUT
+
+    Since ``_`` is just a placeholder for the data on the left-hand-side of >>, you
+    can pass it multiple times to the to-be-called function (e.g. print).
+
+    >>> "nice" >> call(print, _, _, sep=" ")
+    nice nice
+
+    Alternatively, you can pass a siu expression straight to call.
+
+    >>> "abc" >> call(_[0].upper())
+    'A'
+        
+    """
+
+    if isinstance(__func, (Symbolic, Call)):
+        if args or kwargs:
+            raise NotImplementedError(
+                "If a siu expression (e.g. _) is the first argument to call, it must "
+                "be the only argument. You can pass arguments using the form, "
+                "call(_.some_method(1, 2, c = 3))."
+            )
+        return strip_symbolic(__func)
+    if not args and not kwargs:
+        # handle implicit case, call(some_func) -> call(some_func, _)
+        return create_eager_pipe_call(__func, MetaArg("_"))
+
+    return create_eager_pipe_call(__func, *args, **kwargs)
+
+
+def pipe(__data, *args: Callable):
+    """Pipe data through a chain of callables. Return the final result.
+
+    Examples
+    --------
+
+    Case 1: pipe regular functions
+
+    >>> pipe({"a": 1}, lambda x: x["a"], lambda x: x + 1)
+    2
+
+    Case 2: pipe to siu expressions
+
+    >>> from siuba import _
+    >>> pipe({"a": 1}, _["a"], _ + 1)
+    2
+
+    Case 3: call external function on siu expression
+
+    >>> from siuba.siu import call
+    >>> pipe({"a": 1}, call(isinstance, _["a"], int))
+    True
+
+    Case 4: _ as first arg to delay
+
+    >>> f = pipe(_, lambda x: x["a"])
+    >>> f
+    PipeCall(...)
+
+    >>> f({"a": 1})
+    1
+
+    Example: using with verb
+
+    >>> from siuba import _, summarize
+    >>> from siuba.data import mtcars
+    >>> pipe(mtcars, summarize(res = _.hp.mean()))
+            res
+    0  146.6875
+    """
+
+    stripped = strip_symbolic(__data)
+
+    # Special case: support backwards compatibility with old pipe() behavior ----
+    # call() and Call.__rrshift__ now handle this behavior.
+    if len(args) == 0:
+        if isinstance(stripped, Call):
+            return stripped
+        else:
+            return call(stripped)
+        
+
+    # When data is _, return a pipe call
+    pipe_call = PipeCall(stripped, *map(strip_symbolic, args))
+
+    if isinstance(stripped, MetaArg):
+        return pipe_call
+
+    return pipe_call()

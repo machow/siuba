@@ -117,6 +117,8 @@ class Call:
 
 
     """
+
+
     def __init__(self, func, *args, **kwargs):
         self.func = func
         self.args = args
@@ -188,6 +190,27 @@ class Call:
         # in normal case, get method to call, and then call it
         f_op = getattr(operator, self.func)
         return f_op(inst, *rest, **kwargs)
+
+    # TODO: type checks will be very useful here. Will need to import symbolic.
+    # Let's do this once types are in a _typing.py submodule.
+    def __rshift__(self, x):
+        """Create a"""
+        from .symbolic import strip_symbolic
+
+        stripped = strip_symbolic(x)
+
+        if isinstance(stripped, Call):
+            return self._construct_pipe(MetaArg("_"), self, x)
+
+        raise TypeError()
+
+    def __rrshift__(self, x):
+        from .symbolic import strip_symbolic
+        if isinstance(strip_symbolic(x), (Call)):
+            # only allow non-calls (i.e. data) on the left.
+            raise TypeError()
+ 
+        return self(x)
 
     @staticmethod
     def evaluate_calls(arg, x):
@@ -283,6 +306,10 @@ class Call:
             return obj.__name__
 
         return None
+
+    @classmethod
+    def _construct_pipe(cls, *args):
+        return PipeCall(*args)
 
 
 class Lazy(Call):
@@ -586,4 +613,37 @@ class FuncArg(Call):
         return self.args[0]
 
 
+# Pipe ===================================================================================
 
+class PipeCall(Call):
+    """
+    pipe(df, a, b, c)
+    pipe(_, a, b, c)
+
+    should options for first arg be only MetaArg or a non-call?
+    """
+
+    def __init__(self, func, *args, **kwargs):
+        self.func = "__siu_pipe_call__"
+        self.args = (func, *args)
+        if kwargs:
+            raise ValueError("Keyword arguments are not allowed.")
+        self.kwargs = {}
+
+    def __call__(self, x=None):
+        # Note that most calls map_subcalls to pass in the same data for each argument.
+        # In contrast, PipeCall passes data from the prev step to the next.
+        crnt_data, *calls = self.args
+
+        if isinstance(crnt_data, MetaArg):
+            crnt_data = crnt_data(x)
+
+        for call in calls:
+            new_data = call(crnt_data)
+            crnt_data = new_data
+
+        return crnt_data
+    
+    def __repr__(self):
+        args_repr = ",".join(map(repr, self.args))
+        return f"{type(self).__name__}({args_repr})"

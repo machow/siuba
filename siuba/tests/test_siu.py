@@ -13,7 +13,7 @@ BINARY_OPS = [
     "%",
     #"_ ** _", #TODO: uses different formatting
     "<<",
-    ">>",
+    #">>",
     "&",
     "^",
     "|"
