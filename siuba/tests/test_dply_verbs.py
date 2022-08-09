@@ -72,18 +72,18 @@ def test_dply_mutate_sym(df1):
 
 # VarList and friends ------
 
-from siuba.dply.verbs import flatten_var, Var, VarList
+from siuba.dply.tidyselect import flatten_var, Var, VarAnd, VarList
 
 def test_flatten_vars():
-    v_a, v_b = flatten_var(-Var(["a", "b"]))
+    v_a, v_b = flatten_var(-VarAnd([Var("a"), Var("b")]))
     assert v_a.name == "a"
     assert v_b.name == "b"
     assert all([v_a.negated, v_b.negated])
 
 @pytest.mark.parametrize("x", [
-    ["x"],
+    [VarAnd((Var("x"), ))],
     [Var("x")],
-    [slice(0,1)]
+    [Var(slice(0,1))]
     ])
 def test_flatten_vars_noop(x):
     assert x is flatten_var(x)[0]
@@ -99,8 +99,12 @@ def test_VarList_getitem_siu():
 def test_VarList_getitem():
     vl = VarList()
     var = vl["a":"b", "c"]
-    assert isinstance(var.name[0], slice)
-    assert var.name[1] == "c"
+
+    assert isinstance(var, VarAnd)
+
+    res = var.flatten()
+    assert isinstance(res[0].name, slice)
+    assert res[1].name == "c"
 
 
 
