@@ -4,6 +4,142 @@ import numpy as np
 from siuba.siu import symbolic_dispatch
 from collections import defaultdict
 
+
+def _get_cat_order(x):
+    if isinstance(x, pd.Series):
+        arr = x.array
+    else:
+        arr = x
+
+    if isinstance(arr, pd.Categorical):
+        return arr.ordered
+
+    return None
+
+
+# fct_inorder, fct_infreq -----------------------------------------------------
+
+@symbolic_dispatch
+def fct_inorder(fct, ordered=None):
+    """Return a copy of fct, with categories ordered by when they first appear.
+
+    Parameters
+    ----------
+    fct : list-like
+        A pandas Series, Categorical, or list-like object
+    ordered : bool
+        Whether to return an ordered categorical. By default a Categorical inputs'
+        ordered setting is respected. Use this to override it.
+
+    See Also
+    --------
+    fct_infreq : Order categories by value frequency count.
+
+    Examples
+    --------
+    
+    >>> fct = pd.Categorical(["c", "a", "b"])
+    >>> fct
+    ['c', 'a', 'b']
+    Categories (3, object): ['a', 'b', 'c']
+
+    Note that above the categories are sorted alphabetically. Use fct_inorder
+    to keep the categories in first-observed order.
+
+    >>> fct_inorder(fct)
+    ['c', 'a', 'b']
+    Categories (3, object): ['c', 'a', 'b']
+
+    fct_inorder also accepts pd.Series and list objects:
+
+    >>> fct_inorder(["z", "a"])
+    ['z', 'a']
+    Categories (2, object): ['z', 'a']
+
+    By default, the ordered setting of categoricals is respected. Use the ordered
+    parameter to override it.
+
+    >>> fct2 = pd.Categorical(["z", "a", "b"], ordered=True)
+    >>> fct_inorder(fct2)
+    ['z', 'a', 'b']
+    Categories (3, object): ['z' < 'a' < 'b']
+
+    >>> fct_inorder(fct2, ordered=False)
+    ['z', 'a', 'b']
+    Categories (3, object): ['z', 'a', 'b']
+
+    """
+
+    if ordered is None:
+        ordered = _get_cat_order(fct)
+
+    if isinstance(fct, (pd.Series, pd.Categorical)):
+        uniq = fct.dropna().unique()
+
+        if isinstance(uniq, pd.Categorical):
+            # the result of .unique for a categorical is a new categorical
+            # unsurprisingly, it also sorts the categories, so reorder manually
+            # (note that this also applies to Series[Categorical].unique())
+            categories = uniq.categories[uniq.dropna().codes]
+            return pd.Categorical(fct, categories, ordered=ordered)
+
+        return pd.Categorical(fct, uniq, ordered=ordered)
+
+    ser = pd.Series(fct)
+    return pd.Categorical(fct, categories = ser.dropna().unique(), ordered=ordered)
+
+
+@symbolic_dispatch
+def fct_infreq(fct, ordered=None):
+    """Return a copy of fct, with categories ordered by frequency (largest first)
+
+    Parameters
+    ----------
+    fct : list-like
+        A pandas Series, Categorical, or list-like object
+    ordered : bool
+        Whether to return an ordered categorical. By default a Categorical inputs'
+        ordered setting is respected. Use this to override it.
+
+    See Also
+    --------
+    fct_inorder : Order categories by when they're first observed.
+
+    Examples
+    --------
+
+    >>> fct_infreq(["c", "a", "c", "b", "a"])
+    ['c', 'a', 'c', 'b', 'a']
+    Categories (3, object): ['c', 'a', 'b']
+
+    """
+
+    if ordered is None:
+        ordered = _get_cat_order(fct)
+
+
+    # sort and create new categorical ----
+    
+    if isinstance(fct, pd.Categorical):
+        # Categorical value counts are sorted in categories order
+        # So to acheive the exact same result as the Series case below,
+        # we need to use fct_inorder, so categories is in first-observed order.
+        # This orders the final result by frequency, and then observed for ties.
+        freq = fct_inorder(fct).value_counts().sort_values(ascending=False)
+
+        # note that freq is a Series, but it has a CategoricalIndex.
+        # we want the index values as shown, so we need to strip them out of
+        # this nightmare index situation.
+        categories = freq.index.categories[freq.index.dropna().codes]
+        return pd.Categorical(fct, categories=categories, ordered=ordered)
+
+    else:
+        # Series sorts in descending frequency order
+        ser = pd.Series(fct) if not isinstance(fct, pd.Series) else fct
+        freq = ser.value_counts()
+        return pd.Categorical(ser, categories=freq.index, ordered=ordered)
+
+
 # fct_reorder -----------------------------------------------------------------
 
 @symbolic_dispatch
