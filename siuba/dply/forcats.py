@@ -108,8 +108,8 @@ def fct_infreq(fct, ordered=None):
     Examples
     --------
 
-    >>> fct_infreq(["c", "a", "c", "b", "a"])
-    ['c', 'a', 'c', 'b', 'a']
+    >>> fct_infreq(["c", "a", "c", "c", "a", "b"])
+    ['c', 'a', 'c', 'c', 'a', 'b']
     Categories (3, object): ['c', 'a', 'b']
 
     """
