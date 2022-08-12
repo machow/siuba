@@ -29,7 +29,7 @@ def _load_data_cars_sql():
 
 def __getattr__(name):
     if name not in __all__:
-        raise NotImplementedError(f"No dataset named: {name}")
+        raise AttributeError(f"No dataset named: {name}")
 
     if name == "cars":
         return _load_data("mtcars")[["cyl", "mpg", "hp"]]
