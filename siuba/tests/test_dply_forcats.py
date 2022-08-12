@@ -39,11 +39,15 @@ def test_fct_inorder(x, dst_categories):
     assert_fct_equal(res3, dst)
 
 
-@pytest.mark.parametrize("x, dst_categories", [
-    (["c", "c", "b", "c", "a", "a", "a"], ["c", "a", "b"]),
-    (["c", "c", "b", "c", "a", "a", "a", None], ["c", "a", "b"])
+@pytest.mark.parametrize("x, dst_categories, skip_pd_v1_1", [
+    (["c", "c", "b", "c", "a", "a"], ["c", "a", "b"], False),              # no ties
+    (["c", "c", "b", "c", "a", "a", "a"], ["c", "a", "b"], True),          # ties
+    (["c", "c", "b", "c", "a", "a", "a", None], ["c", "a", "b"], False)    # None
 ])
-def test_fct_infreq(x, dst_categories):
+def test_fct_infreq(x, dst_categories, skip_pd_v1_1):
+    if pd.__version__.startswith("1.1."):
+        pytest.skip()
+
     dst = pd.Categorical(x, categories=dst_categories)
 
     res1 = fct_infreq(x)
