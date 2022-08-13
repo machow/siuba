@@ -1,4 +1,7 @@
-from siuba.dply.forcats import fct_reorder, fct_recode, fct_collapse, fct_lump
+import pandas as pd
+import pytest
+
+from siuba.dply.forcats import fct_reorder, fct_recode, fct_collapse, fct_lump, fct_inorder, fct_infreq
 from pandas import Categorical
 
 try:
@@ -10,6 +13,58 @@ except ImportError:
 
 def assert_fct_equal(x, y):
     return assert_categorical_equal(x,  y)
+
+# fct_inorder -----------------------------------------------------------------
+
+@pytest.mark.parametrize("x, dst_categories", [
+    (["c", "a", "c", "b", "b"], ["c", "a", "b"]),
+    (["c", "a", "c", "b", "b", None], ["c", "a", "b"])
+])
+def test_fct_inorder(x, dst_categories):
+    dst = pd.Categorical(x, categories=dst_categories)
+
+    res1 = fct_inorder(x)
+
+    assert isinstance(res1, pd.Categorical)
+    assert_categorical_equal(res1, dst)
+
+    res2 = fct_inorder(pd.Series(x))
+
+    assert isinstance(res2, pd.Categorical)
+    assert_fct_equal(res2, dst)
+
+    res3 = fct_inorder(pd.Categorical(x))
+
+    assert isinstance(res3, pd.Categorical)
+    assert_fct_equal(res3, dst)
+
+
+@pytest.mark.parametrize("x, dst_categories, skip_pd_v1_1", [
+    (["c", "c", "b", "c", "a", "a"], ["c", "a", "b"], False),              # no ties
+    (["c", "c", "b", "c", "a", "a", "a"], ["c", "a", "b"], True),          # ties
+    (["c", "c", "b", "c", "a", "a", "a", None], ["c", "a", "b"], False)    # None
+])
+def test_fct_infreq(x, dst_categories, skip_pd_v1_1):
+    if pd.__version__.startswith("1.1."):
+        pytest.skip()
+
+    dst = pd.Categorical(x, categories=dst_categories)
+
+    res1 = fct_infreq(x)
+
+    assert isinstance(res1, pd.Categorical)
+    assert_categorical_equal(res1, dst)
+
+    res2 = fct_infreq(pd.Series(x))
+
+    assert isinstance(res2, pd.Categorical)
+    assert_categorical_equal(res2, dst)
+
+    res3 = fct_infreq(pd.Categorical(x))
+
+    assert isinstance(res3, pd.Categorical)
+    assert_categorical_equal(res3, dst)
+
 
 
 # fct_reorder -----------------------------------------------------------------

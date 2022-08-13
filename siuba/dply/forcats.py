@@ -4,34 +4,179 @@ import numpy as np
 from siuba.siu import symbolic_dispatch
 from collections import defaultdict
 
+
+def _get_cat_order(x):
+    if isinstance(x, pd.Series):
+        arr = x.array
+    else:
+        arr = x
+
+    if isinstance(arr, pd.Categorical):
+        return arr.ordered
+
+    return None
+
+
+# fct_inorder, fct_infreq -----------------------------------------------------
+
+@symbolic_dispatch
+def fct_inorder(fct, ordered=None):
+    """Return a copy of fct, with categories ordered by when they first appear.
+
+    Parameters
+    ----------
+    fct : list-like
+        A pandas Series, Categorical, or list-like object
+    ordered : bool
+        Whether to return an ordered categorical. By default a Categorical inputs'
+        ordered setting is respected. Use this to override it.
+
+    See Also
+    --------
+    fct_infreq : Order categories by value frequency count.
+
+    Examples
+    --------
+    
+    >>> fct = pd.Categorical(["c", "a", "b"])
+    >>> fct
+    ['c', 'a', 'b']
+    Categories (3, object): ['a', 'b', 'c']
+
+    Note that above the categories are sorted alphabetically. Use fct_inorder
+    to keep the categories in first-observed order.
+
+    >>> fct_inorder(fct)
+    ['c', 'a', 'b']
+    Categories (3, object): ['c', 'a', 'b']
+
+    fct_inorder also accepts pd.Series and list objects:
+
+    >>> fct_inorder(["z", "a"])
+    ['z', 'a']
+    Categories (2, object): ['z', 'a']
+
+    By default, the ordered setting of categoricals is respected. Use the ordered
+    parameter to override it.
+
+    >>> fct2 = pd.Categorical(["z", "a", "b"], ordered=True)
+    >>> fct_inorder(fct2)
+    ['z', 'a', 'b']
+    Categories (3, object): ['z' < 'a' < 'b']
+
+    >>> fct_inorder(fct2, ordered=False)
+    ['z', 'a', 'b']
+    Categories (3, object): ['z', 'a', 'b']
+
+    """
+
+    if ordered is None:
+        ordered = _get_cat_order(fct)
+
+    if isinstance(fct, (pd.Series, pd.Categorical)):
+        uniq = fct.dropna().unique()
+
+        if isinstance(uniq, pd.Categorical):
+            # the result of .unique for a categorical is a new categorical
+            # unsurprisingly, it also sorts the categories, so reorder manually
+            # (note that this also applies to Series[Categorical].unique())
+            categories = uniq.categories[uniq.dropna().codes]
+            return pd.Categorical(fct, categories, ordered=ordered)
+
+        return pd.Categorical(fct, uniq, ordered=ordered)
+
+    ser = pd.Series(fct)
+    return pd.Categorical(fct, categories = ser.dropna().unique(), ordered=ordered)
+
+
+@symbolic_dispatch
+def fct_infreq(fct, ordered=None):
+    """Return a copy of fct, with categories ordered by frequency (largest first)
+
+    Parameters
+    ----------
+    fct : list-like
+        A pandas Series, Categorical, or list-like object
+    ordered : bool
+        Whether to return an ordered categorical. By default a Categorical inputs'
+        ordered setting is respected. Use this to override it.
+
+    See Also
+    --------
+    fct_inorder : Order categories by when they're first observed.
+
+    Examples
+    --------
+
+    >>> fct_infreq(["c", "a", "c", "c", "a", "b"])
+    ['c', 'a', 'c', 'c', 'a', 'b']
+    Categories (3, object): ['c', 'a', 'b']
+
+    """
+
+    if ordered is None:
+        ordered = _get_cat_order(fct)
+
+
+    # sort and create new categorical ----
+    
+    if isinstance(fct, pd.Categorical):
+        # Categorical value counts are sorted in categories order
+        # So to acheive the exact same result as the Series case below,
+        # we need to use fct_inorder, so categories is in first-observed order.
+        # This orders the final result by frequency, and then observed for ties.
+        freq = fct_inorder(fct).value_counts().sort_values(ascending=False)
+
+        # note that freq is a Series, but it has a CategoricalIndex.
+        # we want the index values as shown, so we need to strip them out of
+        # this nightmare index situation.
+        categories = freq.index.categories[freq.index.dropna().codes]
+        return pd.Categorical(fct, categories=categories, ordered=ordered)
+
+    else:
+        # Series sorts in descending frequency order
+        ser = pd.Series(fct) if not isinstance(fct, pd.Series) else fct
+        freq = ser.value_counts()
+        return pd.Categorical(ser, categories=freq.index, ordered=ordered)
+
+
 # fct_reorder -----------------------------------------------------------------
 
 @symbolic_dispatch
 def fct_reorder(fct, x, func = np.median, desc = False) -> pd.Categorical:
     """Return copy of fct, with categories reordered according to values in x.
     
-    Arguments:
-        fct: a pandas.Categorical, or array(-like) used to create one.
-        x: values used to reorder categorical. Must be same length as fct.
-        func: function run over all values within a level of the categorical.
-        desc: whether to sort in descending order.
+    Parameters
+    ----------
+    fct :
+        A pandas.Categorical, or array(-like) used to create one.
+    x :
+        Values used to reorder categorical. Must be same length as fct.
+    func :
+        Function run over all values within a level of the categorical.
+    desc :
+        Whether to sort in descending order.
 
-    Notes that NaN categories can't be ordered. When func returns NaN, sorting
+    Notes
+    -----
+    NaN categories can't be ordered. When func returns NaN, sorting
     is always done with NaNs last.
 
 
-    Examples:
-        >>> fct_reorder(['a', 'a', 'b'], [4, 3, 2])
-        ['a', 'a', 'b']
-        Categories (2, object): ['b', 'a']
+    Examples
+    --------
 
-        >>> fct_reorder(['a', 'a', 'b'], [4, 3, 2], desc = True)
-        ['a', 'a', 'b']
-        Categories (2, object): ['a', 'b']
+    >>> fct_reorder(['a', 'a', 'b'], [4, 3, 2])
+    ['a', 'a', 'b']
+    Categories (2, object): ['b', 'a']
 
-        >>> fct_reorder(['x', 'x', 'y'], [4, 0, 2], np.max)
-        ['x', 'x', 'y']
-        Categories (2, object): ['y', 'x']
+    >>> fct_reorder(['a', 'a', 'b'], [4, 3, 2], desc = True)
+    ['a', 'a', 'b']
+    Categories (2, object): ['a', 'b']
+
+    >>> fct_reorder(['x', 'x', 'y'], [4, 0, 2], np.max)
+    ['x', 'x', 'y']
+    Categories (2, object): ['y', 'x']
 
     """
 
@@ -51,18 +196,22 @@ def fct_reorder(fct, x, func = np.median, desc = False) -> pd.Categorical:
 def fct_recode(fct, recat=None, **kwargs) -> pd.Categorical:
     """Return copy of fct with renamed categories.
 
-    Arguments:
-        fct: a pandas.Categorical, or array(-like) used to create one. 
-        **kwargs: arguments of form new_name = old_name.
+    Parameters
+    ----------
+    fct :
+        A pandas.Categorical, or array(-like) used to create one. 
+    **kwargs :
+        Arguments of form new_name = old_name.
 
-    Examples:
-        >>> cat = ['a', 'b', 'c']
-        >>> fct_recode(cat, z = 'c')
-        ['a', 'b', 'z']
-        Categories (3, object): ['a', 'b', 'z']
+    Examples
+    --------
+    >>> cat = ['a', 'b', 'c']
+    >>> fct_recode(cat, z = 'c')
+    ['a', 'b', 'z']
+    Categories (3, object): ['a', 'b', 'z']
 
-        # >>> fct_recode(cat, x = 'a', x = 'b')
-        # >>> fct_recode(cat, x = ['a', 'b'])
+    # >>> fct_recode(cat, x = 'a', x = 'b')
+    # >>> fct_recode(cat, x = ['a', 'b'])
         
     """
 
@@ -87,32 +236,38 @@ def fct_recode(fct, recat=None, **kwargs) -> pd.Categorical:
 def fct_collapse(fct, recat, group_other = None) -> pd.Categorical:
     """Return copy of fct with categories renamed. Optionally group all others.
 
-    Arguments:
-        fct: a pandas.Categorical, or array(-like) used to create one.  
-        recat: dictionary of form {new_cat_name: old_cat_name}. old_cat_name may be
-               a list of existing categories, to be given the same name.
-        group_other: an optional string, specifying what all other categories should be named.
+    Parameters
+    ----------
+    fct :
+        A pandas.Categorical, or array(-like) used to create one.  
+    recat :
+        Dictionary of form {new_cat_name: old_cat_name}. old_cat_name may be
+        a list of existing categories, to be given the same name.
+    group_other :
+        An optional string, specifying what all other categories should be named.
 
-    Notes:
-        Resulting levels index is ordered according to the earliest level replaced.
-        If we rename the first and last levels to "c", then "c" is the first level.
+    Notes
+    -----
+    Resulting levels index is ordered according to the earliest level replaced.
+    If we rename the first and last levels to "c", then "c" is the first level.
 
-    Examples:
-        >>> fct_collapse(['a', 'b', 'c'], {'x': 'a'})
-        ['x', 'b', 'c']
-        Categories (3, object): ['x', 'b', 'c']
+    Examples
+    --------
+    >>> fct_collapse(['a', 'b', 'c'], {'x': 'a'})
+    ['x', 'b', 'c']
+    Categories (3, object): ['x', 'b', 'c']
 
-        >>> fct_collapse(['a', 'b', 'c'], {'x': 'a'}, group_other = 'others')
-        ['x', 'others', 'others']
-        Categories (2, object): ['x', 'others']
+    >>> fct_collapse(['a', 'b', 'c'], {'x': 'a'}, group_other = 'others')
+    ['x', 'others', 'others']
+    Categories (2, object): ['x', 'others']
 
-        >>> fct_collapse(['a', 'b', 'c'], {'ab': ['a', 'b']})
-        ['ab', 'ab', 'c']
-        Categories (2, object): ['ab', 'c']
+    >>> fct_collapse(['a', 'b', 'c'], {'ab': ['a', 'b']})
+    ['ab', 'ab', 'c']
+    Categories (2, object): ['ab', 'c']
 
-        >>> fct_collapse(['a', 'b', None], {'a': ['b']})
-        ['a', 'a', NaN]
-        Categories (1, object): ['a']
+    >>> fct_collapse(['a', 'b', None], {'a': ['b']})
+    ['a', 'a', NaN]
+    Categories (1, object): ['a']
 
     """
     if not isinstance(fct, pd.Categorical):
@@ -159,27 +314,37 @@ def fct_collapse(fct, recat, group_other = None) -> pd.Categorical:
 
 @symbolic_dispatch
 def fct_lump(fct, n = None, prop = None, w = None, other_level = "Other", ties = None) -> pd.Categorical:
-    """
-    Arguments:
-        fct: a pandas.Categorical, or array(-like) used to create one.
-        n: number of categories to keep.
-        prop: (not implemented) keep categories that occur prop proportion of the time.
-        w: array of weights corresponding to each value in fct.
-        other_level: name for all lumped together levels.
-        ties: (not implemented) method to use in the case of ties.
+    """Return a copy of fct with categories lumped together.
 
-    Notes:
-        Currently, one of n and prop must be specified.
+    Parameters
+    ----------
+    fct :
+        A pandas.Categorical, or array(-like) used to create one.
+    n :
+        Number of categories to keep.
+    prop :
+        (not implemented) keep categories that occur prop proportion of the time.
+    w :
+        Array of weights corresponding to each value in fct.
+    other_level :
+        Name for all lumped together levels.
+    ties :
+        (not implemented) method to use in the case of ties.
 
-    Examples:
-        >>> fct_lump(['a', 'a', 'b', 'c'], n = 1)
-        ['a', 'a', 'Other', 'Other']
-        Categories (2, object): ['a', 'Other']
+    Notes
+    -----
+    Currently, one of n and prop must be specified.
 
-        # TODO: implement prop arg
-        >>> fct_lump(['a', 'a', 'b', 'b', 'c', 'd'], prop = .2)
-        ['a', 'a', 'b', 'b', 'Other', 'Other']
-        Categories (3, object): ['a', 'b', 'Other']
+    Examples
+    --------
+    >>> fct_lump(['a', 'a', 'b', 'c'], n = 1)
+    ['a', 'a', 'Other', 'Other']
+    Categories (2, object): ['a', 'Other']
+
+    # TODO: implement prop arg
+    >>> fct_lump(['a', 'a', 'b', 'b', 'c', 'd'], prop = .2)
+    ['a', 'a', 'b', 'b', 'Other', 'Other']
+    Categories (3, object): ['a', 'b', 'Other']
         
 
     """
@@ -228,8 +393,28 @@ def _get_values(x):
 def fct_rev(fct) -> pd.Categorical:
     """Return a copy of fct with category level order reversed.next
     
-    Arguments:
-        fct: a pandas.Categorical, or array(-like) used to create one.
+    Parameters
+    ----------
+    fct :
+        A pandas.Categorical, or array(-like) used to create one.
+
+    Examples
+    --------
+    >>> fct = pd.Categorical(["a", "b", "c"])
+    >>> fct
+    ['a', 'b', 'c']
+    Categories (3, object): ['a', 'b', 'c']
+
+    >>> fct_rev(fct)
+    ['a', 'b', 'c']
+    Categories (3, object): ['c', 'b', 'a']
+
+    Note that this function can also accept a list.
+
+    >>> fct_rev(["a", "b", "c"])
+    ['a', 'b', 'c']
+    Categories (3, object): ['c', 'b', 'a']
+
 
     """
 
