@@ -245,6 +245,7 @@ def fct_collapse(fct, recat, group_other = None) -> pd.Categorical:
         a list of existing categories, to be given the same name.
     group_other :
         An optional string, specifying what all other categories should be named.
+        This will always be the last category level in the result.
 
     Notes
     -----
@@ -293,11 +294,22 @@ def fct_collapse(fct, recat, group_other = None) -> pd.Categorical:
                 cat_to_new[k] = k
 
     # map from old cat to new code ----
+
     # calculate new codes
     ordered_cats = {new: True for old, new in cat_to_new.items()}
 
+    # move the other group to last in the ordered set
+    if group_other is not None:
+        try:
+            del ordered_cats[group_other]
+            ordered_cats[group_other] = True
+        except KeyError:
+            pass
+
+    # map new category name to code
     new_cat_set = {k: ii for ii, k in enumerate(ordered_cats)}
 
+    # at this point, we need remap codes to the other category
     # make an array, where the index is old code + 1 (so missing val index is 0)
     old_code_to_new = np.array(
             [-1] + [new_cat_set[new_cat] for new_cat in cat_to_new.values()]

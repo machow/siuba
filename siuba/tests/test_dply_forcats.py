@@ -120,6 +120,12 @@ def test_fct_collapse_others():
 
     assert_fct_equal(res, dst)
 
+def test_fct_collapse_other_always_last():
+    res = fct_collapse(['a', 'b', 'c'], {'x': 'c'}, group_other = 'others')
+    dst = Categorical(['others', 'others', 'x'], ['x', 'others'])
+
+    assert_fct_equal(res, dst)
+
 def test_fct_collapse_many_to_one():
     res = fct_collapse(['a', 'b', 'c'], {'ab': ['a', 'b']})
     dst = Categorical(['ab', 'ab', 'c'], ['ab', 'c'])
