@@ -16,6 +16,12 @@ def _get_cat_order(x):
 
     return None
 
+def _maybe_upcast(fct_in, fct_out):
+    if isinstance(fct_in, pd.Series):
+        return pd.Series(fct_out)
+
+    return fct_out
+
 
 # fct_inorder, fct_infreq -----------------------------------------------------
 
@@ -194,7 +200,8 @@ def fct_reorder(fct, x, func = np.median, desc = False) -> pd.Categorical:
     # but that's okay, since pandas categoricals can't order the NA category
     ordered = s.groupby(level = 0).agg(func).sort_values(ascending = not desc)
 
-    return pd.Categorical(fct, categories=ordered.index)
+    out = pd.Categorical(fct, categories=ordered.index)
+    return _maybe_upcast(fct, out)
 
 
 # fct_recode ------------------------------------------------------------------
@@ -234,7 +241,7 @@ def fct_recode(fct, recat=None, **kwargs) -> pd.Categorical:
             )
 
     new_cats = {**recat, **kwargs} if recat else kwargs
-    return fct_collapse(fct, new_cats)
+    return _maybe_upcast(fct, fct_collapse(fct, new_cats))
 
 
 # fct_collapse ----------------------------------------------------------------
@@ -279,12 +286,14 @@ def fct_collapse(fct, recat, group_other = None) -> pd.Categorical:
 
     """
     if not isinstance(fct, pd.Categorical):
-        fct = pd.Categorical(fct)
+        new_fct = pd.Categorical(fct)
+    else:
+        new_fct = fct
 
     # each existing cat will map to a new one ----
     # need to know existing to new cat
     # need to know new cat to new code
-    cat_to_new = {k: None for k in fct.categories}
+    cat_to_new = {k: None for k in new_fct.categories}
     for new_name, v in recat.items():
         v = [v] if not np.ndim(v) else v
         for old_name in v:
@@ -324,9 +333,11 @@ def fct_collapse(fct, recat, group_other = None) -> pd.Categorical:
 
     # map old cats to new codes
     #remap_code = {old: new_cat_set[new] for old, new in cat_to_new.items()}
-    new_codes = old_code_to_new[fct.codes + 1]
+    new_codes = old_code_to_new[new_fct.codes + 1]
     new_cats = list(new_cat_set)
-    return pd.Categorical.from_codes(new_codes, new_cats)
+
+    out = pd.Categorical.from_codes(new_codes, new_cats)
+    return _maybe_upcast(fct, out)
 
 
 # fct_lump --------------------------------------------------------------------
@@ -365,7 +376,6 @@ def fct_lump(fct, n = None, prop = None, w = None, other_level = "Other", ties =
     ['a', 'a', 'b', 'b', 'Other', 'Other']
     Categories (3, object): ['a', 'b', 'Other']
         
-
     """
 
     if ties is not None:
@@ -375,7 +385,10 @@ def fct_lump(fct, n = None, prop = None, w = None, other_level = "Other", ties =
         raise NotImplementedError("Either n or prop must be specified")
 
     keep_cats = _fct_lump_n_cats(fct, w, other_level, ties, n = n, prop = prop)
-    return fct_collapse(fct, {k:k for k in keep_cats}, group_other = other_level)
+
+    out = fct_collapse(fct, {k:k for k in keep_cats}, group_other = other_level)
+    return _maybe_upcast(fct, out)
+
 
 def _fct_lump_n_cats(fct, w, other_level, ties, n = None, prop = None):
     # TODO: currently always selects n, even if ties
@@ -442,4 +455,5 @@ def fct_rev(fct) -> pd.Categorical:
 
     rev_levels = list(reversed(fct.categories))
 
-    return fct.reorder_categories(rev_levels)
+    out = fct.reorder_categories(rev_levels)
+    return _maybe_upcast(fct, out)
