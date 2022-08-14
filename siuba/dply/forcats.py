@@ -83,7 +83,9 @@ def fct_inorder(fct, ordered=None):
             categories = uniq.categories[uniq.dropna().codes]
             return pd.Categorical(fct, categories, ordered=ordered)
 
-        return pd.Categorical(fct, uniq, ordered=ordered)
+        # series in, so series out
+        cat = pd.Categorical(fct, uniq, ordered=ordered)
+        return pd.Series(cat)
 
     ser = pd.Series(fct)
     return pd.Categorical(fct, categories = ser.dropna().unique(), ordered=ordered)
@@ -137,7 +139,12 @@ def fct_infreq(fct, ordered=None):
         # Series sorts in descending frequency order
         ser = pd.Series(fct) if not isinstance(fct, pd.Series) else fct
         freq = ser.value_counts()
-        return pd.Categorical(ser, categories=freq.index, ordered=ordered)
+        cat = pd.Categorical(ser, categories=freq.index, ordered=ordered)
+
+        if isinstance(fct, pd.Series):
+            return pd.Series(cat)
+
+        return cat
 
 
 # fct_reorder -----------------------------------------------------------------

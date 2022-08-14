@@ -30,8 +30,8 @@ def test_fct_inorder(x, dst_categories):
 
     res2 = fct_inorder(pd.Series(x))
 
-    assert isinstance(res2, pd.Categorical)
-    assert_fct_equal(res2, dst)
+    assert isinstance(res2, pd.Series)
+    assert_fct_equal(res2.array, dst)
 
     res3 = fct_inorder(pd.Categorical(x))
 
@@ -57,8 +57,8 @@ def test_fct_infreq(x, dst_categories, skip_pd_v1_1):
 
     res2 = fct_infreq(pd.Series(x))
 
-    assert isinstance(res2, pd.Categorical)
-    assert_categorical_equal(res2, dst)
+    assert isinstance(res2, pd.Series)
+    assert_categorical_equal(res2.array, dst)
 
     res3 = fct_infreq(pd.Categorical(x))
 
