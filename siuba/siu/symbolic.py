@@ -1,10 +1,29 @@
 from functools import singledispatch
 
-from .calls import BINARY_OPS, UNARY_OPS, Call, BinaryOp, BinaryRightOp, MetaArg, UnaryOp, SliceOp, FuncArg
+from .calls import Call, BinaryOp, BinaryRightOp, MetaArg, UnaryOp, SliceOp, FuncArg
 from .format import Formatter
 
 # Symbolic
 # =============================================================================
+
+def create_binary_op(op_name, left_op = True):
+    def _binary_op(self, x):
+        if left_op:
+            node = BinaryOp(op_name, strip_symbolic(self), strip_symbolic(x))
+        else:
+            node = BinaryRightOp(op_name, strip_symbolic(self), strip_symbolic(x))
+
+        return self.__class__(node, ready_to_call = True)
+    return _binary_op
+
+def create_unary_op(op_name):
+    def _unary_op(self):
+        node = UnaryOp(op_name, strip_symbolic(self))
+
+        return self.__class__(node, ready_to_call = True)
+
+    return _unary_op
+
 
 class Symbolic(object):
     def __init__(self, source = None, ready_to_call = False):
@@ -17,6 +36,9 @@ class Symbolic(object):
 
     def __array_function__(self, func, types, args, kwargs):
         return array_function(self, func, types, *args, **kwargs)
+
+    # since we override __eq__, we must explicitly set the hash method back to default
+    __hash__ = object.__hash__
 
     # allowed methods ----
 
@@ -56,6 +78,24 @@ class Symbolic(object):
     def __op_invert(self):
         return Symbolic(UnaryOp('__invert__', self.__source), ready_to_call = True)
 
+    def __rshift__(self, x):
+
+        # Note that this and __rrshift__ are copied from Call
+        stripped = strip_symbolic(x)
+
+        if isinstance(stripped, Call):
+            lhs_call = self.__source
+            return Call._construct_pipe(MetaArg("_"), lhs_call, stripped)
+        # strip_symbolic(self)(x)
+        # x is a symbolic
+        raise NotImplementedError("Symbolic may only be used on right-hand side of >> operator.")
+
+    def __rrshift__(self, x):
+        if isinstance(x, (Symbolic, Call)):
+            raise NotImplementedError()
+
+        return strip_symbolic(self)(x)
+
 
     # banned methods ----
 
@@ -72,11 +112,54 @@ class Symbolic(object):
     def __repr__(self):
         return Formatter().format(self.__source)
 
+    # unary operators ----
+    # note that __invert__ is handled in a custom way above
+    __neg__ = create_unary_op("__neg__")
+    __pos__ = create_unary_op("__pos__")
+    __abs__ = create_unary_op("__abs__")
 
-def create_sym_call(source, *args, **kwargs):
+
+    # binary operators ----
+    __add__ = create_binary_op("__add__")
+    __sub__ = create_binary_op("__sub__")
+    __mul__ = create_binary_op("__mul__")
+    __matmul__ = create_binary_op("__matmul__")
+    __truediv__ = create_binary_op("__truediv__")
+    __floordiv__ = create_binary_op("__floordiv__")
+    __mod__ = create_binary_op("__mod__")
+    __divmod__ = create_binary_op("__divmod__")
+    __pow__ = create_binary_op("__pow__")
+    __lshift__ = create_binary_op("__lshift__")
+    __and__ = create_binary_op("__and__")
+    __xor__ = create_binary_op("__xor__")
+    __or__ = create_binary_op("__or__")
+    __gt__ = create_binary_op("__gt__")
+    __lt__ = create_binary_op("__lt__")
+    __eq__ = create_binary_op("__eq__")
+    __ne__ = create_binary_op("__ne__")
+    __ge__ = create_binary_op("__ge__")
+    __le__ = create_binary_op("__le__")
+
+
+    __radd__ = create_binary_op("__radd__", False)
+    __rsub__ = create_binary_op("__rsub__", False)
+    __rmul__ = create_binary_op("__rmul__", False)
+    __rmatmul__ = create_binary_op("__rmatmul__", False)
+    __rtruediv__ = create_binary_op("__rtruediv__", False)
+    __rfloordiv__ = create_binary_op("__rfloordiv__", False)
+    __rmod__ = create_binary_op("__rmod__", False)
+    __rdivmod__ = create_binary_op("__rdivmod__", False)
+    __rpow__ = create_binary_op("__rpow__", False)
+    __rlshift__ = create_binary_op("__rlshift__", False)
+    __rand__ = create_binary_op("__rand__", False)
+    __rxor__ = create_binary_op("__rxor__", False)
+    __ror__ = create_binary_op("__ror__", False)
+
+
+def create_sym_call(__source, *args, **kwargs):
     return Symbolic(Call(
             "__call__",
-            strip_symbolic(source),
+            strip_symbolic(__source),
             *map(strip_symbolic, args),
             **{k: strip_symbolic(v) for k,v in kwargs.items()}
             ),
@@ -173,33 +256,4 @@ def _array_ufunc_sym(self, ufunc, method, *inputs, **kwargs):
 
 # Do some gnarly method setting on Symbolic -----------------------------------
 # =============================================================================
-
-def create_binary_op(op_name, left_op = True):
-    def _binary_op(self, x):
-        if left_op:
-            node = BinaryOp(op_name, strip_symbolic(self), strip_symbolic(x))
-        else:
-            node = BinaryRightOp(op_name, strip_symbolic(self), strip_symbolic(x))
-
-        return Symbolic(node, ready_to_call = True)
-    return _binary_op
-
-def create_unary_op(op_name):
-    def _unary_op(self):
-        node = UnaryOp(op_name, strip_symbolic(self))
-
-        return Symbolic(node, ready_to_call = True)
-
-    return _unary_op
-
-for k, v in BINARY_OPS.items():
-    if k in {"__getattr__", "__getitem__"}: continue
-    rop = k.replace("__", "__r", 1)
-    setattr(Symbolic, k, create_binary_op(k))
-    setattr(Symbolic, rop, create_binary_op(rop, left_op = False))
-
-for k, v in UNARY_OPS.items():
-    if k != "__invert__":
-        setattr(Symbolic, k, create_unary_op(k))
-
 
