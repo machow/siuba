@@ -37,6 +37,8 @@ from .utils import (
     _sql_column_collection,
     _sql_add_columns,
     _sql_with_only_columns,
+    _sql_simplify_select,
+    _use_simple_names,
     MockConnection
 )
 
@@ -431,23 +433,10 @@ sql_raw = sql.literal_column
 
 # show query -----------
 
-from sqlalchemy.ext.compiler import compiles, deregister
-from contextlib import contextmanager
-
-@contextmanager
-def use_simple_names():
-    get_col_name = lambda el, *args, **kwargs: str(el.element.name)
-    try:
-        yield compiles(sql.compiler._CompileLabel)(get_col_name)
-    except:
-        pass
-    finally:
-        deregister(sql.compiler._CompileLabel)
-
 @show_query.register(LazyTbl)
-def _show_query(tbl, simplify = False):
-    query = tbl.last_op #if not simplify else 
-    compile_query = lambda: query.compile(
+def _show_query(tbl, simplify = False, return_table = True):
+    #query = tbl.last_op #if not simplify else 
+    compile_query = lambda query: query.compile(
                 dialect = tbl.source.dialect,
                 compile_kwargs = {"literal_binds": True}
             )
@@ -455,13 +444,20 @@ def _show_query(tbl, simplify = False):
 
     if simplify:
         # try to strip table names and labels where unnecessary
-        with use_simple_names():
-            print(compile_query())
+        simple_sel = _sql_simplify_select(tbl.last_op)
+
+        with _use_simple_names():
+            explained = compile_query(simple_sel)
     else:
         # use a much more verbose query
-        print(compile_query())
+        explained = compile_query(tbl.last_op)
 
-    return tbl
+    if return_table:
+        print(str(explained))
+        return tbl
+
+    return str(explained)
+
 
 
 # collect ----------
