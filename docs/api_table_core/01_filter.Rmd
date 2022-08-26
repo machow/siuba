@@ -64,7 +64,7 @@ Otherwise, python will group the operation like `_.cyl == (4 | _.gear) == 5`.
 
 ### Dropping NAs
 
-As with most subsetting in pandas, when a condition evalutes to an `NA` value, the row is automatically excluded. This is different from pandas indexing, where `NA` values produce errors.
+As with most subsetting in pandas, when a condition evaluates to an `NA` value, the row is automatically excluded. This is different from pandas indexing, where `NA` values produce errors.
 
 ```{python}
 df = pd.DataFrame({

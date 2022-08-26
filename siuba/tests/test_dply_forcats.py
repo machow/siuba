@@ -1,4 +1,7 @@
-from siuba.dply.forcats import fct_reorder, fct_recode, fct_collapse, fct_lump
+import pandas as pd
+import pytest
+
+from siuba.dply.forcats import fct_reorder, fct_recode, fct_collapse, fct_lump, fct_inorder, fct_infreq
 from pandas import Categorical
 
 try:
@@ -11,6 +14,58 @@ except ImportError:
 def assert_fct_equal(x, y):
     return assert_categorical_equal(x,  y)
 
+# fct_inorder -----------------------------------------------------------------
+
+@pytest.mark.parametrize("x, dst_categories", [
+    (["c", "a", "c", "b", "b"], ["c", "a", "b"]),
+    (["c", "a", "c", "b", "b", None], ["c", "a", "b"])
+])
+def test_fct_inorder(x, dst_categories):
+    dst = pd.Categorical(x, categories=dst_categories)
+
+    res1 = fct_inorder(x)
+
+    assert isinstance(res1, pd.Categorical)
+    assert_categorical_equal(res1, dst)
+
+    res2 = fct_inorder(pd.Series(x))
+
+    assert isinstance(res2, pd.Series)
+    assert_fct_equal(res2.array, dst)
+
+    res3 = fct_inorder(pd.Categorical(x))
+
+    assert isinstance(res3, pd.Categorical)
+    assert_fct_equal(res3, dst)
+
+
+@pytest.mark.parametrize("x, dst_categories, skip_pd_v1_1", [
+    (["c", "c", "b", "c", "a", "a"], ["c", "a", "b"], False),              # no ties
+    (["c", "c", "b", "c", "a", "a", "a"], ["c", "a", "b"], True),          # ties
+    (["c", "c", "b", "c", "a", "a", "a", None], ["c", "a", "b"], False)    # None
+])
+def test_fct_infreq(x, dst_categories, skip_pd_v1_1):
+    if pd.__version__.startswith("1.1."):
+        pytest.skip()
+
+    dst = pd.Categorical(x, categories=dst_categories)
+
+    res1 = fct_infreq(x)
+
+    assert isinstance(res1, pd.Categorical)
+    assert_categorical_equal(res1, dst)
+
+    res2 = fct_infreq(pd.Series(x))
+
+    assert isinstance(res2, pd.Series)
+    assert_categorical_equal(res2.array, dst)
+
+    res3 = fct_infreq(pd.Categorical(x))
+
+    assert isinstance(res3, pd.Categorical)
+    assert_categorical_equal(res3, dst)
+
+
 
 # fct_reorder -----------------------------------------------------------------
 
@@ -20,12 +75,25 @@ def test_fct_reorder_simple():
 
     assert_fct_equal(res, dst)
     
+def test_fct_reorder_simple_upcast():
+    res = fct_reorder(pd.Series(['a', 'a', 'b']), [4, 3, 2])
+    dst = Categorical(['a', 'a', 'b'], ['b', 'a'])
+
+    assert isinstance(res, pd.Series)
+    assert_fct_equal(res.array, dst)
 
 def test_fct_reorder_desc():
     res = fct_reorder(['a', 'a', 'b'], [4, 3, 2], desc = True)
     dst = Categorical(['a', 'a', 'b'], ['a', 'b'])
 
     assert_fct_equal(res, dst)
+
+def test_fct_reorder_desc_upcast():
+    res = fct_reorder(pd.Series(['a', 'a', 'b']), [4, 3, 2], desc = True)
+    dst = Categorical(['a', 'a', 'b'], ['a', 'b'])
+
+    assert isinstance(res, pd.Series)
+    assert_fct_equal(res.array, dst)
 
 def test_fct_reorder_custom_func():
     import numpy as np
@@ -50,6 +118,14 @@ def test_fct_recode_simple():
 
     assert_fct_equal(res, dst)
 
+def test_fct_recode_simple_upcast():
+    ser = pd.Series(['a', 'b', 'c'])
+    res = fct_recode(ser, z = 'c')
+    dst = Categorical(['a', 'b', 'z'], ['a', 'b', 'z'])
+
+    assert isinstance(ser, pd.Series)
+    assert_fct_equal(res.array, dst)
+
 
 # fct_collapse ----------------------------------------------------------------
 
@@ -59,9 +135,22 @@ def test_fct_collapse_simple():
 
     assert_fct_equal(res, dst)
 
+def test_fct_collapse_simple_upcast():
+    res = fct_collapse(pd.Series(['a', 'b', 'c']), {'x': 'a'})
+    dst = Categorical(['x', 'b', 'c'], ['x', 'b', 'c'])
+
+    assert isinstance(res, pd.Series)
+    assert_fct_equal(res.array, dst)
+
 def test_fct_collapse_others():
     res = fct_collapse(['a', 'b', 'c'], {'x': 'a'}, group_other = 'others')
     dst = Categorical(['x', 'others', 'others'], ['x', 'others'])
+
+    assert_fct_equal(res, dst)
+
+def test_fct_collapse_other_always_last():
+    res = fct_collapse(['a', 'b', 'c'], {'x': 'c'}, group_other = 'others')
+    dst = Categorical(['others', 'others', 'x'], ['x', 'others'])
 
     assert_fct_equal(res, dst)
 
@@ -79,6 +168,13 @@ def test_fct_lump_n():
     dst = Categorical(['a', 'a', 'Other', 'Other'], ['a', 'Other'])
 
     assert_fct_equal(res, dst)
+
+def test_fct_lump_n_upcast():
+    res = fct_lump(pd.Series(['a', 'a', 'b', 'c']), n = 1)
+    dst = Categorical(['a', 'a', 'Other', 'Other'], ['a', 'Other'])
+
+    assert isinstance(res, pd.Series)
+    assert_fct_equal(res.array, dst)
 
 def test_fct_lump_prop():
     res = fct_lump(['a', 'a', 'b', 'b', 'c', 'd'], prop = .2)

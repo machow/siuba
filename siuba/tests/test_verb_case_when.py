@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 
 from siuba.dply.verbs import case_when
+from pandas.testing import assert_series_equal
 from numpy.testing import assert_equal
 from siuba.siu import _
 
@@ -29,10 +30,9 @@ def data():
     #(np.array([True, True, False]), 0, [0, 0, None])
     ])
 def test_case_when_single_cond(k, v, res, data):
-    arr_res = np.array(res)
     out = case_when(data, {k: v})
 
-    assert_equal(out, arr_res)
+    assert_series_equal(out, pd.Series(res))
 
 
 def test_case_when_cond_order(data):
@@ -41,5 +41,5 @@ def test_case_when_cond_order(data):
         True               : 999
         })
 
-    assert_equal(out, np.array([0, 0, 999]))
+    assert_series_equal(out, pd.Series([0, 0, 999]))
 

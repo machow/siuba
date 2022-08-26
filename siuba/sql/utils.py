@@ -1,5 +1,7 @@
 import importlib
 
+from contextlib import contextmanager
+
 try:
     # once we drop sqlalchemy 1.2, can use create_mock_engine function
     from sqlalchemy.engine.mock import MockConnection
@@ -135,3 +137,66 @@ def _sql_with_only_columns(select, columns):
         return select.with_only_columns(columns)
 
     return select.with_only_columns(*columns)
+
+
+# Simplify option in show_query -----------------------------------------------
+
+def _sql_refresh(el):
+    f_refresh = getattr(
+        el,
+        "_reset_memoizations",
+        getattr(el, "_reset_exported", None)
+    )
+
+    f_refresh()
+
+
+def _sql_simplify_select(select):
+    from sqlalchemy import sql
+    from sqlalchemy.sql.visitors import traverse, cloned_traverse
+
+    def simplify_sel(sel):
+
+        if isinstance(sel, sql.Select) and len(sel.froms) == 1:
+            child = sel.froms[0]
+
+            # technically should be an ordered set
+            crnt_cols = set(sel.inner_columns)
+            child_cols = set(child.columns)
+
+            if len(child_cols - crnt_cols) == 0:
+                remaining = list(crnt_cols - child_cols)
+
+                star = sql.text("*")
+                star._from_objects = (child,)
+
+                sel._raw_columns = [star, *remaining]
+                _sql_refresh(sel)
+
+    # TODO: find simpler way to clone an element. We cannot use the visitors
+    # argument of cloned_traverse, since it visits the inner-most element first.
+    clone_el = cloned_traverse(select, {}, {})
+
+    # modify in-place
+    traverse(clone_el, {}, {"select": simplify_sel})
+
+    return clone_el
+
+
+@contextmanager
+def _use_simple_names():
+    from sqlalchemy import sql
+    from sqlalchemy.ext.compiler import compiles, deregister
+
+    get_col_name = lambda el, *args, **kwargs: str(el.element.name)
+    get_lab_name = lambda el, *args, **kwargs: str(el.element.name)
+    get_col_name = lambda el, *args, **kwargs: str(el.name)
+    compiles(sql.compiler._CompileLabel)(get_lab_name)
+    compiles(sql.elements.ColumnClause)(get_col_name)
+    compiles(sql.schema.Column)(get_col_name)
+    try:
+        yield 1
+    except:
+        pass
+    finally:
+        deregister(sql.compiler._CompileLabel)
