@@ -11,6 +11,8 @@ from siuba.siu import (
     singledispatch2, pipe_no_args, Pipeable, pipe
     )
 
+from .tidyselect import var_create, var_select, Var
+
 DPLY_FUNCTIONS = (
         # Dply ----
         "group_by", "ungroup", 
@@ -366,153 +368,6 @@ def _transmute(__data, *args, **kwargs):
 
 
 # Select ======================================================================
-
-from collections import OrderedDict
-from itertools import chain
-
-class Var:
-    def __init__(self, name, negated = False, alias = None):
-        self.name = name
-        self.negated = negated
-        self.alias = alias
-
-    def __neg__(self):
-        return self.to_copy(negated = not self.negated)
-
-    def __eq__(self, x):
-        name = x.name if isinstance(x, Var) else x
-        return self.to_copy(name = name, negated = False, alias = self.name)
-
-    def __call__(self, *args, **kwargs):
-        call = Call('__call__',
-                    BinaryOp('__getattr__', MetaArg("_"), self.name),
-                    *args,
-                    **kwargs
-                    )
-
-        return self.to_copy(name = call)
-
-
-    def __repr__(self):
-        return "Var('{self.name}', negated = {self.negated}, alias = {self.alias})" \
-                    .format(self = self)
-
-    def __str__(self):
-        op = "-" if self.negated else ""
-        pref = self.alias + " = " if self.alias else ""
-        return "{pref}{op}{self.name}".format(pref = pref, op = op, self = self)
-
-    def to_copy(self, **kwargs):
-        return self.__class__(**{**self.__dict__, **kwargs})
-
-
-class VarList:
-    def __getattr__(self, x):
-        return Var(x)
-
-    def __getitem__(self, x):
-        return Var(x)
-
-
-def var_slice(colnames, x):
-    """Return indices in colnames corresponding to start and stop of slice."""
-    # TODO: produces behavior similar to df.loc[:, "V1":"V3"], but can reverse
-    # TODO: make DRY
-    # TODO: reverse not including end points
-    if isinstance(x.start, Var):
-        start_indx = (colnames == x.start.name).idxmax()
-    elif isinstance(x.start, str):
-        start_indx = (colnames == x.start).idxmax()
-    else:
-        start_indx = x.start or 0
-
-    if isinstance(x.stop, Var):
-        stop_indx = (colnames == x.stop.name).idxmax() + 1
-    elif isinstance(x.stop, str):
-        stop_indx = (colnames == x.stop).idxmax() + 1
-    else:
-        stop_indx = x.stop or len(colnames)
-
-    if start_indx > stop_indx:
-        return stop_indx, start_indx
-    else:
-        return start_indx, stop_indx
-
-def var_put_cols(name, var, cols):
-    if isinstance(name, list) and var.alias is not None:
-        raise Exception("Cannot assign name to multiple columns")
-    
-    names = [name] if not isinstance(name, list) else name
-
-    for name in names:
-        if var.negated:
-            if name in cols: cols.pop(name)
-        #elif name in cols: cols.move_to_end(name)
-        else: cols[name] = var.alias
-
-def flatten_var(var):
-    if isinstance(var, Var) and isinstance(var.name, (tuple, list)):
-        return [var.to_copy(name = x) for x in var.name]
-    
-    return [var]
-            
-
-
-
-def var_select(colnames, *args):
-    # TODO: don't erase named column if included again
-    colnames = colnames if isinstance(colnames, pd.Series) else pd.Series(colnames)
-    cols = OrderedDict()
-    everything = None
-
-    #flat_args = var_flatten(args)
-    all_vars = chain(*map(flatten_var, args))
-
-    # Add entries in pandas.rename style {"orig_name": "new_name"}
-    for arg in all_vars:
-        # strings are added directly
-        if isinstance(arg, str):
-            cols[arg] = None
-        # integers add colname at corresponding index
-        elif isinstance(arg, int):
-            cols[colnames[arg]] = None
-        # general var handling
-        elif isinstance(arg, Var):
-            # remove negated Vars, otherwise include them
-            if arg.negated and everything is None:
-                # first time using negation, apply an implicit everything
-                everything = True
-                cols.update((k, None) for k in colnames if k not in cols)
-
-            # slicing can refer to single, or range of columns
-            if isinstance(arg.name, slice):
-                start, stop = var_slice(colnames, arg.name)
-                for ii in range(start, stop):
-                    var_put_cols(colnames[ii], arg, cols)
-            # method calls like endswith()
-            elif callable(arg.name):
-                # TODO: not sure if this is a good idea...
-                #       basically proxies to pandas str methods (they must return bool array)
-                indx = arg.name(colnames.str)
-                var_put_cols(colnames[indx].tolist(), arg, cols)
-                #cols.update((x, None) for x in set(colnames[indx]) - set(cols))
-            else:
-                var_put_cols(arg.name, arg, cols)
-        else:
-            raise Exception("variable must be either a string or Var instance")
-
-    return cols
-
-def var_create(*args):
-    vl = VarList()
-    all_vars = []
-    for arg in args:
-        if callable(arg) and not isinstance(arg, Var):
-            all_vars.append(arg(vl))
-        else:
-            all_vars.append(arg)
-     
-    return all_vars
 
 @singledispatch2(DataFrame)
 def select(__data, *args, **kwargs):
@@ -902,11 +757,14 @@ def nest(__data, *args, key = "data"):
 
 @nest.register(DataFrameGroupBy)
 def _nest(__data, *args, key = "data"):
+    from siuba.dply.tidyselect import VarAnd
+
     grp_keys = [x.name for x in __data.grouper.groupings]
     if None in grp_keys:
         raise NotImplementedError("All groupby variables must be named when using nest")
 
-    return nest(__data.obj, -Var(grp_keys), *args, key = key)
+    sel_vars = var_create(*grp_keys)
+    return nest(__data.obj, -VarAnd(sel_vars), *args, key = key)
 
 
 
