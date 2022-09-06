@@ -51,26 +51,36 @@ def _get_series_dispatcher(f, x):
 
     raise TypeError("does not seem to be a period or datetime")
 
-DOCSTRING = """
+DOCSTRING = """\
     floor_date and ceil_date return dates rounded to nearest specified unit.
 
-    Args:
-        x: a DatetimeIndex, PeriodIndex, or their underlying arrays or elements.
-        units: a date or time unit for rounding (eg. "MS" rounds down or up to the start of a month)
-
-    Note:
-        For a full list of units run the following:
-        
-        :: 
-            from pandas.tseries.offsets import prefix_mapping
-        
-        Common time units include seconds (S), minute (T), hour (H), week (W). 
-        Some date units are month end (M), month start (MS), year start (AS)
-
-
+    These functions address limitations in pandas' round() method, which cannot
+    round down to, e.g., the month.
+    
+    Parameters
+    ----------
+    x:
+        a DatetimeIndex, PeriodIndex, or their underlying arrays or elements.
+    units:
+        a date or time unit for rounding (eg. "MS" rounds down or up to the start of a month)
+    
+    Notes
+    -----
+    
+    For a full list of units run the following:
+    
+        from pandas.tseries.offsets import prefix_mapping
+    
+    Common time units include seconds (S), minute (T), hour (H), week (W). 
+    Some date units are month end (M), month start (MS), year start (AS)
+    
+    
     The main feature of floor_date is that it works on things like Months, which is
     not supported in the floor method.
-
+    
+    Examples
+    --------
+    
     >>> import pandas as pd
     >>> a_date = "2020-02-02 02:02:02"
     >>> dti = pd.DatetimeIndex([a_date])
@@ -78,35 +88,35 @@ DOCSTRING = """
     Traceback (most recent call last):
     ...
     ValueError: <MonthBegin> is a non-fixed frequency
-
+    
     Month start will always go to the first day of a month.
-
+    
     >>> floor_date(dti, "MS") 
     DatetimeIndex(['2020-02-01'], dtype='datetime64[ns]', freq=None)
-
+    
     >>> ceil_date(dti, "MS")
     DatetimeIndex(['2020-03-01'], dtype='datetime64[ns]', freq=None)
-
+    
     On the other hand, here is month end.
     
     >>> floor_date(dti, "M") 
     DatetimeIndex(['2020-01-31'], dtype='datetime64[ns]', freq=None)
-
+    
     >>> ceil_date(dti, "M")
     DatetimeIndex(['2020-02-29'], dtype='datetime64[ns]', freq=None)
-
+    
     It also works on things supported by the Series.dt.floor method, like hours.
-
+    
     >>> floor_date(dti, "H")
     DatetimeIndex(['2020-02-02 02:00:00'], dtype='datetime64[ns]', freq=None)
-
+    
     You can also use it on other types, like a PeriodIndex
-
+    
     >>> per = pd.PeriodIndex([a_date], freq = "S")
     >>> floor_date(per, "M")
     PeriodIndex(['2020-02'], dtype='period[M]'...
-
-"""
+    
+    """
 
 # Create single dispatch functions --------------------------------------------
 
@@ -120,7 +130,10 @@ def ceil_date(x, unit = "S"):
     raise TypeError("ceil_date not implemented for class {}".format(type(x)))
 
 floor_date.__doc__ = DOCSTRING
+floor_date.__wrapped__.__doc__ = DOCSTRING
+
 ceil_date.__doc__  = DOCSTRING
+ceil_date.__wrapped__.__doc__ = DOCSTRING
 
 
 # Floor date ------------------------------------------------------------------

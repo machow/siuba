@@ -17,19 +17,21 @@ jobs:
       matrix:
         python-version: [3.7, 3.8]
         requirements: ['-r requirements.txt']
+        # unset doctests for earlier versions of python.
+        pytest_flags: ["-o addopts='' -m 'not bigquery and not snowflake'"]
         include:
           # historical requirements
           - name: "2020-mid dependencies"
             python-version: 3.8
             requirements: numpy~=1.19.1 pandas~=1.1.0 SQLAlchemy~=1.3.18 psycopg2~=2.8.5 PyMySQL==1.0.2
+            pytest_flags: "-o addopts='' -m 'not bigquery and not snowflake'"
           - name: "2021-mid dependencies"
             python-version: 3.8
             requirements: numpy~=1.19.1 pandas~=1.1.0 SQLAlchemy~=1.4.13 psycopg2~=2.8.5 PyMySQL==1.0.2
-            latest: true
+            pytest_flags: "-o addopts='' -m 'not bigquery and not snowflake'"
           - name: "2022-early dependencies"
             python-version: 3.8
             requirements: numpy~=1.22.0 pandas~=1.3.5 SQLAlchemy~=1.4.29 psycopg2-binary~=2.9.3 PyMySQL==1.0.2
-            latest: true
           - name: "2022-early dependencies"
             python-version: 3.10.1
             requirements: numpy~=1.22.0 pandas~=1.3.5 SQLAlchemy~=1.4.29 psycopg2-binary~=2.9.3 PyMySQL==1.0.2

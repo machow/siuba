@@ -135,6 +135,9 @@ def ordered_union(*args):
 @pipe_no_args
 @singledispatch2((DataFrame, DataFrameGroupBy))
 def collect(__data, *args, **kwargs):
+    """Retrieve data as a local DataFrame.
+    
+    """
     # simply return DataFrame, since requires no execution
     return __data
 
@@ -142,6 +145,18 @@ def collect(__data, *args, **kwargs):
 @pipe_no_args
 @singledispatch2((DataFrame, DataFrameGroupBy))
 def show_query(__data, simplify = False):
+    """Print the details of a query.
+
+    Parameters
+    ----------
+    __data:
+        A DataFrame of siuba.sql.LazyTbl.
+    simplify:
+        Whether to attempt to simplify the query.
+    **kwargs:
+        Additional arguments passed to specific implementations.
+
+    """
     print("No query to show for a DataFrame")
     return __data
 
@@ -152,17 +167,25 @@ def show_query(__data, simplify = False):
 def mutate(__data, **kwargs):
     """Assign new variables to a DataFrame, while keeping existing ones.
 
-    Args:
-        ___data: a DataFrame
-        **kwargs: new_col_name=value pairs, where value can be a function taking
-                  a single argument for the data being operated on.
+    Parameters
+    ----------
+    __data: pd.DataFrame
+    **kwargs:
+        new_col_name=value pairs, where value can be a function taking a singledispatch2
+        argument for the data being operated on.
+
+    See Also
+    --------
+    transmute : Returns a DataFrame with only the newly created columns.
 
     Examples
     --------
-
-    ::
-        from siuba.data import mtcars
-        mtcars >> mutate(cyl2 = _.cyl * 2, cyl4 = _.cyl2 * 2)
+    >>> from siuba import _, mutate, head
+    >>> from siuba.data import cars
+    >>> cars >> mutate(cyl2 = _.cyl * 2, cyl4 = _.cyl2 * 2) >> head(2)
+       cyl   mpg   hp  cyl2  cyl4
+    0    6  21.0  110    12    24
+    1    6  21.0  110    12    24
         
     """
     
@@ -195,6 +218,70 @@ def _mutate(__data, **kwargs):
 
 @singledispatch2((pd.DataFrame, DataFrameGroupBy))
 def group_by(__data, *args, add = False, **kwargs):
+    """Return a grouped DataFrame, using columns or expressions to define groups.
+
+    Any operations (e.g. summarize, mutate, filter) performed on grouped data
+    will be performed "by group". Use `ungroup()` to remove the groupings.
+
+    Parameters
+    ----------
+    __data:
+        The data being grouped.
+    *args:
+        Lazy expressions used to select the grouping columns. Currently, each
+        arg must refer to a single columns (e.g. _.cyl, _.mpg).
+    add: bool
+        If the data is already grouped, whether to add these groupings on top of those.
+    **kwargs:
+        Keyword arguments define new columns used to group the data.
+
+
+    Examples
+    --------
+
+    >>> from siuba import _, group_by, summarize, filter, mutate, head
+    >>> from siuba.data import cars
+
+    >>> by_cyl = cars >> group_by(_.cyl)
+
+    >>> by_cyl >> summarize(max_mpg = _.mpg.max(), max_hp = _.hp.max())
+       cyl  max_mpg  max_hp
+    0    4     33.9     113
+    1    6     21.4     175
+    2    8     19.2     335
+
+    >>> by_cyl >> filter(_.mpg == _.mpg.max())
+    (grouped data frame)
+        cyl   mpg   hp
+    3     6  21.4  110
+    19    4  33.9   65
+    24    8  19.2  175
+
+    >>> cars >> group_by(cyl2 = _.cyl + 1) >> head(2)
+    (grouped data frame)
+       cyl   mpg   hp  cyl2
+    0    6  21.0  110     7
+    1    6  21.0  110     7
+
+    Note that creating the new grouping column is always performed on ungrouped data.
+    Use an explicit mutate on the grouped data perform the operation within groups.
+
+    For example, the code below calls pd.cut on the mpg column, within each cyl group.
+
+    >>> from siuba.siu import call
+    >>> (cars
+    ...     >> group_by(_.cyl)
+    ...     >> mutate(mpg_bin = call(pd.cut, _.mpg, 3))
+    ...     >> group_by(_.mpg_bin, add=True)
+    ...     >> head(2)
+    ... )
+    (grouped data frame)
+       cyl   mpg   hp       mpg_bin
+    0    6  21.0  110  (20.2, 21.4]
+    1    6  21.0  110  (20.2, 21.4]
+    
+    """
+
     tmp_df = mutate(__data, **kwargs) if kwargs else __data
 
     by_vars = list(map(simple_varname, args))
@@ -213,6 +300,23 @@ def group_by(__data, *args, add = False, **kwargs):
 
 @singledispatch2((pd.DataFrame, DataFrameGroupBy))
 def ungroup(__data):
+    """Return an ungrouped DataFrame.
+
+    Parameters
+    ----------
+    __data:
+        The data being ungrouped.
+
+    Examples
+    --------
+    >>> from siuba import _, group_by, ungroup
+    >>> from siuba.data import cars
+
+    >>> g_cyl = cars.groupby("cyl")
+    >>> res1 = ungroup(g_cyl)
+
+    >>> res2 = cars >> group_by(_.cyl) >> ungroup()
+    """
     # TODO: can we somehow just restore the original df used to construct
     #       the groupby?
     if isinstance(__data, pd.DataFrame):
@@ -230,18 +334,34 @@ def ungroup(__data):
 def filter(__data, *args):
     """Keep rows where conditions are true.
 
-    Args:
-        ___data: a DataFrame
-        *args: conditions that must be met to keep a column. Multiple conditions
-               are combined using ``&``.
+    Parameters
+    ----------
+    __data:
+        The data being filtered.
+    *args:
+        conditions that must be met to keep a column. 
 
     Examples
     --------
 
-    ::
-        from siuba.data import mtcars
-        # keep rows where cyl is 4 and mpg is less than 25
-        mtcars >> filter(mtcars, _.cyl ==  4, _.mpg < 25) 
+    >>> from siuba import _, filter
+    >>> from siuba.data import cars
+    
+    Keep rows where cyl is 4 *and* mpg is less than 25.
+
+    >>> cars >> filter(_.cyl ==  4, _.mpg < 22) 
+        cyl   mpg   hp
+    20    4  21.5   97
+    31    4  21.4  109
+
+    Use `|` to represent an OR condition. For example, the code below keeps
+    rows where hp is over 250 *or* mpg is over 32.
+
+    >>> cars >> filter((_.hp > 300) | (_.mpg > 32))
+        cyl   mpg   hp
+    17    4  32.4   66
+    19    4  33.9   65
+    30    8  15.0  335
 
     """
     crnt_indx = True
@@ -280,25 +400,39 @@ def _filter(__data, *args):
 def summarize(__data, **kwargs):
     """Assign variables that are single number summaries of a DataFrame.
 
+    Grouped DataFrames will produce one row for each group. Otherwise, summarize
+    produces a DataFrame with a single row.
 
-    Args:
-        ___data: a DataFrame
-        **kwargs: new_col_name=value pairs, where value can be a function taking
-                  a single argument for the data being operated on.
-
-    Note
-    ----
-
-    Grouped DataFrames will produce one row for each group. Ungrouped DataFrames
-    will produce a single row.
+    Parameters
+    ----------
+    __data: a DataFrame
+        The data being summarized.
+    **kwargs:
+        new_col_name=value pairs, where value can be a function taking
+        a single argument for the data being operated on.
 
 
     Examples
     --------
+    >>> from siuba import _, group_by, summarize
+    >>> from siuba.data import cars
 
-    ::
-        from siuba.data import mtcars
-        mtcars >> summarize(mean = _.disp.mean(), n = n(_))
+    >>> cars >> summarize(avg = _.mpg.mean(), n = _.shape[0])
+             avg   n
+    0  20.090625  32
+
+    >>> g_cyl = cars >> group_by(_.cyl)
+    >>> g_cyl >> summarize(min = _.mpg.min())
+       cyl   min
+    0    4  21.4
+    1    6  17.8
+    2    8  10.4
+
+    >>> g_cyl >> summarize(mpg_std_err = _.mpg.std() / _.shape[0]**.5)
+       cyl  mpg_std_err
+    0    4     1.359764
+    1    6     0.549397
+    2    8     0.684202
         
     """
     results = {}
@@ -335,6 +469,41 @@ def _summarize(__data, **kwargs):
 
 @singledispatch2(DataFrame)
 def transmute(__data, *args, **kwargs):
+    """Assign new columns to a DataFrame, while dropping previous columns.
+
+    Parameters
+    ----------
+    __data:
+        The input data.
+    **kwargs:
+        Each keyword argument is the name of a new column, and an expression.
+
+    See Also
+    --------
+    mutate : Assign new columns, or modify existing ones.
+
+    Examples
+    --------
+
+    >>> from siuba import _, transmute, mutate, head
+    >>> from siuba.data import cars
+
+    Notice that transmute results in a table with only the new column:
+
+    >>> cars >> transmute(cyl2 = _.cyl + 1) >> head(2)
+       cyl2
+    0     7
+    1     7
+
+    By contrast, mutate adds the new column to the end of the table:
+
+    >>> cars >>  mutate(cyl2 = _.cyl + 1) >> head(2)
+       cyl   mpg   hp  cyl2
+    0    6  21.0  110     7
+    1    6  21.0  110     7
+    
+
+    """
     arg_vars = list(map(simple_varname, args))
     for ii, name in enumerate(arg_vars):
         if name is None: raise Exception("complex, unnamed expression at pos %s not supported"%ii)
@@ -371,6 +540,63 @@ def _transmute(__data, *args, **kwargs):
 
 @singledispatch2(DataFrame)
 def select(__data, *args, **kwargs):
+    """Select columns of a table to keep or drop (and optionally rename).
+
+    Parameters
+    ----------
+    __data:
+        The input table.
+    *args: 
+        An expression specifying columns to keep or drop. 
+    **kwargs:
+        Not implemented.
+
+    Examples
+    --------
+    >>> from siuba import _, select
+    >>> from siuba.data import cars
+
+    >>> small_cars = cars.head(1)
+    >>> small_cars
+       cyl   mpg   hp
+    0    6  21.0  110
+
+    You can refer to columns by name or position.
+
+    >>> small_cars >> select(_.cyl, _[2])
+       cyl   hp
+    0    6  110
+
+    Use a `~` sign to exclude a column.
+
+    >>> small_cars >> select(~_.cyl)
+        mpg   hp
+    0  21.0  110
+
+    You can use any methods you'd find on the .columns.str accessor:
+
+    >>> small_cars.columns.str.contains("p")
+    array([False,  True,  True])
+
+    >>> small_cars >> select(_.contains("p"))
+        mpg   hp
+    0  21.0  110
+
+    Use a slice to select a range of columns:
+
+    >>> small_cars >> select(_[0:2])
+       cyl   mpg
+    0    6  21.0
+
+    Multiple expressions can be combined using _[a, b, c] syntax. This is useful
+    for dropping a complex set of matches.
+
+    >>> small_cars >> select(~_[_.startswith("c"), -1])
+        mpg
+    0  21.0
+
+    """
+
     if kwargs:
         raise NotImplementedError(
                 "Using kwargs in select not currently supported. "
@@ -394,6 +620,33 @@ def _select(__data, *args, **kwargs):
 
 @singledispatch2(DataFrame)
 def rename(__data, **kwargs):
+    """Rename columns of a table.
+
+    Parameters
+    ----------
+    __data:
+        The input table.
+    **kwargs:
+        Keyword arguments of the form new_name = _.old_name, or new_name = "old_name".
+
+    Examples
+    --------
+
+    >>> import pandas as pd
+    >>> from siuba import _, rename, select
+
+    >>> df = pd.DataFrame({"zzz": [1], "b": [2]})
+    >>> df >> rename(a = _.zzz)
+       a  b
+    0  1  2
+
+    Note that this is equivalent to this select code:
+
+    >>> df >> select(_.a == _.zzz, _.b)
+       a  b
+    0  1  2
+
+    """
     # TODO: allow names with spaces, etc..
     col_names = {simple_varname(v):k for k,v in kwargs.items()}
     if None in col_names:
@@ -420,6 +673,61 @@ def _call_strip_ascending(f):
 
 @singledispatch2(DataFrame)
 def arrange(__data, *args):
+    """Re-order the rows of a DataFrame using the values of specified columns.
+
+    Parameters
+    ----------
+    __data:
+        The input table.
+    *args:
+        Columns or expressions used to sort the rows.
+
+    Examples
+    --------
+
+    >>> import pandas as pd
+    >>> from siuba import _, arrange, mutate
+
+    >>> df = pd.DataFrame({"x": [2, 1, 1], "y": ["aa", "b", "aa"]})
+    >>> df
+       x   y
+    0  2  aa
+    1  1   b
+    2  1  aa
+
+    Arrange sorts on the first argument, then the second, etc..
+
+    >>> df >> arrange(_.x, _.y)
+       x   y
+    2  1  aa
+    1  1   b
+    0  2  aa
+
+    Use a minus sign (`-`) to sort is descending order.
+
+    >>> df >> arrange(-_.x)
+       x   y
+    0  2  aa
+    1  1   b
+    2  1  aa
+
+    Note that arrange can sort on complex expressions:
+
+    >>> df >> arrange(-_.y.str.len())
+       x   y
+    0  2  aa
+    2  1  aa
+    1  1   b
+
+    The case above is equivalent to running a mutate before arrange:
+
+    >>> df >> mutate(res = -_.y.str.len()) >> arrange(_.res)
+       x   y  res
+    0  2  aa   -2
+    2  1  aa   -2
+    1  1   b   -1
+
+    """
     # TODO:
     #   - add arguments to pass to sort_values (e.g. ascending, kind)
     # 
@@ -481,6 +789,47 @@ def _arrange(__data, *args):
 
 @singledispatch2(DataFrame)
 def distinct(__data, *args, _keep_all = False, **kwargs):
+    """Keep only distinct (unique) rows from a table.
+
+    Parameters
+    ----------
+    __data:
+        The input data.
+    *args:
+        Columns to use when determining which rows are unique.
+    _keep_all:
+        Whether to keep all columns of the original data, not just *args.
+    **kwargs:
+        If specified, arguments passed to the verb mutate(), and then being used
+        in distinct().
+
+    See Also
+    --------
+    count : keep distinct rows, and count their number of observations.
+
+    Examples
+    --------
+    >>> from siuba import _, distinct, select
+    >>> from siuba.data import penguins
+
+    >>> penguins >> distinct(_.species, _.island)
+         species     island
+    0     Adelie  Torgersen
+    1     Adelie     Biscoe
+    2     Adelie      Dream
+    3     Gentoo     Biscoe
+    4  Chinstrap      Dream
+
+    Use _keep_all=True, to keep all columns in each distinct row. This lets you
+    peak at the values of the first unique row.
+
+    >>> small_penguins = penguins >> select(_[:4])
+    >>> small_penguins >> distinct(_.species, _keep_all = True)
+         species     island  bill_length_mm  bill_depth_mm
+    0     Adelie  Torgersen            39.1           18.7
+    1     Gentoo     Biscoe            46.1           13.2
+    2  Chinstrap      Dream            46.5           17.9
+    """
     # using dict as ordered set
     cols = {simple_varname(x): True for x in args}
     if None in cols:
@@ -509,43 +858,57 @@ def _distinct(__data, *args, _keep_all = False, **kwargs):
 # if_else
 # TODO: move to vector.py
 @singledispatch
-def if_else(__data, *args, **kwargs):
+def if_else(condition, true, false):
     """
-    Example:
-        >>> ser1 = pd.Series([1,2,3])
-        >>> if_else(ser1 > 2, np.nan, ser1)
-        0    1.0
-        1    2.0
-        2    NaN
-        dtype: float64
+    Parameters
+    ----------
+    condition:
+        Logical vector (or lazy expression).
+    true:
+        Values to be used when condition is True.
+    false:
+        Values to be used when condition is False.
 
-        >>> from siuba import _
-        >>> f = if_else(_ < 2, _, 2)
-        >>> f(ser1)
-        0    1
-        1    2
-        2    2
-        dtype: int64
+    See Also
+    --------
+    case_when : Generalized if_else, for handling many cases.
+        
+    Examples
+    --------
+    >>> ser1 = pd.Series([1,2,3])
+    >>> if_else(ser1 > 2, np.nan, ser1)
+    0    1.0
+    1    2.0
+    2    NaN
+    dtype: float64
 
-        >>> import numpy as np
-        >>> ser2 = pd.Series(['NA', 'a', 'b'])
-        >>> if_else(ser2 == 'NA', np.nan, ser2)
-        0    NaN
-        1      a
-        2      b
-        dtype: object
+    >>> from siuba import _
+    >>> f = if_else(_ < 2, _, 2)
+    >>> f(ser1)
+    0    1
+    1    2
+    2    2
+    dtype: int64
+
+    >>> import numpy as np
+    >>> ser2 = pd.Series(['NA', 'a', 'b'])
+    >>> if_else(ser2 == 'NA', np.nan, ser2)
+    0    NaN
+    1      a
+    2      b
+    dtype: object
 
     """
-    raise_type_error(__data)
+    raise_type_error(condition)
 
 @if_else.register(Call)
 @if_else.register(Symbolic)
-def _if_else(__data, *args, **kwargs):
-    return create_sym_call(if_else, __data, *args, **kwargs)
+def _if_else(condition, true, false):
+    return create_sym_call(if_else, condition, true, false)
 
 @if_else.register(pd.Series)
-def _if_else(cond, true_vals, false_vals):
-    result = np.where(cond.fillna(False), true_vals, false_vals)
+def _if_else(condition, true, false):
+    result = np.where(condition.fillna(False), true, false)
 
     return pd.Series(result)
 
@@ -570,7 +933,46 @@ def _val_call(call, data, n, indx = None):
 
 
 @singledispatch2((pd.DataFrame,pd.Series))
-def case_when(__data, cases):
+def case_when(__data, cases: dict):
+    """Generalized, vectorized if statement.
+
+    Parameters
+    ----------
+    __data:
+        The input data.
+    cases: dict
+        A mapping of condition : value.
+
+    See Also
+    --------
+    if_else : Handles the special case of two conditions.
+        
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> from siuba import _, case_when
+
+    >>> df = pd.DataFrame({"x": [1, 2, 3]})
+    >>> case_when(df, {_.x == 1: "one", _.x == 2: "two"})
+    0     one
+    1     two
+    2    None
+    dtype: object
+
+    >>> df >> case_when({_.x == 1: "one", _.x == 2: "two"})
+    0     one
+    1     two
+    2    None
+    dtype: object
+
+    >>> df >> case_when({_.x == 1: "one", _.x == 2: "two", True: "other"})
+    0      one
+    1      two
+    2    other
+    dtype: object
+
+
+    """
     if isinstance(cases, Call):
         cases = cases(__data)
     # TODO: handle when receive list of (k,v) pairs for py < 3.5 compat?
@@ -617,14 +1019,50 @@ def _count_group(data, *args):
 
 @singledispatch2((pd.DataFrame, DataFrameGroupBy))
 def count(__data, *args, wt = None, sort = False, **kwargs):
-    """Return the number of rows for each grouping of data.
+    """Summarize data with the number of rows for each grouping of data.
 
-    Args:
-        __data: a DataFrame
-        *args: the names of columns to be used for grouping. Passed to group_by.
-        wt: the name of a column to use as a weighted for each row.
-        sort: whether to sort the results in descending order.
-        **kwargs: creates a new named column, and uses for grouping. Passed to group_by.
+    Parameters
+    ----------
+    __data:
+        A DataFrame.
+    *args:
+        The names of columns to be used for grouping. Passed to group_by.
+    wt:
+        The name of a column to use as a weighted for each row.
+    sort:
+        Whether to sort the results in descending order.
+    **kwargs:
+        Creates a new named column, and uses for grouping. Passed to group_by.
+
+    Examples
+    --------
+
+    >>> from siuba import _, count, group_by, summarize, arrange
+    >>> from siuba.data import mtcars
+
+    >>> count(mtcars, _.cyl, high_mpg = _.mpg > 30)
+       cyl  high_mpg   n
+    0    4     False   7
+    1    4      True   4
+    2    6     False   7
+    3    8     False  14
+
+    Use sort to order results by number of observations (in descending order).
+
+    >>> count(mtcars, _.cyl, sort=True)
+       cyl   n
+    0    8  14
+    1    4  11
+    2    6   7
+
+    count is equivalent to doing a grouped summarize:
+
+    >>> mtcars >> group_by(_.cyl) >> summarize(n = _.shape[0]) >> arrange(-_.n)
+       cyl   n
+    2    8  14
+    0    4  11
+    1    6   7
+
 
     """
     no_grouping_vars = not args and not kwargs and isinstance(__data, pd.DataFrame)
@@ -665,6 +1103,53 @@ def count(__data, *args, wt = None, sort = False, **kwargs):
 
 @singledispatch2(pd.DataFrame)
 def add_count(__data, *args, wt = None, sort = False, **kwargs):
+    """Add a column that is the number of observations for each grouping of data.
+
+    Note that this function is similar to count(), but does not aggregate. It's
+    useful combined with filter().
+
+    Parameters
+    ----------
+    __data:
+        A DataFrame.
+    *args:
+        The names of columns to be used for grouping. Passed to group_by.
+    wt:
+        The name of a column to use as a weighted for each row.
+    sort:
+        Whether to sort the results in descending order.
+    **kwargs:
+        Creates a new named column, and uses for grouping. Passed to group_by.
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> from siuba import _, add_count, group_by, ungroup, mutate
+    >>> from siuba.data import mtcars
+
+    >>> df = pd.DataFrame({"x": ["a", "a", "b"], "y": [1, 2, 3]})
+    >>> df >> add_count(_.x)
+       x  y  n
+    0  a  1  2
+    1  a  2  2
+    2  b  3  1
+
+    This is useful if you want to see data associated with some count:
+
+    >>> df >> add_count(_.x) >> filter(_.n == 1)
+       x  y  n
+    2  b  3  1
+
+    Note that add_count is equivalent to a grouped mutate:
+
+    >>> df >> group_by(_.x) >> mutate(n = _.shape[0]) >> ungroup()
+       x  y  n
+    0  a  1  2
+    1  a  2  2
+    2  b  3  1
+
+
+    """
     counts = count(__data, *args, wt = wt, sort = sort, **kwargs)
 
     on = list(counts.columns)[:-1]
@@ -712,18 +1197,32 @@ def nest(__data, *args, key = "data"):
     """Nest columns within a DataFrame.
     
 
-    Args:
-        ___data: a DataFrame
-        *args: the names of columns to be nested. May use any syntax used by
-               the ``select`` function.
-        key: the name of the column that will hold the nested columns.
+    Parameters
+    ----------
+    __data:
+        A DataFrame.
+    *args:
+        The names of columns to be nested. May use any syntax used by the
+        `select` function.
+    key:
+        The name of the column that will hold the nested columns.
 
     Examples
     --------
 
-    ::
-        from siuba.data import mtcars
-        mtcars >> nest(-_.cyl)
+    >>> from siuba import _, nest
+    >>> from siuba.data import cars
+    >>> nested_cars = cars >> nest(-_.cyl)
+
+    Note that pandas with nested DataFrames looks okay in juypter notebooks,
+    but has a weird representation in the IPython console, so the example below
+    shows that each entry in the data column is a DataFrame.
+
+    >>> nested_cars.shape
+    (3, 2)
+
+    >>> type(nested_cars.data[0])
+    <class 'pandas.core.frame.DataFrame'>
         
     """
     # TODO: copied from select function
@@ -775,17 +1274,23 @@ def _nest(__data, *args, key = "data"):
 def unnest(__data, key = "data"):
     """Unnest a column holding nested data (e.g. Series of lists or DataFrames).
     
-    Args:
-        ___data: a DataFrame
-        key: the name of the column to be unnested.
+    Parameters
+    ----------
+    ___data:
+        A DataFrame.
+    key:
+        The name of the column to be unnested.
 
     Examples
     --------
 
-    ::
-        import pandas as pd
-        df = pd.DataFrame({'id': [1,2], 'data': [['a', 'b'], ['c', 'd']]})
-        df >> unnest()
+    >>> import pandas as pd
+    >>> df = pd.DataFrame({'id': [1,2], 'data': [['a', 'b'], ['c']]})
+    >>> df >> unnest()
+       id data
+    0   1    a
+    1   1    b
+    2   2    c
         
     """
     # TODO: currently only takes key, not expressions
@@ -820,6 +1325,109 @@ from pandas.core.reshape.merge import _MergeOperation
 # TODO: will need to use multiple dispatch
 @singledispatch2(pd.DataFrame)
 def join(left, right, on = None, how = None, *args, by = None, **kwargs):
+    """Join two tables together, by matching on specified columns.
+
+    The functions inner_join, left_join, right_join, and full_join are provided
+    as wrappers around join, and are used in the examples.
+
+    Parameters
+    ----------
+    left :
+        The left-hand table.
+    right :
+        The right-hand table.
+    on :
+        How to match them. Note that the keyword "by" can also be used for this
+        parameter, in order to support compatibility with dplyr.
+    how :
+        The type of join to perform (inner, full, left, right).
+    *args:
+        Additional postition arguments. Currently not supported.
+    **kwargs:
+        Additional keyword arguments. Currently not supported.
+
+
+    Returns
+    -------
+    pd.DataFrame
+
+    Examples
+    --------
+
+    >>> from siuba import _, inner_join, left_join, full_join, right_join
+    >>> from siuba.data import band_members, band_instruments, band_instruments2
+    >>> band_members
+       name     band
+    0  Mick   Stones
+    1  John  Beatles
+    2  Paul  Beatles
+
+    >>> band_instruments
+        name   plays
+    0   John  guitar
+    1   Paul    bass
+    2  Keith  guitar
+
+    Notice that above, only John and Paul have entries for band instruments.
+    This means that they will be the only two rows in the inner_join result:
+
+    >>> band_members >> inner_join(_, band_instruments)
+       name     band   plays
+    0  John  Beatles  guitar
+    1  Paul  Beatles    bass
+
+    A left join ensures all original rows of the left hand data are included.
+
+    >>> band_members >> left_join(_, band_instruments)
+       name     band   plays
+    0  Mick   Stones     NaN
+    1  John  Beatles  guitar
+    2  Paul  Beatles    bass
+
+    A full join is similar, but ensures all rows of both data are included.
+
+    >>> band_members >> full_join(_, band_instruments)
+        name     band   plays
+    0   Mick   Stones     NaN
+    1   John  Beatles  guitar
+    2   Paul  Beatles    bass
+    3  Keith      NaN  guitar
+
+    You can explicilty specify columns to join on using the "by" argument:
+
+    >>> band_members >> inner_join(_, band_instruments, by = "name")
+       n...
+
+    Use a dictionary for the by argument, to match up columns with different names:
+
+    >>> band_members >> full_join(_, band_instruments2, {"name": "artist"})
+       n...
+ 
+    Joins create a new row for each pair of matches. For example, the value 1
+    is in two rows on the left, and 2 rows on the right so 4 rows will be created.
+
+    >>> df1 = pd.DataFrame({"x": [1, 1, 3]})
+    >>> df2 = pd.DataFrame({"x": [1, 1, 2], "y": ["first", "second", "third"]})
+    >>> df1 >> left_join(_, df2)
+       x       y
+    0  1   first
+    1  1  second
+    2  1   first
+    3  1  second
+    4  3     NaN
+
+    Missing values count as matches to eachother by default:
+
+
+    >>> df3 = pd.DataFrame({"x": [1, None], "y": 2})
+    >>> df4 = pd.DataFrame({"x": [1, None], "z": 3})
+    >>> left_join(df3, df4)
+         x  y  z
+    0  1.0  2  3
+    1  NaN  2  3
+
+    """
+
     if not isinstance(right, DataFrame):
         raise Exception("right hand table must be a DataFrame")
     if how is None:
@@ -849,6 +1457,41 @@ def _join(left, right, on = None, how = None):
 
 @singledispatch2(pd.DataFrame)
 def semi_join(left, right = None, on = None):
+    """Return the left table with every row that would be kept in an inner join.
+
+    Parameters
+    ----------
+    left :
+        The left-hand table.
+    right :
+        The right-hand table.
+    on :
+        How to match them. By default it uses matches all columns with the same
+        name across the two tables.
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> from siuba import _, semi_join, anti_join
+
+    >>> df1 = pd.DataFrame({"id": [1, 2, 3], "x": ["a", "b", "c"]})
+    >>> df2 = pd.DataFrame({"id": [2, 3, 3], "y": ["l", "m", "n"]})
+
+    >>> df1 >> semi_join(_, df2)
+       id  x
+    1   2  b
+    2   3  c
+
+    >>> df1 >> anti_join(_, df2)
+       id  x
+    0   1  a
+
+    Generally, it's a good idea to explicitly specify the on argument.
+
+    >>> df1 >> anti_join(_, df2, on="id")
+       id  x
+    0   1  a
+    """
     if isinstance(on, Mapping):
         # coerce colnames to list, to avoid indexing with tuples
         on_cols, right_on = map(list, zip(*on.items()))
@@ -888,6 +1531,39 @@ def semi_join(left, right = None, on = None):
 @singledispatch2(pd.DataFrame)
 def anti_join(left, right = None, on = None):
     """Return the left table with every row that would *not* be kept in an inner join.
+
+    Parameters
+    ----------
+    left :
+        The left-hand table.
+    right :
+        The right-hand table.
+    on :
+        How to match them. By default it uses matches all columns with the same
+        name across the two tables.
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> from siuba import _, semi_join, anti_join
+
+    >>> df1 = pd.DataFrame({"id": [1, 2, 3], "x": ["a", "b", "c"]})
+    >>> df2 = pd.DataFrame({"id": [2, 3, 3], "y": ["l", "m", "n"]})
+
+    >>> df1 >> semi_join(_, df2)
+       id  x
+    1   2  b
+    2   3  c
+
+    >>> df1 >> anti_join(_, df2)
+       id  x
+    0   1  a
+
+    Generally, it's a good idea to explicitly specify the on argument.
+
+    >>> df1 >> anti_join(_, df2, on="id")
+       id  x
+    0   1  a
     """
     # copied from semi_join
     if isinstance(on, Mapping):
@@ -915,9 +1591,23 @@ inner_join = partial(join, how = "inner")
 def head(__data, n = 5):
     """Return the first n rows of the data.
 
-    Args:
-        __data: a DataFrame.
-        n: the number of rows of data to keep.
+    Parameters
+    ----------
+    __data:
+        a DataFrame.
+    n:
+        The number of rows of data to keep.
+
+    Examples
+    --------
+
+    >>> from siuba import head
+    >>> from siuba.data import cars
+
+    >>> cars >> head(2)
+       cyl   mpg   hp
+    0    6  21.0  110
+    1    6  21.0  110
     """
 
     return __data.head(n)
@@ -939,28 +1629,33 @@ def _head_gdf(__data, n = 5):
 def top_n(__data, n, wt = None):
     """Filter to keep the top or bottom entries in each group.
 
-    Args:
-        ___data: a DataFrame
-        n: the number of rows to keep in each group
-        wt: a column or expression that determines ordering (defaults to the last column in data)
+    Parameters
+    ----------
+    ___data:
+        A DataFrame.
+    n:
+        The number of rows to keep in each group.
+    wt:
+        A column or expression that determines ordering (defaults to last column in data).
 
-    Examples:
-        >>> from siuba import _, top_n
-        >>> df = pd.DataFrame({'x': [3, 1, 2, 4], 'y': [1, 1, 0, 0]})
-        >>> top_n(df, 2, _.x)
-           x  y
-        0  3  1
-        3  4  0
+    Examples
+    --------
+    >>> from siuba import _, top_n
+    >>> df = pd.DataFrame({'x': [3, 1, 2, 4], 'y': [1, 1, 0, 0]})
+    >>> top_n(df, 2, _.x)
+       x  y
+    0  3  1
+    3  4  0
 
-        >>> top_n(df, -2, _.x)
-           x  y
-        1  1  1
-        2  2  0
+    >>> top_n(df, -2, _.x)
+       x  y
+    1  1  1
+    2  2  0
 
-        >>> top_n(df, 2, _.x*_.y)
-           x  y
-        0  3  1
-        1  1  1
+    >>> top_n(df, 2, _.x*_.y)
+       x  y
+    0  3  1
+    1  1  1
 
     """
     # NOTE: using min_rank, since it can return a lazy expr for min_rank(ing)
@@ -988,6 +1683,49 @@ def top_n(__data, n, wt = None):
 
 @singledispatch2(pd.DataFrame)
 def gather(__data, key = "key", value = "value", *args, drop_na = False, convert = False):
+    """Reshape table by gathering it in to long format.
+
+    Parameters
+    ----------
+    __data:
+        The input data.
+    key:
+        Name of the key (or measure) column, which holds the names of the columns
+        that were turned into rows.
+    value:
+        Name of the value column, which holds the values from the columns that
+        were turned into rows.
+    *args:
+        A selection of columns. If unspecified, all columns are selected. Any
+        arguments you could pass to the select() verb are allowed.
+    drop_na: bool
+        Whether to remove any rows where the value column is NA.
+        
+
+    Examples
+    --------
+
+    >>> import pandas as pd
+    >>> from siuba import _, gather
+
+    >>> df = pd.DataFrame({"id": ["a", "b"], "x": [1, 2], "y": [3, None]})
+
+    The code below gathers in all columns, except id:
+
+    >>> gather(df, "key", "value", -_.id)
+      id key  value
+    0  a   x    1.0
+    1  b   x    2.0
+    2  a   y    3.0
+    3  b   y    NaN
+
+    >>> gather(df, "measure", "result", _.x, _.y, drop_na=True)
+      id measure  result
+    0  a       x     1.0
+    1  b       x     2.0
+    2  a       y     3.0
+
+    """
     # TODO: implement var selection over *args
     if convert:
         raise NotImplementedError("convert not yet implemented")
@@ -1020,6 +1758,40 @@ def _get_single_var_select(columns, x):
 
 @singledispatch2(pd.DataFrame)
 def spread(__data, key, value, fill = None, reset_index = True):
+    """Reshape table by spreading it out to wide format.
+
+    Parameters
+    ----------
+    __data:
+        The input data.
+    key:
+        Column whose values will be used as new column names.
+    value:
+        Column whose values will fill the new column entries.
+    fill:
+        Value to set for any missing values. By default keeps them as missing values.
+
+
+    Examples
+    --------
+    >>> import pandas as pd                                                
+    >>> from siuba import _, gather                                        
+
+    >>> df = pd.DataFrame({"id": ["a", "b"], "x": [1, 2], "y": [3, None]}) 
+
+    >>> long = gather(df, "key", "value", -_.id, drop_na=True)
+    >>> long
+      id key  value
+    0  a   x    1.0
+    1  b   x    2.0
+    2  a   y    3.0
+
+    >>> spread(long, "key", "value")
+      id    x    y
+    0  a  1.0  3.0
+    1  b  2.0  NaN
+
+    """
     key_col = _get_single_var_select(__data.columns, key)
     val_col = _get_single_var_select(__data.columns, value)
 
@@ -1060,6 +1832,48 @@ from pandas.core.reshape.util import cartesian_product
 
 @singledispatch2(pd.DataFrame)
 def expand(__data, *args, fill = None):
+    """Return table with unique crossings of specified columns.
+
+    Parameters
+    ----------
+    __data:
+        The input data.
+    *args:
+        Column names to cross and de-duplicate.
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> from siuba import _, expand, count, anti_join, right_join
+
+    >>> df = pd.DataFrame({"x": [1, 2, 2], "y": ["a", "a", "b"], "z": 1})
+    >>> df
+       x  y  z
+    0  1  a  1
+    1  2  a  1
+    2  2  b  1
+
+    >>> combos = df >> expand(_.x, _.y)
+    >>> combos
+       x  y
+    0  1  a
+    1  1  b
+    2  2  a
+    3  2  b
+
+    >>> df >> right_join(_, combos)
+         x  y    z
+    0  1.0  a  1.0
+    1    1  b  NaN
+    2  2.0  a  1.0
+    3  2.0  b  1.0
+
+    >>> combos >> anti_join(_, df)
+       x  y
+    1  1  b
+
+    """
+
     var_names = list(map(simple_varname, args))
     cols = [__data[name].unique() for name in var_names]
     # see https://stackoverflow.com/a/25636395/1144523
@@ -1072,6 +1886,58 @@ def expand(__data, *args, fill = None):
 
 @singledispatch2(pd.DataFrame)
 def complete(__data, *args, fill = None):
+    """Add rows to fill in missing combinations in the data.
+
+    This is a wrapper around expand(), right_join(), along with filling NAs.
+
+    Parameters
+    ----------
+    __data:
+        The input data.
+    *args:
+        Columns to cross and expand.
+    fill:
+        A dictionary specifying what to use for missing values in each column.
+        If a column is not specified, missing values are left as is.
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> from siuba import _, expand, count, anti_join, right_join
+
+    >>> df = pd.DataFrame({"x": [1, 2, 2], "y": ["a", "a", "b"], "z": 1})
+    >>> df
+       x  y  z
+    0  1  a  1
+    1  2  a  1
+    2  2  b  1
+
+    >>> df >> complete(_.x, _.y)
+         x  y    z
+    0  1.0  a  1.0
+    1    1  b  NaN
+    2  2.0  a  1.0
+    3  2.0  b  1.0
+
+    Use the fill argument to replace missing values:
+
+    >>> df >> complete(_.x, _.y, fill={"z": 999})
+         x  y      z
+    0  1.0  a    1.0
+    1    1  b  999.0
+    2  2.0  a    1.0
+    3  2.0  b    1.0
+
+    A common use of complete is to make zero counts explicit (e.g. for charting):
+
+    >>> df >> count(_.x, _.y) >> complete(_.x, _.y, fill={"n": 0})
+         x  y    n
+    0  1.0  a  1.0
+    1    1  b  0.0
+    2  2.0  a  1.0
+    3  2.0  b  1.0
+    """
+
     expanded = expand(__data, *args, fill = fill)
 
     # TODO: should we attempt to coerce cols back to original types?
@@ -1096,34 +1962,46 @@ def separate(__data, col, into, sep = r"[^a-zA-Z0-9]",
             ):
     """Split col into len(into) piece. Return DataFrame with a column added for each piece.
 
-    Args:
-        __data:  a DataFrame
-        col: name of column to split (either string, or siu expression)
-        into: names of resulting columns holding each entry in split
-        sep: regular expression used to split col. Passed to col.str.split method.
-        remove: whether to remove col from the returned DataFrame
-        convert: whether to attempt to convert the split columns to numerics
-        extra: what to do when more splits than into names.
-               One of ("warn", "drop" or "merge").
-               "warn" produces a warning; "drop" and "merge" currently not implemented.
-        fill: what to do when fewer splits than into names. Currently not implemented.
+    Parameters
+    ----------
+    __data:
+        a DataFrame.
+    col:
+        name of column to split (either string, or siu expression).
+    into:
+        names of resulting columns holding each entry in split.
+    sep:
+        regular expression used to split col. Passed to col.str.split method.
+    remove:
+        whether to remove col from the returned DataFrame.
+    convert:
+        whether to attempt to convert the split columns to numerics.
+    extra:
+        what to do when more splits than into names.  One of ("warn", "drop" or "merge").
+        "warn" produces a warning; "drop" and "merge" currently not implemented.
+    fill:
+        what to do when fewer splits than into names. Currently not implemented.
 
     Examples
     --------
+    >>> import pandas as pd
+    >>> from siuba import separate
 
-    ::
-        import pandas as pd
-        from siuba import separate
+    >>> df = pd.DataFrame({"label": ["S1-1", "S2-2"]})
 
-        df = pd.DataFrame({
-            "label": ["S1-1", "S2-2"]
-            })
+    Split into two columns:
 
-        # split into two columns
-        separate(df, "label", into = ["season", "episode"])
+    >>> separate(df, "label", into = ["season", "episode"])
+      season episode
+    0     S1       1
+    1     S2       2
 
-        # split, and try to convert columns to numerics
-        separate(df, "label", into = ["season", "episode"], convert = True)
+    Split, and try to convert columns to numerics:
+    
+    >>> separate(df, "label", into = ["season", "episode"], convert = True)
+      season  episode
+    0     S1        1
+    1     S2        2
 
     """
 
@@ -1199,12 +2077,18 @@ from functools import reduce
 def unite(__data, col, *args, sep = "_", remove = True):
     """Combine multiple columns into a single column. Return DataFrame that column included.
 
-    Args:
-        __data:  a DataFrame
-        col: name of the to-be-created column (string).
-        *args: names of each column to combine.
-        sep: separator joining each column being combined.
-        remove: whether to remove the combined columns from the returned DataFrame.
+    Parameters
+    ----------
+    __data:
+        a DataFrame
+    col:
+        name of the to-be-created column (string).
+    *args:
+        names of each column to combine.
+    sep:
+        separator joining each column being combined.
+    remove:
+        whether to remove the combined columns from the returned DataFrame.
 
     """
     unite_col_names = list(map(simple_varname, args))
@@ -1258,16 +2142,26 @@ def extract(
         remove = True, convert = False,
         flags = 0
         ):
-    """Pull out len(into) fields from character strings. Return DataFrame with a column added for each piece.
+    """Pull out len(into) fields from character strings. 
 
-    Args:
-        __data:  a DataFrame
-        col: name of column to split (either string, or siu expression).
-        into: names of resulting columns holding each entry in pulled out fields.
-        regex: regular expression used to extract field. Passed to col.str.extract method.
-        remove: whether to remove col from the returned DataFrame.
-        convert: whether to attempt to convert the split columns to numerics.
-        flags: flags from the re module, passed to col.str.extract.
+    Returns a DataFrame with a column added for each piece.
+
+    Parameters
+    ----------
+    __data:
+        a DataFrame
+    col:
+        name of column to split (either string, or siu expression).
+    into:
+        names of resulting columns holding each entry in pulled out fields.
+    regex:
+        regular expression used to extract field. Passed to col.str.extract method.
+    remove:
+        whether to remove col from the returned DataFrame.
+    convert:
+        whether to attempt to convert the split columns to numerics.
+    flags:
+        flags from the re module, passed to col.str.extract.
 
     """
 

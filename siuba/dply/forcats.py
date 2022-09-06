@@ -224,8 +224,13 @@ def fct_recode(fct, recat=None, **kwargs) -> pd.Categorical:
     ['a', 'b', 'z']
     Categories (3, object): ['a', 'b', 'z']
 
-    # >>> fct_recode(cat, x = 'a', x = 'b')
-    # >>> fct_recode(cat, x = ['a', 'b'])
+    >>> fct_recode(cat, x = ['a', 'b'])
+    ['x', 'x', 'c']
+    Categories (2, object): ['x', 'c']
+
+    >>> fct_recode(cat, {"x": ['a', 'b']})
+    ['x', 'x', 'c']
+    Categories (2, object): ['x', 'c']
         
     """
 
@@ -371,7 +376,6 @@ def fct_lump(fct, n = None, prop = None, w = None, other_level = "Other", ties =
     ['a', 'a', 'Other', 'Other']
     Categories (2, object): ['a', 'Other']
 
-    # TODO: implement prop arg
     >>> fct_lump(['a', 'a', 'b', 'b', 'c', 'd'], prop = .2)
     ['a', 'a', 'b', 'b', 'Other', 'Other']
     Categories (3, object): ['a', 'b', 'Other']
