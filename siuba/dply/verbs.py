@@ -183,7 +183,7 @@ def show_query(__data, simplify = False):
 
 # TODO: support for unnamed args
 @singledispatch2(pd.DataFrame)
-def mutate(__data, **kwargs):
+def mutate(__data, *args, **kwargs):
     """Assign new variables to a DataFrame, while keeping existing ones.
 
     Parameters
@@ -207,9 +207,25 @@ def mutate(__data, **kwargs):
     1    6  21.0  110    12    24
         
     """
-    
-    orig_cols = __data.columns
-    result = __data.assign(**kwargs)
+
+    args_result_df = __data.copy()
+
+    # handle across ----
+    for arg in args:
+        # TODO: make robust. validate input. validate output (e.g. shape).
+        new_col_map = arg(args_result_df)
+
+        if not isinstance(new_col_map, pd.DataFrame):
+            raise NotImplementedError("Only across() can be used as positional argument.")
+
+        for col_name, col_ser in new_col_map.items():
+            args_result_df[col_name] = col_ser
+
+    # handle everything else ----
+    # TODO: what if kw expr returns DataFrame?
+
+    orig_cols = args_result_df.columns
+    result = args_result_df.assign(**kwargs)
 
     new_cols = result.columns[~result.columns.isin(orig_cols)]
 
@@ -218,11 +234,13 @@ def mutate(__data, **kwargs):
 
 
 @mutate.register(DataFrameGroupBy)
-def _mutate(__data, **kwargs):
+def _mutate(__data, *args, **kwargs):
     groupings = __data.grouper.groupings
     orig_index = __data.obj.index
 
-    df = __data.apply(lambda d: d.assign(**kwargs))
+    f_mutate = mutate.dispatch(pd.DataFrame)
+
+    df = __data.apply(lambda d: f_mutate(d, *args, **kwargs))
     
     # will drop all but original index
     group_by_lvls = list(range(df.index.nlevels - 1))
@@ -385,7 +403,14 @@ def filter(__data, *args):
     """
     crnt_indx = True
     for arg in args:
-        crnt_indx &= arg(__data) if callable(arg) else arg
+        res = arg(__data) if callable(arg) else arg
+
+        if isinstance(res, pd.DataFrame):
+            crnt_indx &= res.all(axis=1)
+        elif isinstance(res, pd.Series):
+            crnt_indx &= res
+        else:
+            crnt_indx &= res
 
     # use loc or iloc to subset, depending on crnt_indx ----
     # the main issue here is that loc can't remove all rows using a slice
@@ -397,6 +422,7 @@ def filter(__data, *args):
         result = __data.loc[crnt_indx,:]
 
     return result
+
 
 @filter.register(DataFrameGroupBy)
 def _filter(__data, *args):
@@ -415,8 +441,9 @@ def _filter(__data, *args):
 
 # Summarize ===================================================================
 
+
 @singledispatch2(DataFrame)
-def summarize(__data, **kwargs):
+def summarize(__data, *args, **kwargs):
     """Assign variables that are single number summaries of a DataFrame.
 
     Grouped DataFrames will produce one row for each group. Otherwise, summarize
@@ -455,26 +482,57 @@ def summarize(__data, **kwargs):
         
     """
     results = {}
+    
+    for ii, expr in enumerate(args):
+        if not callable(expr):
+            raise TypeError(
+                "Unnamed arguments to summarize must be callable, but argument number "
+                f"{ii} was type: {type(expr)}"
+            )
+
+        res = expr(__data)
+        if isinstance(res, DataFrame):
+            if len(res) != 1:
+                raise ValueError(
+                    f"Summarize argument `{ii}` returned a DataFrame with {len(res)} rows."
+                    " Result must only be a single row."
+                )
+
+            for col_name in res.columns:
+                results[col_name] = res[col_name].array
+        else:
+            raise ValueError(
+                "Unnamed arguments to summarize must return a DataFrame, but argument "
+                f"`{ii} returned type: {type(expr)}"
+            )
+
+
+
     for k, v in kwargs.items():
+        # TODO: raise error if a named expression returns a DataFrame
         res = v(__data) if callable(v) else v
 
-        # validate operations returned single result
-        if not is_scalar(res) and len(res) > 1:
-            raise ValueError("Summarize argument, %s, must return result of length 1 or a scalar." % k)
+        if is_scalar(res) or len(res) == 1:
+            # keep result, but use underlying array to avoid crazy index issues
+            # on DataFrame construction (#138)
+            results[k] = res.array if isinstance(res, pd.Series) else res
 
-        # keep result, but use underlying array to avoid crazy index issues
-        # on DataFrame construction (#138)
-        results[k] = res.array if isinstance(res, pd.Series) else res
+        else:
+            raise ValueError(
+                f"Summarize argument `{k}` must return result of length 1 or a scalar.\n\n"
+                f"Result type: {type(res)}\n"
+                f"Result length: {len(res)}"
+            )
         
     # must pass index, or raises error when using all scalar values
     return DataFrame(results, index = [0])
 
     
 @summarize.register(DataFrameGroupBy)
-def _summarize(__data, **kwargs):
+def _summarize(__data, *args, **kwargs):
     df_summarize = summarize.registry[pd.DataFrame]
 
-    df = __data.apply(df_summarize, **kwargs)
+    df = __data.apply(df_summarize, *args, **kwargs)
         
     group_by_lvls = list(range(df.index.nlevels - 1))
     out = df.reset_index(group_by_lvls)
@@ -643,7 +701,7 @@ def select(__data, *args, **kwargs):
                 )
     var_list = var_create(*args)
 
-    od = var_select(__data.columns, *var_list)
+    od = var_select(__data.columns, *var_list, data=__data)
 
     to_rename = {k: v for k,v in od.items() if v is not None}
 
