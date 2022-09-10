@@ -2019,7 +2019,16 @@ def separate(__data, col, into, sep = r"[^a-zA-Z0-9]",
     elif n_split_cols > n_into:
         # Extra argument controls how we deal with too many splits
         if extra == "warn":
-            warnings.warn("some warning about too many splits", UserWarning)
+            df_extra_cols = all_splits.iloc[:, n_into].reset_index(drop=True)
+            bad_rows = df_extra_cols.dropna(how="all")
+            n_extra = bad_rows.shape[0]
+
+            warnings.warn(
+                f"Expected {n_into} pieces."
+                f"Additional pieces discarded in {n_extra} rows."
+                f"Row numbers: {bad_rows.index.values}",
+                UserWarning
+            )
         elif extra == "drop":
             pass
         elif extra == "merge":
@@ -2027,11 +2036,13 @@ def separate(__data, col, into, sep = r"[^a-zA-Z0-9]",
         else:
             raise ValueError("Invalid extra argument: %s" %extra)
 
-    # end up with only the into columns, correctly named ----
-    new_names = dict(zip(range(n_into), into))
-    keep_splits = all_splits.iloc[:, :n_into].rename(columns = new_names)
+    # create new columns in data ----
+    out = __data.copy()
+
+    for ii, name in enumerate(into):
+        out[name] = all_splits.iloc[:, ii]
     
-    out = pd.concat([__data, keep_splits], axis = 1)
+    #out = pd.concat([__data, keep_splits], axis = 1)
 
     # attempt to convert columns to numeric ----
     if convert:
@@ -2042,7 +2053,7 @@ def separate(__data, col, into, sep = r"[^a-zA-Z0-9]",
             except ValueError:
                 pass
 
-    if remove:
+    if remove and col_name not in into:
         return out.drop(columns = col_name)
 
     return out
@@ -2174,22 +2185,19 @@ def extract(
     if n_split_cols != n_into:
         raise ValueError("Split into %s pieces, but expected %s" % (n_split_cols, n_into))
 
-    # end up with only the into columns, correctly named ----
-    new_names = dict(zip(all_splits.columns, into))
-    keep_splits = all_splits.rename(columns = new_names)
-
     # attempt to convert columns to numeric ----
     if convert:
         # TODO: better strategy here? 
-        for k in keep_splits:
+        for k in all_splits:
             try:
-                keep_splits[k] = pd.to_numeric(keep_splits[k])
+                all_splits[k] = pd.to_numeric(all_splits[k])
             except ValueError:
                 pass
 
+    out = __data.copy()
+    for ii, name in enumerate(into):
+        out[name] = all_splits.iloc[:, ii]
     
-    out = pd.concat([__data, keep_splits], axis = 1)
-
     if remove:
         return out.drop(columns = col_name)
 
