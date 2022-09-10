@@ -4,7 +4,7 @@ import numpy as np
 from typing import Union, Tuple, Dict, Optional
 from pandas.core.groupby import DataFrameGroupBy
 
-from siuba.dply.verbs import gather, var_create, var_select
+from siuba.dply.verbs import gather, var_create, var_select, separate, extract
 from siuba.siu import singledispatch2
 
 
@@ -13,6 +13,43 @@ def pivot_longer_spec(data,
                       names_repair: Optional[str] = "check_unique",
                       values_drop_na: bool = False):
     raise NotImplementedError("TODO: see https://github.com/machow/siuba/issues/293")
+
+
+def create_spec(var_names, names_to, names_sep, names_pattern, values_to):
+    df_spec = pd.DataFrame({"_name": var_names, "_value": values_to})
+
+    if names_sep:
+        df_spec = separate(df_spec, "_name", names_to, names_sep, remove=False)
+    elif names_pattern:
+        df_spec = extract(df_spec, "_name", names_to, names_pattern, remove=False)
+    else:
+        if len(names_to) > 1:
+            raise TypeError(
+                "pivot_longer either needs names_to to be string, or to receive "
+                "names_sep or names_pattern arguments."
+            )
+        df_spec = df_spec.assign(**{names_to[0]: df_spec["_name"]})
+
+    return df_spec
+
+
+def spec_to_multiindex(df_spec):
+    # _value will be the outer column index, and split name columns the inner.
+    # this allows us to stack the inner part, while that _values stays as columns.
+    internal = {"_value", "_name"}
+
+    #other_cols = [name for name in df_spec.columns if name not in internal]
+    #df_spec[other_cols].apply(lambda ser: tuple(ser), axis=1)
+    other_cols = [nm for nm in df_spec.columns if nm not in internal]
+
+    indx_cols = ["_value", *other_cols]
+    indx_names = [None] + other_cols
+
+    return pd.MultiIndex.from_frame(df_spec[indx_cols], names=indx_names)
+
+
+def _drop_cols_by_position(df, locations):
+    return df.loc[:, ~np.array([x in locations for x in range(df.shape[1])])]
 
 
 @singledispatch2(pd.DataFrame)
@@ -38,105 +75,106 @@ def pivot_longer(
     if isinstance(names_to, str):
         names_to = (names_to,)
 
-    # Copied selection over from gather, maybe this can be compartmentalised?
+    # select id columns and measure data --------------------------------------
+
     var_list = var_create(*args)
     od = var_select(__data.columns, *var_list)
 
-    value_vars = list(od) or None
+    value_vars = list(od)
+
+    if value_vars is None:
+        raise ValueError(
+            "Please select at least 1 column of values in pivot_longer.\n\n"
+            "E.g. pivot_longer(data, _.some_col, _.another_col, ...)"
+        )
 
     id_vars = [col for col in __data.columns if col not in od]
+    wide_ids = __data.loc[:,id_vars]
+    wide_values = __data.loc[:,value_vars]
 
-    keep_data = __data.loc[:,id_vars]
-    if value_vars is None:
-        # While stack works in this case, it will later on merge in to the
-        # original dataframe. To copy tidyr behaviour, we need to raise a
-        # ValueError
-        # stacked = __data.stack(dropna=values_drop_na)
-        raise ValueError("Please provide at least 1 column or all columns "
-                         "(shorthand: _[:]).")
-    elif names_sep is not None or names_pattern is not None:
-        to_stack = __data.loc[:,value_vars]
-        column_index = (
-            to_stack.columns.str.split(names_sep).map(tuple)
-            if names_sep is not None
-            # Split by names_pattern, and remove empty strings using filter
-            else to_stack.columns.str.split(names_pattern).map(
-                lambda x: tuple(list(filter(None, x)))
-            )
-        )
-        split_lengths = np.array(column_index.map(len))
+    # note that this will include repeats in the data (e.g. two columns named "a")
+    wide_cols = list(wide_values.columns)
 
-        if not np.all(split_lengths == split_lengths[0]):
-            raise ValueError(
-                    "Splitting by {} leads to unequal lengths ({}).".format(
-                        names_sep if names_sep is not None else names_pattern
-                    )
-                )
-        
-        if split_lengths[0] != len(names_to):
-            raise ValueError("Splitting provided more values than provided in "
-                             "`names_to`")
-        
-        # TODO: To set names for the new index, we need to feed in a list.
-        # There's no particular reason to use a tuples as input in the first
-        # place, might be worth reconsidering the choice of input format?
-        # TODO: What if we don't use '_value' in the tuple? Need to check tidyr
-        stack_idx = (
-            [i for i, x in enumerate(list(names_to)) if x != "_value"]
-            if names_to != ('_value',)
-            else -1
-        )
-        names_to = [x if x != "_value" else None for x in names_to]
+    # the spec is usable by both pivot longer and wider
+    df_spec = create_spec(wide_cols, names_to, names_sep, names_pattern, values_to)
+    
+    column_index = spec_to_multiindex(df_spec)
 
-        column_index = column_index.set_names(names_to)
+    # reshape to long ---------------------------------------------------------
+    # note that this section could be moved to a function that takes only the
+    # wide_values and a spec
+    inner_levels_na = pd.isna(column_index.names[1:])
+    indx_to_drop = np.where(inner_levels_na)[0]
 
-        to_stack.columns = column_index
-        stacked = to_stack.stack(stack_idx)
-        stacked = stacked.reset_index(level=stacked.index.nlevels - 1)
+    if len(column_index.levels[0]) == 1:
+        # simple case: only creating a single value column. in this case we use pd.melt,
+        # since it can handle duplicate single and multi-index columns.
+        _value_name = column_index.levels[0][0]
 
-        if stack_idx == -1:
-            stacked = stacked.drop(columns='level_1')
-        if np.nan in names_to:
-            stacked = stacked.drop(columns=[np.nan])
-        if values_drop_na:
-            stacked = stacked.dropna(axis = 1)
+        wide_values.columns = column_index.droplevel(0)
+
+        long_values = pd.melt(
+            wide_values,
+            value_vars=None,
+            value_name=_value_name,
+            ignore_index=False
+        ).sort_index(level=-1).pipe(_drop_cols_by_position, indx_to_drop)
+
     else:
-        stacked = __data.loc[:,value_vars].stack(dropna=values_drop_na)
-        # Set column names for stack
-        # As in tidyr `values_to` is ignored if `names_sep` or `names_pattern`
-        # is provided.
-        stacked.index.rename(names_to[0], level=1, inplace=True)
-        stacked.name = values_to
+        # complex case: multiple value columns. Note that pandas throws an error if the
+        # columns being unstacked contain duplicate column parts. E.g. if you split
+        # duplicate columns x_1_1 and x_1_1 on "_".
+        # (this behavior is fairly funky in dplyr, so probably okay to error)
+        n_orig_levels = wide_values.index.nlevels
 
-    # values_transform was introduced in tidyr 1.1.0
-    if values_to in values_transform:
+        if column_index.nlevels > 1:
+            inner_levels = np.array(range(1, column_index.nlevels))
+        else:
+            # edge case, where only _values exists and is defined from matching
+            # patterns in the columns. we can stack this only multiindex level, and it
+            # will still set the _values as columns.
+            inner_levels = np.array([0])
+            indx_to_drop = np.array([0])
+
+        wide_values.columns = column_index
+
+        long_values = (wide_values .stack(inner_levels.tolist()).droplevel(list(n_orig_levels + indx_to_drop))
+            .reset_index(inner_levels[~inner_levels_na].tolist())
+        )
+    
+    if values_drop_na:
+        value_column_names = list(column_index.levels[0])
+        long_values = long_values.dropna(subset=value_column_names, how="all")
+
+    # transform values --------------------------------------------------------
+
+    # TODO: names_transform for names, values_transform for values (including .value in names_to)
+    if len(names_to) > 1:
+        # TODO: transforms with values in names
+        transformed = long_values
+    elif values_to in values_transform:
         # TODO: error handling -- this won't work for dictionaries
         # list needs special handling, as it can only be applied to iterables,
         # not integers.
-        if values_transform[values_to] == list:
-            stacked = stacked.apply(lambda x: [x])
-        else:
-            stacked = stacked.apply(lambda x: values_transform[values_to](x))
-
-    stacked_df = (
-        # if `names_sep` or `names_pattern` are not provided `stacked` will
-        # be a pd.Series and needs its index reset.
-        stacked.reset_index(1)
-        if names_sep is None and names_pattern is None
-        else stacked
-    )
-
-    # If we want to pivot all but one, we are left with a `pd.Series`.
-    # This needs to be converted to a DataFrame to serve as left element in a
-    # merge
-    if isinstance(keep_data, pd.Series):
-        output_df = keep_data.to_frame().merge(stacked_df, left_index=True, right_index=True)
-    elif keep_data.empty:
-        output_df = stacked_df
+        f_transform = values_transform[values_to]
+        if f_transform == list:
+            f_transform = lambda ser: ser.apply(lambda x: [x])
+            
+        transformed = long_values.copy()
+        transformed[values_to] = f_transform(long_values[values_to])
     else:
-        output_df = keep_data.merge(stacked_df, left_index=True, right_index=True)
+        transformed = long_values
+
+    # merge in id variables ---------------------------------------------------
+
+    if wide_ids.shape[1] == 0:
+        # no id columns, just return long values
+        output_df = transformed
+    else:
+        output_df = wide_ids.merge(transformed, left_index=True, right_index=True)
     
     return output_df
+
 
 @pivot_longer.register(DataFrameGroupBy)
 def _pivot_longer_gdf(__data, *args, **kwargs):
