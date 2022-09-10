@@ -1888,11 +1888,11 @@ def expand(__data, *args, fill = None):
     3  2  b
 
     >>> df >> right_join(_, combos)
-         x  y    z
-    0  1.0  a  1.0
-    1    1  b  NaN
-    2  2.0  a  1.0
-    3  2.0  b  1.0
+       x  y    z
+    0  1  a  1.0
+    1  1  b  NaN
+    2  2  a  1.0
+    3  2  b  1.0
 
     >>> combos >> anti_join(_, df)
        x  y
@@ -1902,11 +1902,11 @@ def expand(__data, *args, fill = None):
 
     >>> df2 = pd.DataFrame({"x": [1, None], "y": [3, 4]})
     >>> expand(df2, _.x, _.y)
-         x    y
-    0  1.0  3.0
-    1  1.0  4.0
-    2  NaN  3.0
-    3  NaN  4.0
+         x  y
+    0  1.0  3
+    1  1.0  4
+    2  NaN  3
+    3  NaN  4
 
     It will also cross all levels of a categorical (even those not in the data):
 
@@ -1943,6 +1943,10 @@ def complete(__data, *args, fill = None, explicit=True):
     fill:
         A dictionary specifying what to use for missing values in each column.
         If a column is not specified, missing values are left as is.
+    explicit:
+        Should both NAs created by the complete and pre-existing NAs be filled
+        by the fill argument? Defaults to True (filling both). When set to False,
+        it will only fill newly created NAs.
 
     Examples
     --------
@@ -1994,7 +1998,7 @@ def complete(__data, *args, fill = None, explicit=True):
     """
 
     if explicit:
-        indicator = None
+        indicator = False
     else:
         indicator = _unique_name("__merge_indicator", {*__data.columns})
     
