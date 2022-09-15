@@ -1830,6 +1830,32 @@ def _spread_gdf(__data, *args, **kwargs):
 # Expand/Complete ====================================================================
 from pandas.core.reshape.util import cartesian_product
 
+
+def _unique_name(prefix: str, names: "set[str]"):
+    names = set(names)
+
+    ii = 0
+    while prefix in names:
+        prefix = prefix + str(ii)
+        
+        ii += 1
+
+    return prefix
+
+
+def _expand_column(x):
+    from pandas.api.types import is_categorical_dtype
+
+    if is_categorical_dtype(x):
+        if x.isna().any():
+            return [*x.cat.categories, None]
+
+        return x.cat.categories
+
+    return x.unique()
+
+
+
 @singledispatch2(pd.DataFrame)
 def expand(__data, *args, fill = None):
     """Return table with unique crossings of specified columns.
@@ -1872,20 +1898,38 @@ def expand(__data, *args, fill = None):
        x  y
     1  1  b
 
+    Note that expand will also cross missing values: 
+
+    >>> df2 = pd.DataFrame({"x": [1, None], "y": [3, 4]})
+    >>> expand(df2, _.x, _.y)
+         x    y
+    0  1.0  3.0
+    1  1.0  4.0
+    2  NaN  3.0
+    3  NaN  4.0
+
+    It will also cross all levels of a categorical (even those not in the data):
+
+    >>> df3 = pd.DataFrame({"x": pd.Categorical(["a"], ["a", "b"])})
+    >>> expand(df3, _.x)
+       x
+    0  a
+    1  b
+
     """
 
-    var_names = list(map(simple_varname, args))
-    cols = [__data[name].unique() for name in var_names]
-    # see https://stackoverflow.com/a/25636395/1144523
-    cprod = cartesian_product(cols)
-    expanded = pd.DataFrame(np.array(cprod).T)
-    expanded.columns = var_names
 
-    return expanded
+    var_names = list(map(simple_varname, args))
+    cols = [_expand_column(__data.loc[:, name]) for name in var_names]
+
+    if fill is not None:
+        raise NotImplementedError()
+
+    return pd.MultiIndex.from_product(cols, names=var_names).to_frame(index=False)
 
 
 @singledispatch2(pd.DataFrame)
-def complete(__data, *args, fill = None):
+def complete(__data, *args, fill = None, explicit=True):
     """Add rows to fill in missing combinations in the data.
 
     This is a wrapper around expand(), right_join(), along with filling NAs.
@@ -1905,52 +1949,78 @@ def complete(__data, *args, fill = None):
     >>> import pandas as pd
     >>> from siuba import _, expand, count, anti_join, right_join
 
-    >>> df = pd.DataFrame({"x": [1, 2, 2], "y": ["a", "a", "b"], "z": 1})
+    >>> df = pd.DataFrame({"x": [1, 2, 2], "y": ["a", "a", "b"], "z": [8, 9, None]})
     >>> df
-       x  y  z
-    0  1  a  1
-    1  2  a  1
-    2  2  b  1
+       x  y    z
+    0  1  a  8.0
+    1  2  a  9.0
+    2  2  b  NaN
 
     >>> df >> complete(_.x, _.y)
-         x  y    z
-    0  1.0  a  1.0
-    1    1  b  NaN
-    2  2.0  a  1.0
-    3  2.0  b  1.0
+       x  y    z
+    0  1  a  8.0
+    1  1  b  NaN
+    2  2  a  9.0
+    3  2  b  NaN
 
     Use the fill argument to replace missing values:
 
     >>> df >> complete(_.x, _.y, fill={"z": 999})
-         x  y      z
-    0  1.0  a    1.0
-    1    1  b  999.0
-    2  2.0  a    1.0
-    3  2.0  b    1.0
+       x  y      z
+    0  1  a    8.0
+    1  1  b  999.0
+    2  2  a    9.0
+    3  2  b  999.0
 
     A common use of complete is to make zero counts explicit (e.g. for charting):
 
     >>> df >> count(_.x, _.y) >> complete(_.x, _.y, fill={"n": 0})
-         x  y    n
-    0  1.0  a  1.0
-    1    1  b  0.0
-    2  2.0  a  1.0
-    3  2.0  b  1.0
+       x  y    n
+    0  1  a  1.0
+    1  1  b  0.0
+    2  2  a  1.0
+    3  2  b  1.0
+    
+    Use explicit=False to only fill the NaNs introduced by complete (implicit missing),
+    and not those already in the original data (explicit missing):
+
+    >>> df >> complete(_.x, _.y, fill={"z": 999}, explicit=False)
+       x  y      z
+    0  1  a    8.0
+    1  1  b  999.0
+    2  2  a    9.0
+    3  2  b    NaN
+    
     """
 
-    expanded = expand(__data, *args, fill = fill)
+    if explicit:
+        indicator = None
+    else:
+        indicator = _unique_name("__merge_indicator", {*__data.columns})
+    
+
+    expanded = expand(__data, *args)
 
     # TODO: should we attempt to coerce cols back to original types?
     #       e.g. NAs will turn int -> float
     on_cols = list(expanded.columns)
-    df = __data.merge(expanded, how = "right", on = on_cols)
+    df = expanded.merge(__data, how = "outer", on = on_cols, indicator = indicator)
     
     if fill is not None:
-        for col_name, val in fill.items():
-            df[col_name].fillna(val, inplace = True)
+        if explicit:
+            for col_name, val in fill.items():
+                df[col_name].fillna(val, inplace = True)
+        else:
+            fill_cols = list(fill)
+            indx = df[indicator] == "left_only"
+            df.loc[indx, fill_cols] = df.loc[indx, fill_cols].fillna(fill)
+
+    if indicator:
+        return df.drop(columns=indicator)
 
     return df
     
+
 # Separate/Unit/Extract ============================================================
 
 import warnings
