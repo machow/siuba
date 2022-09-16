@@ -38,7 +38,8 @@ def test_raw_sql_mutate_refer_previous_raise_dberror(backend, skip_backend, df):
     if backend.name == "duckdb":
         # duckdb dialect re-raises the engines exception, which is RuntimeError
         # the expression to know whether we need to create a subquery.
-        exc = RuntimeError
+        import duckdb
+        exc = duckdb.BinderException
     else:
         exc = sqlalchemy.exc.DatabaseError
 
