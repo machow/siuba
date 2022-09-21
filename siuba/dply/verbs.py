@@ -2297,6 +2297,51 @@ from siuba.siu._databackend import SqlaEngine
 
 @singledispatch2((pd.DataFrame, DataFrameGroupBy))
 def tbl(src, *args, **kwargs):
+    """Create a table from a data source.
+
+    Parameters
+    ----------
+    src:
+        A pandas DataFrame, SQLAlchemy Engine, or other registered object.
+    *args, **kwargs:
+        Additional arguments passed to the individual implementations.
+
+    Examples
+    --------
+    >>> from siuba.data import cars
+
+    A pandas DataFrame is already a table of data, so trivially returns itself.
+
+    >>> tbl(mtcars) is cars
+    True
+
+    tbl() is useful for quickly connecting to a SQL database table.
+
+    >>> from sqlalchemy import create_engine
+    >>> from siuba import count, show_query, collect
+
+    >>> engine = create_engine("sqlite:///:memory:")
+    >>> cars.head(2).to_sql("cars", engine, index=False)
+
+    >>> tbl_sql_cars = tbl(engine, "cars")
+    >>> tbl_sql_cars >> count()
+    # Source: lazy query
+    # DB Conn: Engine(sqlite:///:memory:)
+    # Preview:
+       n
+    0  2
+    # .. may have more rows
+
+    When using duckdb, pass a DataFrame as the third argument to operate directly on it:
+
+    >>> engine2 = create_engine("duckdb:///:memory:")
+    >>> tbl_cars_duck = tbl(engine, "cars", cars.head(2)) 
+    >>> tbl_cars_duck >> count() >> collect()
+       n
+    0  2
+
+    """
+
     return src
 
 
@@ -2306,6 +2351,7 @@ def _tbl_sqla(src: SqlaEngine, table_name, columns=None):
 
     if src.dialect.name == "duckdb" and isinstance(columns, pd.DataFrame):
         src.execute("register", (table_name, columns))
+        return LazyTbl(src, table_name)
     
     return LazyTbl(src, table_name)
 
