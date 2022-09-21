@@ -18,14 +18,16 @@ from siuba.dply.verbs import (
         filter,
         arrange, _call_strip_ascending,
         summarize,
-        count,
+        count, add_count,
         group_by, ungroup,
         case_when,
         join, left_join, right_join, inner_join, semi_join, anti_join,
         head,
         rename,
         distinct,
-        if_else
+        if_else,
+        _select_group_renames,
+        _var_select_simple
         )
 
 from siuba.dply.tidyselect import VarList, var_select
@@ -251,6 +253,8 @@ def ordered_union(x, y):
     return tuple({**dx, **dy})
 
 
+def _warn_missing(missing_groups):
+    warnings.warn(f"Adding missing grouping variables: {missing_groups}")
 
 
 # Table -----------------------------------------------------------------------
@@ -524,12 +528,22 @@ def _select(__data, *args, **kwargs):
     evaluated = (arg(vl) if callable(arg) else arg for arg in args)
     od = var_select(colnames, *evaluated)
 
+    missing_groups, group_keys = _select_group_renames(od, __data.group_by)
+
+    if missing_groups:
+        _warn_missing(missing_groups)
+
+    final_od = {**{k: None for k in missing_groups}, **od}
+
     col_list = []
-    for k,v in od.items():
+    for k,v in final_od.items():
         col = columns[k]
         col_list.append(col if v is None else col.label(v))
 
-    return __data.append_op(last_op.with_only_columns(col_list))
+    return __data.append_op(
+        last_op.with_only_columns(col_list),
+        group_by = group_keys
+    )
 
 
 
@@ -761,6 +775,14 @@ def _count(__data, *args, sort = False, wt = None, **kwargs):
             )
 
 
+@add_count.register(LazyTbl)
+def _add_count(__data, *args, wt = None, sort = False, **kwargs):
+    counts = count(__data, *args, wt = wt, sort = sort, **kwargs)
+    by = list(c.name for c in counts.last_op.inner_columns)[:-1]
+
+    return inner_join(__data, counts, by = by)
+
+
 @summarize.register(LazyTbl)
 def _summarize(__data, **kwargs):
     # https://stackoverflow.com/questions/14754994/why-is-sqlalchemy-count-much-slower-than-the-raw-query
@@ -931,8 +953,11 @@ def _relabeled_cols(columns, keys, suffix):
 
 
 @join.register(LazyTbl)
-def _join(left, right, on = None, *args, how = "inner", sql_on = None):
+def _join(left, right, on = None, *args, by = None, how = "inner", sql_on = None):
     _raise_if_args(args)
+
+    if on is None and by is not None:
+        on = by
 
     # Needs to be on the table, not the select
     left_sel = left.last_op.alias()
@@ -982,7 +1007,10 @@ def _join(left, right, on = None, *args, how = "inner", sql_on = None):
 
 
 @semi_join.register(LazyTbl)
-def _semi_join(left, right = None, on = None, *args, sql_on = None):
+def _semi_join(left, right = None, on = None, *args, by = None, sql_on = None):
+    if on is None and by is not None:
+        on = by
+
     _raise_if_args(args)
 
     left_sel = left.last_op.alias()
@@ -1008,7 +1036,10 @@ def _semi_join(left, right = None, on = None, *args, sql_on = None):
 
 
 @anti_join.register(LazyTbl)
-def _anti_join(left, right = None, on = None, *args, sql_on = None):
+def _anti_join(left, right = None, on = None, *args, by = None, sql_on = None):
+    if on is None and by is not None:
+        on = by
+
     _raise_if_args(args)
 
     left_sel = left.last_op.alias()
@@ -1129,7 +1160,9 @@ def _rename(__data, **kwargs):
 
     new_sel = sel.with_only_columns(labs)
 
-    return __data.append_op(new_sel)
+    missing_groups, group_keys = _select_group_renames(old_to_new, __data.group_by)
+
+    return __data.append_op(new_sel, group_by=group_keys)
 
 
 # Distinct --------------------------------------------------------------------
@@ -1143,28 +1176,25 @@ def _distinct(__data, *args, _keep_all = False, **kwargs):
 
     # TODO: this is copied from the df distinct version
     # cols dict below is used as ordered set
-    cols = {simple_varname(x): True for x in args}
+    cols = _var_select_simple(args)
     cols.update(kwargs)
-
-    if None in cols:
-        raise KeyError("positional arguments must be simple column, "
-                        "e.g. _.colname or _['colname']"
-                        )
 
     # use all columns by default
     if not cols:
-        cols = lift_inner_cols(inner_sel).keys()
+        cols = {k: True for k in lift_inner_cols(inner_sel).keys()}
+
+    final_names = {**{k: True for k in __data.group_by}, **cols}
 
     if not len(inner_sel._order_by_clause):
         # select distinct has to include any columns in the order by clause,
         # so can only safely modify existing statement when there's no order by
         sel_cols = lift_inner_cols(inner_sel)
-        distinct_cols = [sel_cols[k] for k in cols]
+        distinct_cols = [sel_cols[k] for k in final_names]
         sel = inner_sel.with_only_columns(distinct_cols).distinct()
     else:
         # fallback to cte
         cte = inner_sel.alias()
-        distinct_cols = [cte.columns[k] for k in cols]
+        distinct_cols = [cte.columns[k] for k in final_names]
         sel = _sql_select(distinct_cols).select_from(cte).distinct()
 
     return __data.append_op(sel)
