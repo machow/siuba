@@ -31,7 +31,8 @@ DPLY_FUNCTIONS = (
         "join", "inner_join", "full_join", "left_join", "right_join", "semi_join", "anti_join",
         # TODO: move to vectors
         "if_else", "case_when",
-        "collect", "show_query"
+        "collect", "show_query",
+        "tbl",
         )
 
 __all__ = [*DPLY_FUNCTIONS, "Pipeable", "pipe"]
@@ -2290,6 +2291,31 @@ def _extract_gdf(__data, *args, **kwargs):
 
     return out.groupby(groupings)
 
+
+# tbl ----
+from siuba.siu._databackend import SqlaEngine
+
+@singledispatch2((pd.DataFrame, DataFrameGroupBy))
+def tbl(src, *args, **kwargs):
+    return src
+
+
+@tbl.register
+def _tbl_sqla(src: SqlaEngine, table_name, columns=None):
+    from siuba.sql import LazyTbl
+
+    if src.dialect.name == "duckdb" and isinstance(columns, pd.DataFrame):
+        src.execute("register", (table_name, columns))
+    
+    return LazyTbl(src, table_name)
+
+
+tbl.register(object)
+def _tbl(__data, *args, **kwargs):
+    raise NotImplementedError(
+        f"Unsupported type {type(__data)}. "
+        "Note that tbl currently cannot be used in a pipe."
+    )
 
 # Install Siu =================================================================
 
