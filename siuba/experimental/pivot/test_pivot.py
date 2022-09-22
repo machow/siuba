@@ -14,28 +14,74 @@ import pandas as pd
 import numpy as np
 
 from siuba.siu import Symbolic
-from siuba import group_by
+from siuba import group_by, collect, show_query
 
-from siuba.tests.helpers import data_frame
+from siuba.tests.helpers import data_frame, assert_equal_query, assert_frame_sort_equal
 from pandas.testing import assert_frame_equal, assert_series_equal
 
 
 _ = Symbolic()
 
 
-def test_pivot_all_cols_to_long():
+
+def assert_equal_query2(left, right, *args, sql_ordered=True, **kwargs):
+    from siuba.sql import LazyTbl
+    from siuba.sql.utils import _is_dialect_duckdb
+    from pandas.core.groupby import DataFrameGroupBy
+    out = collect(left)
+
+    if isinstance(left, LazyTbl) and _is_dialect_duckdb(left.source):
+        # TODO: find a nice way to remove duckdb specific code from here
+        # duckdb does not use pandas.DataFrame.to_sql method, which coerces
+        # everything to 64 bit. So we need to coerce any results it returns
+        # as 32 bit to 64 bit, to match to_sql.
+        int_cols = out.select_dtypes('int32').columns
+        flt_cols = out.select_dtypes('float32').columns
+        out[int_cols] = out[int_cols].astype('int64')
+        out[flt_cols] = out[flt_cols].astype('float64')
+
+    if isinstance(left, LazyTbl):
+        if not sql_ordered:
+            assert_frame_sort_equal(out, right, *args, **kwargs)
+        else:
+            assert_frame_equal(out, right, *args, **kwargs)
+    else:
+        assert_frame_equal(out, right, *args, **kwargs)
+
+
+def assert_series_equal2(left, right, *args, sql_ordered=True, **kwargs):
+    from siuba.sql import LazyTbl
+
+    if isinstance(left, LazyTbl):
+        left = collect(left)
+
+        if not sql_ordered:
+            left = left.sort_values()
+            right = right.sort_values()
+
+        assert_series_equal(
+            left.reset_index(drop=True),
+            right.reset_index(drop=True),
+            *args,
+            **kwargs
+        )
+    else:
+        assert_series_equal(left, right, *args, **kwargs)
+
+
+    
+def test_pivot_all_cols_to_long(backend):
     "can pivot all cols to long"
 
-    src = data_frame(x = [1,2], y = [3,4])
+    src = backend.load_df(data_frame(x = [1,2], y = [3,4]))
     dst = data_frame(name = ["x", "y", "x", "y"], value = [1, 3, 2, 4])
     
-    res = pivot_longer(src, _["x":"y"])
+    query = pivot_longer(_, _["x":"y"])
 
-    assert_frame_equal(res.reset_index(drop=True), dst)
+    assert_equal_query(src, query, dst)
 
 
 def test_values_interleaved_correctly():
-    # TODO: fix order issue
     df = data_frame(x = [1,2], y = [10, 20], z = [100, 200])
 
     pv = pivot_longer(df, _[0:3])
@@ -43,6 +89,7 @@ def test_values_interleaved_correctly():
 
 
 def test_spec_add_multi_columns():
+    # TODO: SQL backends
     df = data_frame(x = [1,2], y = [3,4])
 
     sp = data_frame(**{".name": ["x", "y"], ".value": "v", "a": 1, "b": 2})
@@ -51,36 +98,54 @@ def test_spec_add_multi_columns():
     assert pv.columns.tolist() == ["a", "b", "v"]
 
 
-def test_preserves_original_keys():
-    df = data_frame(x = [1,2], y = [2,2], z = [1,2])
-    pv = pivot_longer(df, _["y":"z"])
+def test_preserves_original_keys(backend):
+    src = data_frame(x = [1,2], y = [2,2], z = [1,2])
+    remote = backend.load_df(src)
+        
+    pv = collect(pivot_longer(remote, _["y":"z"]))
 
     assert pv.columns.tolist() == ["x", "name", "value"]
-    assert_series_equal(
+    assert_series_equal2(
         pv["x"],
-        pd.Series(df["x"].repeat(2))
-        )
+        pd.Series(src["x"].repeat(2)),
+        sql_ordered=False
+    )
 
 
-def test_can_drop_missing_values():
-    df = data_frame(x = [1, np.nan], y = [np.nan, 2])
-    pv = pivot_longer(df, _["x":"y"], values_drop_na=True)
+def test_can_drop_missing_values(backend):
+    src = backend.load_df(
+        data_frame(x = [1, np.nan], y = [np.nan, 2])
+    )
+    dst = data_frame(name = ["x", "y"], value = [1, 2])
+    pv = pivot_longer(src, _["x":"y"], values_drop_na=True)
 
-    assert pv["name"].tolist() == ["x", "y"]
-    assert pv["value"].tolist() == [1, 2]
+    # TODO: sql databases sometimes return float. we need assertions to take
+    # backend (or sql vs pandas) specific options.
+    assert_equal_query2(pv, dst, sql_ordered=False, check_dtype=False)
 
 
-def test_can_handle_missing_combinations():
+def test_can_handle_missing_combinations(backend):
     df = data_frame(id = ["A", "B"], x_1 = [1, 3], x_2 = [2, 4], y_2 = ["a", "b"])
-    pv = pivot_longer(df, -_.id, names_to = (".value", "n"), names_sep = "_")
+    src = backend.load_df(df)
+    pv = collect(
+        pivot_longer(src, -_.id, names_to = (".value", "n"), names_sep = "_")
+    )
 
-    pv_expected = pd.Series([np.nan, "a", np.nan, "b"],
+    pd.Series([np.nan, "a", np.nan, "b"],
                             index = [0, 0, 1, 1],
                             name = 'y')
 
     assert pv.columns.tolist() == ["id", "n", "x", "y"]
-    assert pv["x"].tolist() == [1, 2, 3, 4]
-    pd.testing.assert_series_equal(pv["y"], pv_expected)
+    assert_series_equal2(
+        pv["x"],
+        pd.Series([1, 2, 3, 4], index = [0, 0, 1, 1], name="x"),
+        sql_ordered=False
+    )
+    assert_series_equal2(
+        pv["y"],
+        pd.Series([np.nan, "a", np.nan, "b"], index = [0, 0, 1, 1], name = 'y'),
+        sql_ordered=False
+    )
 
 
 @pytest.mark.xfail
@@ -99,24 +164,27 @@ def test_can_override_default_output_col_type():
     assert pv["value"].tolist() == ["x", "1"]
 
 
-def test_spec_can_pivot_to_multi_measure_cols():
-    df = data_frame(x = "x", y = 1)
+def test_spec_can_pivot_to_multi_measure_cols(backend):
+    df = backend.load_df(data_frame(x = "x", y = 1))
     sp = data_frame(**{".name": ["x", "y"], ".value": ["X", "Y"], "row": [1, 1]})
 
-    pv = pivot_longer_spec(df, sp)
+    pv = collect(pivot_longer_spec(df, sp))
 
     assert pv.columns.tolist() == ["row", "X", "Y"]
     assert pv["X"].tolist() == ["x"]
     assert pv["Y"].tolist() == [1]
 
 
-def test_original_col_order_is_preserved():
+def test_original_col_order_is_preserved(backend):
     df = data_frame(
         id = ["A", "B"],
         z_1 = [1, 7], y_1 = [2, 8], x_1 = [3, 9],
         z_2 = [4, 10], y_2 = [5, 11], x_2 = [6, 12]
     )
-    pv = pivot_longer(df, -_.id, names_to = (".value", "n"), names_sep = "_")
+    src = backend.load_df(df)
+    pv = collect(
+        pivot_longer(src, -_.id, names_to = (".value", "n"), names_sep = "_")
+    )
 
     assert pv.columns.tolist() == ["id", "n", "z", "y", "x"]
 
@@ -134,8 +202,10 @@ def test_handles_duplicate_column_names():
     assert pv["value"].tolist() == [1, 2, 3, 4]
 
 
-def test_can_pivot_duplicate_names_to_value():
+def test_can_pivot_duplicate_names_to_value(backend):
     df = data_frame(x = 1, a_1 = 1, a_2 = 2, b_1 = 3, b_2 = 4)
+    src = backend.load_df(df)
+
     pv1 = pivot_longer(df, -_.x, names_to = (".value", np.nan), names_sep = "_")
     pv2 = pivot_longer(df, -_.x, names_to = (".value", np.nan), names_pattern = "(.)_(.)")
     pv3 = pivot_longer(df, -_.x, names_to = ".value", names_pattern = "(.)_.")
@@ -147,6 +217,7 @@ def test_can_pivot_duplicate_names_to_value():
 
 
 def test_value_can_be_any_pos_in_names_to():
+    # TODO: should work in SQL
     samp = data_frame(
         i = np.arange(1, 5),
         y_t1 = np.random.standard_normal(4),

@@ -11,6 +11,7 @@ from . import pivot_wider, pivot_wider_spec, build_wider_spec
 _ = Symbolic()
 
 def test_pivot_all_cols():
+    # TODO: SQL
     src = data_frame(key = ["x", "y", "z"], val = [1, 2, 3])
     dst = data_frame(x = 1, y = 2, z = 3)
 
@@ -20,6 +21,7 @@ def test_pivot_all_cols():
 
 
 def test_pivot_id_cols_default_preserve():
+    # TODO: SQL
     src = data_frame(a = 1, key = ["x", "y"], val = [1, 2])
     dst = data_frame(a = [1], x = [1], y = [2])
 
@@ -29,12 +31,13 @@ def test_pivot_id_cols_default_preserve():
 
 
 def test_pivot_implicit_missings_to_explicit():
+    # TODO: SQL
     src = data_frame(a = [1, 2], key = ["x", "y"], val = [1, 2])
     dst = data_frame(a = [1, 2], x = [1., None], y = [None, 2.])
 
     pv = pivot_wider(src, names_from = _.key, values_from = _.val)
 
-    assert_frame_equal(pv, dst)
+    assert_frame_equal(pv, dst, check_dtype=False)
 
 
 def test_error_overwriting_existing_column():

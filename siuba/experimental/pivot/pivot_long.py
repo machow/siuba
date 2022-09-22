@@ -54,7 +54,7 @@ def pivot_longer(
         values_to: str = "value",
         values_drop_na: bool = False,
         values_ptypes: Optional[Union[str, Tuple[str, ...]]] = None,
-        values_transform: Optional[Dict] = dict(),
+        values_transform: Optional[Dict] = None,
         ):
     
     df_spec = build_longer_spec(
