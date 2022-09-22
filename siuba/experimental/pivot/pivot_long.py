@@ -225,7 +225,20 @@ def pivot_longer_spec(
 
         wide_values.columns = column_index
 
-        long_values = (wide_values .stack(inner_levels.tolist()).droplevel(list(n_orig_levels + indx_to_drop))
+        # note that levels named NA should not be in the final result, but are
+        # needed for stacking.
+        long_values_almost = (wide_values
+            .stack(inner_levels.tolist())
+            .droplevel(list(n_orig_levels + indx_to_drop))
+        )
+
+        # note: this is necessary for pandas <1.3 backwards compat. our column
+        # index is a categorical, so reset_index is seen as trying to add a category
+        # that doesn't exist to it... :/
+        long_values_almost.columns = list(long_values_almost.columns)
+
+        # once we drop earlier pandas versions, can cut out piece above
+        long_values = (long_values_almost
             .reset_index(inner_levels[~inner_levels_na].tolist())
         )
     
