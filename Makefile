@@ -13,11 +13,11 @@ SPHINX_BUILDARGS=-j auto
 
 test:
 	py.test --nbval $(NOTEBOOK_TESTS)
-	pytest --dbs="sqlite,postgresql" siuba/
+	pytest siuba/
 
 test-travis:
 	py.test --nbval-lax $(filter-out %postgres.ipynb, $(NOTEBOOK_TESTS))
-	pytest --dbs="sqlite,postgresql" $(PYTEST_FLAGS) siuba/
+	pytest $(PYTEST_FLAGS) siuba/
 
 examples/%.ipynb:
 	jupyter nbconvert --to notebook --inplace --execute $@
