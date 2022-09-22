@@ -1,5 +1,5 @@
 numpy==1.19.1
-pandas==1.1.0
+pandas==1.2.0
 psycopg2==2.8.5
 PyMySQL==1.0.2
 python-dateutil==2.8.1
