@@ -4,44 +4,73 @@ import pytest
 
 from pandas.testing import assert_frame_equal, assert_series_equal
 
+from siuba.dply.verbs import collect
 from siuba.siu import Symbolic
 from siuba.tests.helpers import data_frame
 from . import pivot_wider, pivot_wider_spec, build_wider_spec
 
+from .test_pivot import assert_equal_query2, assert_series_equal2
+
 _ = Symbolic()
 
-def test_pivot_all_cols():
-    # TODO: SQL
-    src = data_frame(key = ["x", "y", "z"], val = [1, 2, 3])
+def test_pivot_all_cols(backend):
+    # TODO: SQL - bigquery distinct not ordered, so col order is out
+    src = backend.load_df(
+        data_frame(key = ["x", "y", "z"], val = [1, 2, 3])
+    )
     dst = data_frame(x = 1, y = 2, z = 3)
 
     pv = pivot_wider(src, names_from=_.key, values_from=_.val)
 
-    assert_frame_equal(pv, dst)
+    # Note: duckdb is ordered
+    assert_equal_query2(pv, dst, sql_kwargs = {"check_like": True})
 
 
-def test_pivot_id_cols_default_preserve():
-    # TODO: SQL
-    src = data_frame(a = 1, key = ["x", "y"], val = [1, 2])
+def test_pivot_id_cols_default_preserve(backend):
+    src = backend.load_df(
+        data_frame(a = 1, key = ["x", "y"], val = [1, 2])
+    )
     dst = data_frame(a = [1], x = [1], y = [2])
 
     pv = pivot_wider(src, names_from = _.key, values_from = _.val)
 
-    assert_frame_equal(pv, dst)
+    # Note: duckdb is ordered
+    assert_equal_query2(pv, dst, sql_kwargs = {"check_like": True})
 
 
 def test_pivot_implicit_missings_to_explicit():
-    # TODO: SQL
     src = data_frame(a = [1, 2], key = ["x", "y"], val = [1, 2])
     dst = data_frame(a = [1, 2], x = [1., None], y = [None, 2.])
 
     pv = pivot_wider(src, names_from = _.key, values_from = _.val)
 
-    assert_frame_equal(pv, dst, check_dtype=False)
+    assert_equal_query2(pv, dst)
 
 
-def test_error_overwriting_existing_column():
-    src = data_frame(a = [1, 1], key = ["a", "b"], val = [1, 2])
+def test_pivot_implicit_missings_to_explicit_from_spec(backend):
+    df = data_frame(a = [1, 2], key = ["x", "y"], val = [1, 2])
+    dst = data_frame(a = [1, 2], x = [1., None], y = [None, 2.])
+
+    sp = pd.DataFrame({".name": ["x", "y"], ".value": ["val"]*2, "key": ["x", "y"]})
+
+    src = backend.load_df(df)
+    pv = pivot_wider_spec(src, sp)
+
+    assert_equal_query2(
+        pv,
+        dst,
+        check_dtype=False,
+        # Note: duckdb is ordered
+        sql_ordered=False,
+    )
+
+
+@pytest.mark.skip_backend("bigquery")
+def test_error_overwriting_existing_column(skip_backend, backend):
+    # TODO: SQL - bigquery distinct not ordered, so col order is out
+    src = backend.load_df(
+        data_frame(a = [1, 1], key = ["a", "b"], val = [1, 2])
+    )
     
     # a bunch of snapshot tests...
     # should error
@@ -50,19 +79,24 @@ def test_error_overwriting_existing_column():
 
     assert "1 duplicate name(s)" in exc_info.value.args[0]
 
-    pv = pivot_wider(src, names_from = _.key, values_from = _.val, names_repair = "unique")
+    pv = collect(
+        pivot_wider(src, names_from = _.key, values_from = _.val, names_repair = "unique")
+    )
 
     # TODO: note that our names start with 0-based indexing
     assert list(pv.columns) == ["a___0", "a___1", "b"]
 
 
-def test_names_repair_unique():
-    src = data_frame(test = ["a", "b"], name = ["test", "test2"], value = [1, 2])
+@pytest.mark.skip_backend("bigquery")
+def test_names_repair_unique(skip_backend, backend):
+    src = backend.load_df(
+        data_frame(test = ["a", "b"], name = ["test", "test2"], value = [1, 2])
+    )
     dst = data_frame(test_0 = ["a", "b"], test_1 = [1., None], test2_2 = [None, 2.])
 
     pv = pivot_wider(src, names_repair=lambda x: [f"{v}_{ii}" for ii, v in enumerate(x)])
 
-    assert_frame_equal(pv, dst)
+    assert_equal_query2(pv, dst)
 
 
 def test_names_repair_minimal():
@@ -88,13 +122,16 @@ def test_grouping_preserved():
     assert isinstance(pv, pd.core.groupby.DataFrameGroupBy)
 
 
-def test_weird_column_name_select():
-    src = pd.DataFrame({"...8": ["x", "y", "z"], "val": [1, 2, 3]})
+@pytest.mark.skip_backend("bigquery")
+def test_weird_column_name_select(skip_backend, backend):
+    src = backend.load_df(
+        pd.DataFrame({"...8": ["x", "y", "z"], "val": [1, 2, 3]})
+    )
     dst = data_frame(x = 1, y = 2, z = 3)
 
     pv = pivot_wider(src, names_from = _["...8"], values_from = _.val)
 
-    assert_frame_equal(pv, dst)
+    assert_equal_query2(pv, dst, sql_kwargs = {"check_like": True})
 
 
 @pytest.mark.skip("Won't do")
@@ -109,9 +146,11 @@ def test_data_frame_columns_pivot_correctly():
     pass
 
 
-def test_names_from_required_error():
+def test_names_from_required_error(backend):
     # column name doesn't exist
-    src = data_frame(key = "x", val = 1)
+    src = backend.load_df(
+        data_frame(key = "x", val = 1)
+    )
 
     with pytest.raises(ValueError) as exc_info:
         pivot_wider(src, values_from = _.val)
@@ -119,8 +158,10 @@ def test_names_from_required_error():
     assert "name" in exc_info.value.args[0]
 
 
-def test_values_from_required_error():
-    src = data_frame(key = "x", val = 1)
+def test_values_from_required_error(backend):
+    src = backend.load_df(
+        data_frame(key = "x", val = 1)
+    )
 
     with pytest.raises(ValueError) as exc_info:
         pivot_wider(src, names_from = _.key)
@@ -128,8 +169,10 @@ def test_values_from_required_error():
     assert "value" in exc_info.value.args[0]
 
 
-def test_names_from_no_match_error():
-    src = data_frame(key = "x", val = 1)
+def test_names_from_no_match_error(backend):
+    src = backend.load_df(
+        data_frame(key = "x", val = 1)
+    )
 
     with pytest.raises(ValueError) as exc_info:
         pv = pivot_wider(src, names_from = _.startswith("foo"), values_from = _.val)
@@ -137,8 +180,10 @@ def test_names_from_no_match_error():
     assert "`names_from` must" in exc_info.value.args[0]
 
 
-def test_values_from_no_match_error():
-    src = data_frame(key = "x", val = 1)
+def test_values_from_no_match_error(backend):
+    src = backend.load_df(
+        data_frame(key = "x", val = 1)
+    )
 
     with pytest.raises(ValueError) as exc_info:
         pv = pivot_wider(src, names_from = _.key, values_from = _.startswith("foo"))
@@ -249,12 +294,16 @@ def test_id_expand_and_names_expand_works_with_zero_row_frames():
 # Column names ================================================================
 
 @pytest.mark.xfail
-def test_names_glue_basic():
+def test_names_glue_basic(backend):
     # TODO: switch to use build_spec
     # TODO: prefix internal spec names with .
-    src = data_frame(x = ["X", "Y"], y = [1, 2], a = [1, 2], b = [1, 2])
+    src = backend.load_df(
+        data_frame(x = ["X", "Y"], y = [1, 2], a = [1, 2], b = [1, 2])
+    )
 
-    pv = pivot_wider(src, names_from=_[_.x, _.y], values_from=_[_.a, _.b], names_glue="{x}{y}_{.value}")
+    pv = collect(
+        pivot_wider(src, names_from=_[_.x, _.y], values_from=_[_.a, _.b], names_glue="{x}{y}_{.value}")
+    )
     assert list(pv.columns) == ["X1_a", "Y2_a", "X1_b", "Y2_b"]
  
 
@@ -373,18 +422,22 @@ def test_pivot_can_override_default_keys():
     assert_frame_equal(pv, dst)
 
 
-def test_selecting_all_id_cols_excludes_names_from_values_from():
-    src = data_frame(key = "x", name = "a", value = 1)
+def test_selecting_all_id_cols_excludes_names_from_values_from(backend):
+    src = backend.load_df(
+        data_frame(key = "x", name = "a", value = 1)
+    )
     dst = data_frame(key = "x", a = 1)
     pv = pivot_wider(src, _[:])
 
-    assert_frame_equal(pv, dst)
+    assert_equal_query2(pv, dst)
 
     # TODO: also test pivot_wider_spec
 
 
-def test_id_cols_overlaps_other_vars_error():
-    src = data_frame(name = ["x", "y"], value = [1, 2])
+def test_id_cols_overlaps_other_vars_error(backend):
+    src = backend.load_df(
+        data_frame(name = ["x", "y"], value = [1, 2])
+    )
 
     with pytest.raises(ValueError) as exc_info:
         pivot_wider(src, id_cols = _.name, names_from = _.name, values_from = _.value)
@@ -393,21 +446,28 @@ def test_id_cols_overlaps_other_vars_error():
         pivot_wider(src, id_cols = _.value, names_from = _.name, values_from = _.value)
 
 
-def test_id_cols_no_column_match_error():
-    src = data_frame(name = ["x", "y"], value = [1, 2])
-    with pytest.raises(KeyError) as exc_info:
+def test_id_cols_no_column_match_error(backend):
+    src = backend.load_df(
+        data_frame(name = ["x", "y"], value = [1, 2])
+    )
+    with pytest.raises(ValueError) as exc_info:
         pivot_wider(src, id_cols = _.foo)
 
-    assert "None of ['foo'] are in the columns"
+    msg = exc_info.value.args[0]
+    assert "id_cols must" in msg
+    assert "Could not find these columns: {'foo'}" in msg
 
 
-def test_pivot_zero_row_frame_id_excludes_values_from():
-    src = data_frame(key = pd.Series([], dtype="int"), name = [], value = [])
-
-    assert_frame_equal(
-        pivot_wider(src, names_from = _.name, values_from = _.value),
-        data_frame(key = pd.Series([], dtype="int"))
+def test_pivot_zero_row_frame_id_excludes_values_from(backend):
+    src = backend.load_df(
+        data_frame(key = pd.Series([], dtype="int"), name = [], value = [])
     )
+    dst = data_frame(key = pd.Series([], dtype="int"))
+
+    pv = pivot_wider(src, names_from = _.name, values_from = _.value)
+
+    # SQL backends return a empty Index, pandas an empty RangeIndex ¯\_(ツ)_/¯
+    assert_equal_query2(pv, dst, sql_kwargs = {"check_index_type": False, "check_dtype": False})
 
 
 #TODO:
@@ -515,13 +575,24 @@ def test_duplicate_error_resolved_by_values_fn():
     )
 
 
-@pytest.mark.parametrize("values_fn", [
-    dict(val = "sum"),
-    lambda x: x.sum()
-])
-def test_values_fn_arg(values_fn):
+def test_values_fn_arg_str(backend):
+    src = backend.load_df(
+        data_frame(a = [1, 1, 2], key = ["x", "x", "x"], val = [1, 2, 3])
+    )
+    pv = pivot_wider(src, names_from = _.key, values_from = _.val, values_fn="sum")
+
+    assert_equal_query2(
+        pv,
+        data_frame(a = [1, 2], x = [3, 3]),
+        sql_ordered=False,
+        sql_kwargs={"check_dtype": False}
+    )
+
+
+def test_values_fn_arg_lambda():
+    f = lambda x: x.sum()
     src = data_frame(a = [1, 1, 2], key = ["x", "x", "x"], val = [1, 2, 3])
-    pv = pivot_wider(src, names_from = _.key, values_from = _.val, values_fn=values_fn)
+    pv = pivot_wider(src, names_from = _.key, values_from = _.val, values_fn=f)
 
     assert_frame_equal(
         pv,

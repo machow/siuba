@@ -20,12 +20,21 @@ def _select_expr_slice(x: "tuple[str]") -> Call:
         getitem(Symbolic(), x)
     )
 
-def _tidy_select(__data, cols):
+def _tidy_select(__data, cols, arg_name):
     if cols is None:
         return {}
 
     var_list = var_create(cols)
     od = var_select(__data.columns, *var_list)
+
+    # TODO: where in tidyselect package does this check happen?
+    missing = set(od) - set(__data.columns)
+
+    if missing:
+        raise ValueError(
+            f"{arg_name} must select columns present in the data. "
+            f"Could not find these columns: {missing}"
+        )
 
     return od
 
@@ -133,8 +142,8 @@ def pivot_wider(
     # necessary here, since if the spec is 0 rows you cannot know values_from
     # TODO: clean up symbolic handling of slices
     if id_cols is None:
-        name_vars = _tidy_select(__data, names_from)
-        val_vars = _tidy_select(__data, values_from)
+        name_vars = _tidy_select(__data, names_from, "names_from")
+        val_vars = _tidy_select(__data, values_from, "values_from")
         others = {*name_vars, *val_vars}
 
         id_cols = tuple([col for col in __data.columns if col not in others])
@@ -155,6 +164,7 @@ def pivot_wider(
 
     return out
 
+@singledispatch2((pd.DataFrame, DataFrameGroupBy))
 def pivot_wider_spec(
     __data,
     spec,
@@ -193,7 +203,7 @@ def pivot_wider_spec(
         others = {*name_vars, *val_vars}
         id_vars = [col for col in __data.columns if col not in others]
     else:
-        id_vars = _tidy_select(__data, id_cols)
+        id_vars = _tidy_select(__data, id_cols, "id_cols")
 
     id_var_bad = set(id_vars) & set([*name_vars, *val_vars])
     if id_var_bad:
@@ -349,20 +359,14 @@ def build_wider_spec(
     # validate tidy selections ------------------------------------------------
     orig_vars = __data.columns
 
-    name_vars = _tidy_select(__data, names_from)
-    val_vars = _tidy_select(__data, values_from)
+    name_vars = _tidy_select(__data, names_from, "names_from")
+    val_vars = _tidy_select(__data, values_from, "values_form")
 
     if not name_vars:
         raise ValueError("`names_from` must select at least one column.")
-    elif set(name_vars) - set(orig_vars):
-        missing = set(name_vars) - set(orig_vars)
-        raise ValueError(f"`names_from` variable not in data: {missing}.")
 
     if not val_vars:
         raise ValueError("`values_from` must select at least one column.")
-    elif set(val_vars) - set(orig_vars):
-        missing = set(val_vars) - set(orig_vars)
-        raise ValueError(f"`values_from` variable(s) not in data: {missing}.")
 
     # get unique variable levels from names_from columns ----------------------
 

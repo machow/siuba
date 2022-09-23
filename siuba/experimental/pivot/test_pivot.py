@@ -24,7 +24,7 @@ _ = Symbolic()
 
 
 
-def assert_equal_query2(left, right, *args, sql_ordered=True, **kwargs):
+def assert_equal_query2(left, right, *args, sql_ordered=True, sql_kwargs=None, **kwargs):
     from siuba.sql import LazyTbl
     from siuba.sql.utils import _is_dialect_duckdb
     from pandas.core.groupby import DataFrameGroupBy
@@ -41,10 +41,14 @@ def assert_equal_query2(left, right, *args, sql_ordered=True, **kwargs):
         out[flt_cols] = out[flt_cols].astype('float64')
 
     if isinstance(left, LazyTbl):
-        if not sql_ordered:
-            assert_frame_sort_equal(out, right, *args, **kwargs)
+        if sql_kwargs:
+            final_kwargs = {**kwargs, **sql_kwargs}
         else:
-            assert_frame_equal(out, right, *args, **kwargs)
+            final_kwargs = kwargs
+        if not sql_ordered:
+            assert_frame_sort_equal(out, right, *args, **final_kwargs)
+        else:
+            assert_frame_equal(out, right, *args, **final_kwargs)
     else:
         assert_frame_equal(out, right, *args, **kwargs)
 
@@ -100,16 +104,14 @@ def test_spec_add_multi_columns():
 
 def test_preserves_original_keys(backend):
     src = data_frame(x = [1,2], y = [2,2], z = [1,2])
+    dst = data_frame(x = [1, 1, 2, 2], name = ["y", "z"]*2, value = [2,1,2,2])
+    dst.index = [0, 0, 1, 1]
+
     remote = backend.load_df(src)
         
-    pv = collect(pivot_longer(remote, _["y":"z"]))
+    pv = pivot_longer(remote, _["y":"z"])
 
-    assert pv.columns.tolist() == ["x", "name", "value"]
-    assert_series_equal2(
-        pv["x"],
-        pd.Series(src["x"].repeat(2)),
-        sql_ordered=False
-    )
+    assert_equal_query2(pv, dst, sql_ordered=False)
 
 
 def test_can_drop_missing_values(backend):
@@ -126,26 +128,18 @@ def test_can_drop_missing_values(backend):
 
 def test_can_handle_missing_combinations(backend):
     df = data_frame(id = ["A", "B"], x_1 = [1, 3], x_2 = [2, 4], y_2 = ["a", "b"])
+    dst = data_frame(
+        id = ["A", "A", "B", "B"],
+        n = ["1", "2"]*2,
+        x = [1, 2, 3, 4],
+        y = [np.nan, "a", np.nan, "b"]
+    )
+    dst.index = [0, 0, 1, 1]
+
     src = backend.load_df(df)
-    pv = collect(
-        pivot_longer(src, -_.id, names_to = (".value", "n"), names_sep = "_")
-    )
+    pv = pivot_longer(src, -_.id, names_to = (".value", "n"), names_sep = "_")
 
-    pd.Series([np.nan, "a", np.nan, "b"],
-                            index = [0, 0, 1, 1],
-                            name = 'y')
-
-    assert pv.columns.tolist() == ["id", "n", "x", "y"]
-    assert_series_equal2(
-        pv["x"],
-        pd.Series([1, 2, 3, 4], index = [0, 0, 1, 1], name="x"),
-        sql_ordered=False
-    )
-    assert_series_equal2(
-        pv["y"],
-        pd.Series([np.nan, "a", np.nan, "b"], index = [0, 0, 1, 1], name = 'y'),
-        sql_ordered=False
-    )
+    assert_equal_query2(pv, dst, sql_ordered=False)
 
 
 @pytest.mark.xfail
