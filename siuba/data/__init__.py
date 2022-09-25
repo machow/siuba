@@ -7,6 +7,9 @@ __all__ = [
         "band_members",
         "band_instruments",
         "band_instruments2",
+        "fish_encounters",
+        "us_rent_income",
+        "warpbreaks",
         ]
 
 def __dir__():
