@@ -48,7 +48,7 @@ def _values_to_select(sel_columns, spec_row: dict, value_vars: "list[str]"):
 def _build_longer_spec(__data: LazyTbl, *args, **kwargs):
     # building the spec only really needs the columns names. however, because we 
     # matched tidyr behavior, we just pass a DataFrame in for now.
-    df_data = pd.DataFrame(columns = list(__data.last_op.columns.keys()))
+    df_data = pd.DataFrame(columns = list(__data.last_op.alias().columns.keys()))
 
     return build_longer_spec(df_data, *args, **kwargs)
 
@@ -79,7 +79,7 @@ def _pivot_longer_spec(
     column_index = spec_to_multiindex(spec)
 
     wide_names = list(spec[".name"].unique())
-    wide_ids = [name for name in sel.columns.keys() if name not in wide_names]
+    wide_ids = [name for name in sel_alias.columns.keys() if name not in wide_names]
 
     long_name_vars = [k for k in spec.columns if k not in {".name", ".value"}]
     long_val_vars = list(spec[".value"].unique())
@@ -87,7 +87,7 @@ def _pivot_longer_spec(
 
     # guard against bad specifications ----
 
-    bad_names = set(wide_names) - set(sel.columns.keys())
+    bad_names = set(wide_names) - set(sel_alias.columns.keys())
     if bad_names:
         raise ValueError(f"Pivot spec contains columns not in the data: {bad_names}")
 
@@ -119,7 +119,8 @@ def _pivot_longer_spec(
     if values_drop_na:
         alias = sel_union.alias()
 
-        bool_clause = sql.and_(*[alias.columns[k].is_not(None) for k in long_val_vars])
+        # TODO: sqlalchemy 1.4+ prefers .is_not()
+        bool_clause = sql.and_(*[alias.columns[k].isnot(None) for k in long_val_vars])
 
         return __data.append_op(alias.select().where(bool_clause))
 

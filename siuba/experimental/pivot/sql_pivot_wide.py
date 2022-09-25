@@ -53,7 +53,7 @@ def _pivot_wider_spec(
     # * values_fn by default is "MAX"
 
     lazy_tbl = __data
-    __data = pd.DataFrame(columns = list(__data.last_op.columns.keys()))
+    __data = pd.DataFrame(columns = list(__data.last_op.alias().columns.keys()))
 
     if id_expand:
         raise NotImplementedError()
@@ -137,7 +137,7 @@ def _pivot_wider_spec(
         zip(repaired_names, [*wide_id_cols, *wide_name_cols])
     ]
     
-    final_sel = _sql_select([labeled_cols]).group_by(*wide_id_cols)
+    final_sel = _sql_select(labeled_cols).group_by(*wide_id_cols)
 
     return lazy_tbl.append_op(final_sel)
 
@@ -164,7 +164,7 @@ def _pivot_wider(
     # note that we use three forms of the data: __data for tidyselect,
     # distinct_data for spec creation, and lazy_tbl for the actual pivot
     lazy_tbl = __data    
-    __data = pd.DataFrame(columns = list(__data.last_op.columns.keys()))
+    __data = pd.DataFrame(columns = list(__data.last_op.alias().columns.keys()))
 
     # tidyselect variable names -----------------------------------------------
     # adapted from pivot_wide
