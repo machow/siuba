@@ -112,13 +112,122 @@ def pivot_wider(
     values_fn=None,
     unused_fn=None
     ):
-    """
+    """Pivot data from long to wide format.
+
+    This function splits a column, putting the pieces side-by-side based on an index.
+
     Parameters
     ----------
+    __data:
+        The input data.
+    id_cols:
+        A selection of columns that uniquely identify each observation.
+    id_expand:
+        Whether to ensure each unique combination of id_cols is a row in the data
+        before pivoting, using `expand()`. This results in more rows. When True,
+        this also sorts the final result by the `id_cols`.
+    names_from, values_from:
+        A pair fo arguments describing which column (or columns) to get the name of
+        the output column (names_from), and which column (or columns) to get the
+        cell values from (values_from).
+    names_prefix:
+        String added to the start of every variable name.
+    names_sep:
+        If names_from or values_from contains multiple values, this will be used
+        to join their values together into a single string to use as a column name.
+    names_glue:
+        Instead of names_sep and names_prefix, supply a string template that uses
+        the names_from columns (and a special .value variable) to create custom
+        column names.
+    names_sort:
+        Should the column names be sorted? The default is False, which results
+        in column names ordered by first appearance.
+    names_vary:
+        Option specifying how columns are ordered when names_from and values_from
+        both identify new columns. "fastest" varies names_from fastest, while "slowest"
+        varies names_from slowest.
+    names_expand:
+        Whether to ensure all combinations of names_from columns are in the result
+        using the `expand()` function. This results in more columns in the output.
+    names_repair:
+        Strategy for fixing of invalid column names. "minimal" leaves them as is.
+        "check_unique" raises an error if there are duplicate names. "unique"
+        de-duplicates names by appending "___{position}" to them.
     values_fill:
         A scalar value used to fill in any missing values. Alternatively, a
         dictionary mapping column names to fill values.
-        
+    values_fn:
+        An optional function to apply to each cell of the output. This is useful
+        when each cell would contain multiple values. E.g. values_fn="max" would
+        calculate the max value.
+    unused_fn:
+        Not implemented.
+
+    Examples
+    --------
+    >>> from siuba import _
+
+    >>> df = pd.DataFrame(
+    ...    {"id": ["a", "b", "a"], "name": ["x", "x", "y"], "value": [1, 2, 3]}
+    ... )
+    >>> df
+      id name  value
+    0  a    x      1
+    1  b    x      2
+    2  a    y      3
+
+    >>> pivot_wider(df, names_from=_.name, values_from=_.value)
+      id    x    y
+    0  a  1.0  3.0
+    1  b  2.0  NaN
+
+    >>> pivot_wider(df, names_from=_.name, values_from=_.value, values_fill=0)
+      id  x  y
+    0  a  1  3
+    1  b  2  0
+
+    >>> many = pd.DataFrame({
+    ...    "id": [1, 1, 2, 2],
+    ...    "var": ["one", "two", "one", "two"],
+    ...    "x": [1, 2, 3, 4],
+    ...    "y": [6, 7, 8, 9]
+    ... })
+    >>> pivot_wider(many, names_from=_.var, values_from=_[_.x, _.y])
+       id  x_one  x_two  y_one  y_two
+    0   1      1      2      6      7
+    1   2      3      4      8      9
+
+    >>> pivot_wider(many, names_from=_.var, values_from=_[_.x, _.y], names_vary="slowest")
+       id  x_one  y_one  x_two  y_two
+    0   1      1      6      2      7
+    1   2      3      8      4      9
+
+    >>> pivot_wider(many, names_from=_.var, values_from=_[_.x, _.y], names_sep=".")
+       id  x.one  x.two  y.one  y.two
+    0   1      1      2      6      7
+    1   2      3      4      8      9
+
+    >>> glue = "{variable}_X_{value}"
+    >>> pivot_wider(many, names_from=_.var, values_from=_[_.x, _.y], names_glue=glue)
+       id  x_X_one  x_X_two  y_X_one  y_X_two
+    0   1        1        2        6        7
+    1   2        3        4        8        9
+
+    >>> from siuba.data import warpbreaks
+    >>> warpbreaks.head()
+       breaks wool tension
+    0      26    A       L
+    1      30    A       L
+    2      54    A       L
+    3      25    A       L
+    4      70    A       L
+
+    >>> pivot_wider(warpbreaks, names_from=_.wool, values_from=_.breaks, values_fn="mean")
+      tension          A          B
+    0       H  24.555556  18.777778
+    1       L  44.555556  28.222222
+    2       M  24.000000  28.777778
+
     """
     input_ = __data
 

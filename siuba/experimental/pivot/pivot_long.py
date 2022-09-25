@@ -44,7 +44,7 @@ def _drop_cols_by_position(df, locations):
 @singledispatch2(pd.DataFrame)
 def pivot_longer(
         __data,
-        *args,
+        *cols,
         names_to: Union[str, Tuple[str, ...]] = "name",
         names_prefix: Optional[str] = None,
         names_sep: Optional[str] = None,
@@ -55,11 +55,86 @@ def pivot_longer(
         values_drop_na: bool = False,
         values_ptypes: Optional[Union[str, Tuple[str, ...]]] = None,
         values_transform: Optional[Dict] = None,
-        ):
-    
+):
+    """Pivot data from wide to long format.
+
+    This function stacks columns of data, turning them into rows.
+
+    Parameters
+    ----------
+    __data:
+        The input data.
+    *cols: 
+        Columns to pivot into longer format. This uses tidyselect
+        (e.g. `_[_.some_col, _.another_col]`).
+    names_to:
+        A list specifying the new column or columns to create from the information
+        stored in the column names of data specified by cols.
+    names_prefix:
+        A regular expression to strip off from the start of column selected by `*cols`.
+    names_sep:
+        If names_to is a list of name parts, this is a separater the name is split on.
+        This is the same as the sep argument in the separate() function.
+    names_pattern:
+        If names_to is a list of name parts, this is a pattern to extract parts
+        This is the same as the regex argument in the extract() function.
+    names_ptypes, values_ptypes:
+        Not implemented.
+    names_transform:
+        TODO
+    names_repair:
+        Strategy for fixing of invalid column names. "minimal" leaves them as is.
+        "check_unique" raises an error if there are duplicate names. "unique"
+        de-duplicates names by appending "___{position}" to them.
+    values_to:
+        A string specifying the name of the column created to hold the stacked
+        values of the selected `*cols`. If names_to is a list with the entry ".value",
+        then this argument is ignored.
+
+
+    Examples
+    --------
+    >>> from siuba import _
+
+    >>> df = pd.DataFrame({"id": [1, 2], "x": [5, 6], "y": [7, 8]})
+    >>> pivot_longer(df, ~_.id, names_to="variable", values_to="number")
+       id variable  number
+    0   1        x       5
+    0   1        y       7
+    1   2        x       6
+    1   2        y       8
+
+    >>> weeks = pd.DataFrame({"id": [1], "year": [2020], "wk1": [5], "wk2": [6]})
+    >>> pivot_longer(weeks, _.startswith("wk"), names_to="week", names_prefix="wk")
+       id  year week  value
+    0   1  2020    1      5
+    0   1  2020    2      6
+
+    >>> df2 = pd.DataFrame({"id": [1], "a_x1": [2], "b_x2": [3], "a_y1": [4]})
+    >>> names = ["condition", "group", "number"]
+    >>> pat = "(.*)_(.)(.*)"
+    >>> pivot_longer(df2, _["a_x1":"a_y1"], names_to = names, names_pattern = pat)
+       id condition group number  value
+    0   1         a     x      1      2
+    0   1         b     x      2      3
+    0   1         a     y      1      4
+
+    >>> names = ["x1", "x2", "y1", "y2"]
+    >>> wide = pd.DataFrame({
+    ...    "x1": [1, 11], "x2": [2, 22], "y1": [3, 33], "y2": [4, 44]
+    ... })
+    >>> pivot_longer(wide, _[:], names_to = [".value", "set"], names_pattern = "(.)(.)")
+      set   x   y
+    0   1   1   3
+    0   2   2   4
+    1   1  11  33
+    1   2  22  44
+
+    """
+
     df_spec = build_longer_spec(
         __data,
-        *args,
+        *cols,
         names_to=names_to,
         values_to=values_to,
         names_prefix=names_prefix,
@@ -99,7 +174,7 @@ def _pivot_longer_gdf(__data, *args, **kwargs):
 @singledispatch2((pd.DataFrame, DataFrameGroupBy))
 def build_longer_spec(
     __data,
-    *args,
+    *cols,
     names_to="name",
     values_to="value",
     names_prefix: "str | None"=None,
@@ -117,7 +192,7 @@ def build_longer_spec(
 
     # select id columns and measure data --------------------------------------
 
-    var_list = var_create(*args)
+    var_list = var_create(*cols)
     od = var_select(__data.columns, *var_list)
 
     value_vars = list(od)
