@@ -2,90 +2,46 @@ from IPython import get_ipython
 from IPython.core.history import HistoryAccessor
 from IPython.core.completer import cursor_to_position, _FakeJediCompletion
 from typing import Iterable, Any
+from functools import wraps, partial
+from contextlib import contextmanager
+
 from siuba.siu import Symbolic
 
-import jedi
-import functools
+
+def order_results_cols_first(completions: "iter[Any]", df) -> "list[Any]":
+    # TODO: annotate this as a list of jedi completions objs
+    cols = set(df.columns)
+    return sorted(completions, key = lambda x: 0 if x.name in cols else 1)
 
 
-def _jedi_matches(self, cursor_column:int, cursor_line:int, text:str) -> Iterable[Any]:
-    """
+def wrap_jedi_matches(_jedi_matches):
+    @wraps(_jedi_matches)
+    def wrapper(self, *args, **kwargs):
+        orig_namespace = self.namespace
 
-    Return a list of :any:`jedi.api.Completions` object from a ``text`` and
-    cursor position.
+        # find DataFrame and inject into namespace
+        df_name = _find_df_in_history(self.shell)
 
-    Parameters
-    ----------
-    cursor_column : int
-        column position of the cursor in ``text``, 0-indexed.
-    cursor_line : int
-        line position of the cursor in ``text``, 0-indexed
-    text : str
-        text to complete
+        # guard to fallback to default behavior ----
+        if df_name is None or not isinstance(self.shell.user_ns.get("_"), Symbolic):
+            return _jedi_matches(*args, **kwargs)
 
-    Debugging
-    ---------
+        # insert dataframe and autocomplete ----
+        df = self.namespace[df_name]
+        self.namespace = {**self.namespace, "_": df}
 
-    If ``IPCompleter.debug`` is ``True`` may return a :any:`_FakeJediCompletion`
-    object containing a string with the Jedi debug information attached.
-    """
-    df = _find_df_in_history(self.shell)
-    if df and isinstance(self.shell.user_ns.get("_"), Symbolic):
-        namespaces = [{**self.namespace, "_": self.namespace[df]}]
-    else:
-        namespaces = [self.namespace]
-
-    if self.global_namespace is not None:
-        namespaces.append(self.global_namespace)
-
-    completion_filter = lambda x:x
-    offset = cursor_to_position(text, cursor_line, cursor_column)
-    # filter output if we are completing for object members
-    if offset:
-        pre = text[offset-1]
-        if pre == '.':
-            if self.omit__names == 2:
-                completion_filter = lambda c:not c.name.startswith('_')
-            elif self.omit__names == 1:
-                completion_filter = lambda c:not (c.name.startswith('__') and c.name.endswith('__'))
-            elif self.omit__names == 0:
-                completion_filter = lambda x:x
-            else:
-                raise ValueError("Don't understand self.omit__names == {}".format(self.omit__names))
-
-    interpreter = jedi.Interpreter(text[:offset], namespaces)
-    try_jedi = True
-
-    try:
-        # find the first token in the current tree -- if it is a ' or " then we are in a string
-        completing_string = False
         try:
-            first_child = next(c for c in interpreter._get_module().tree_node.children if hasattr(c, 'value'))
-        except StopIteration:
-            pass
-        else:
-            # note the value may be ', ", or it may also be ''' or """, or
-            # in some cases, """what/you/typed..., but all of these are
-            # strings.
-            completing_string = len(first_child.value) > 0 and first_child.value[0] in {"'", '"'}
+            completions = _jedi_matches(*args, **kwargs)
+        finally:
+            self.namespace = orig_namespace
 
-        # if we are in a string jedi is likely not the right candidate for
-        # now. Skip it.
-        try_jedi = not completing_string
-    except Exception as e:
-        # many of things can go wrong, we are using private API just don't crash.
-        if self.debug:
-            print("Error detecting if completing a non-finished string :", e, '|')
+        self._all_completions = list(completions)
 
-    if not try_jedi:
-        return []
-    try:
-        return filter(completion_filter, interpreter.complete(column=cursor_column, line=cursor_line + 1))
-    except Exception as e:
-        if self.debug:
-            return [_FakeJediCompletion('Oops Jedi has crashed, please report a bug with the following:\n"""\n%s\ns"""' % (e))]
-        else:
-            return []
+        return order_results_cols_first(self._all_completions, df)
+
+        #return completions
+
+    return wrapper
 
 
 def _match_df_name(dfs, commands):
@@ -131,7 +87,10 @@ def _find_df_in_history(shell):
 
 
 def siuba_jedi_override(shell):
-    shell.Completer._jedi_matches = functools.partial(_jedi_matches, shell.Completer)
+    # wrap the bound method _jedi_matches. Note that Completer is actually an instance
+    self = shell.Completer
+    wrapped = wrap_jedi_matches(self._jedi_matches)
+    shell.Completer._jedi_matches = partial(wrapped, self)
 
 
 shell = get_ipython()
