@@ -2341,6 +2341,15 @@ def tbl(src, *args, **kwargs):
         n
     0  32
 
+    You can analyze a mock table
+
+    >>> from sqlalchemy import create_mock_engine
+    >>> mock_engine = create_mock_engine("postgresql:///", lambda *args, **kwargs: None)
+    >>> tbl_mock = tbl(mock_engine, "some_table", columns = ["a", "b", "c"])
+    >>> q = tbl_mock >> count() >> show_query()    # doctest: +NORMALIZE_WHITESPACE
+    SELECT count(*) AS n
+    FROM (SELECT some_table.a AS a, some_table.b AS b, some_table.c AS c
+    FROM some_table) AS anon_1 ORDER BY n DESC
     """
 
     return src
@@ -2350,14 +2359,16 @@ def tbl(src, *args, **kwargs):
 def _tbl_sqla(src: SqlaEngine, table_name, columns=None):
     from siuba.sql import LazyTbl
 
+    # TODO: once we subclass LazyTbl per dialect (e.g. duckdb), we can move out
+    # this dialect specific logic.
     if src.dialect.name == "duckdb" and isinstance(columns, pd.DataFrame):
         src.execute("register", (table_name, columns))
         return LazyTbl(src, table_name)
     
-    return LazyTbl(src, table_name)
+    return LazyTbl(src, table_name, columns=columns)
 
 
-tbl.register(object)
+@tbl.register(object)
 def _tbl(__data, *args, **kwargs):
     raise NotImplementedError(
         f"Unsupported type {type(__data)}. "

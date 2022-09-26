@@ -39,7 +39,7 @@ class AbstractBackend(metaclass=_AbstractBackendMeta):
                 continue
             else:
                 target_cls = _load_class(mod_name, cls_name)
-                if issubclass(target_cls, subclass):
+                if issubclass(subclass, target_cls):
                     return True
 
         return NotImplemented
@@ -49,4 +49,4 @@ class AbstractBackend(metaclass=_AbstractBackendMeta):
 
 class SqlaEngine(AbstractBackend): pass
 
-SqlaEngine.register_backend("sqlalchemy.engine", "Engine")
+SqlaEngine.register_backend("sqlalchemy.engine", "Connectable")

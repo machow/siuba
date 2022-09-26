@@ -287,7 +287,7 @@ class LazyTbl:
         self.source = sqlalchemy.create_engine(source) if isinstance(source, str) else source
 
         # get dialect name
-        dialect = self.source.url.get_backend_name()
+        dialect = self.source.dialect.name
         self.translator = get_dialect_translator(dialect)
 
         self.tbl = self._create_table(tbl, columns, self.source)
