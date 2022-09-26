@@ -40,6 +40,8 @@ def _load_data_cars_sql():
             "cars",
             ["cyl", "mpg", "hp"]
             )
+    
+    return cars_sql
 
 
 def __getattr__(name):
