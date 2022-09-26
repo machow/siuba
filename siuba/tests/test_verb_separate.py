@@ -23,6 +23,26 @@ def test_extract_default(df):
             data_frame(season = ["S1", "S1"])
             )
 
+def test_separate_into_replace_column():
+    src = data_frame(x = [1, 2], label = ["S1-E1", "S1-E2"])
+    dst = data_frame(x = ["S1", "S1"], episode = ["E1", "E2"])
+
+    assert_equal_query(
+            src,
+            separate("label", into = ["x", "episode"]),
+            dst
+            )
+
+
+def test_extract_into_replace_column():
+    src = data_frame(x = [1, 2], label = ["S1-E1", "S1-E2"])
+    dst = data_frame(x = ["S1", "S1"], episode = ["E1", "E2"])
+
+    assert_equal_query(
+            src,
+            extract("label", into = ["x", "episode"], regex="(.*)?-(.*)"),
+            dst
+            )
 
 # regexes ----
 def test_separate_sep_arg(df):

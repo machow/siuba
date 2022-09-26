@@ -139,6 +139,14 @@ def _sql_with_only_columns(select, columns):
     return select.with_only_columns(*columns)
 
 
+def _sql_case(*args, **kwargs):
+    from sqlalchemy import sql
+    if is_sqla_12() or is_sqla_13():
+        return sql.case(args, **kwargs)
+
+    return sql.case(*args, **kwargs)
+
+
 # Simplify option in show_query -----------------------------------------------
 
 def _sql_refresh(el):
