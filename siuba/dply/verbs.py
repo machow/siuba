@@ -31,7 +31,8 @@ DPLY_FUNCTIONS = (
         "join", "inner_join", "full_join", "left_join", "right_join", "semi_join", "anti_join",
         # TODO: move to vectors
         "if_else", "case_when",
-        "collect", "show_query"
+        "collect", "show_query",
+        "tbl",
         )
 
 __all__ = [*DPLY_FUNCTIONS, "Pipeable", "pipe"]
@@ -2290,6 +2291,90 @@ def _extract_gdf(__data, *args, **kwargs):
 
     return out.groupby(groupings)
 
+
+# tbl ----
+
+from siuba.siu._databackend import SqlaEngine
+
+@singledispatch2((pd.DataFrame, DataFrameGroupBy))
+def tbl(src, *args, **kwargs):
+    """Create a table from a data source.
+
+    Parameters
+    ----------
+    src:
+        A pandas DataFrame, SQLAlchemy Engine, or other registered object.
+    *args, **kwargs:
+        Additional arguments passed to the individual implementations.
+
+    Examples
+    --------
+    >>> from siuba.data import cars
+
+    A pandas DataFrame is already a table of data, so trivially returns itself.
+
+    >>> tbl(cars) is cars
+    True
+
+    tbl() is useful for quickly connecting to a SQL database table.
+
+    >>> from sqlalchemy import create_engine
+    >>> from siuba import count, show_query, collect
+
+    >>> engine = create_engine("sqlite:///:memory:")
+    >>> cars.to_sql("cars", engine, index=False)
+
+    >>> tbl_sql_cars = tbl(engine, "cars")
+    >>> tbl_sql_cars >> count()
+    # Source: lazy query
+    # DB Conn: Engine(sqlite:///:memory:)
+    # Preview:
+        n
+    0  32
+    # .. may have more rows
+
+    When using duckdb, pass a DataFrame as the third argument to operate directly on it:
+
+    >>> engine2 = create_engine("duckdb:///:memory:")
+    >>> tbl_cars_duck = tbl(engine, "cars", cars.head(2)) 
+    >>> tbl_cars_duck >> count() >> collect()
+        n
+    0  32
+
+    You can analyze a mock table
+
+    >>> from sqlalchemy import create_mock_engine
+    >>> mock_engine = create_mock_engine("postgresql:///", lambda *args, **kwargs: None)
+    >>> tbl_mock = tbl(mock_engine, "some_table", columns = ["a", "b", "c"])
+    >>> q = tbl_mock >> count() >> show_query()    # doctest: +NORMALIZE_WHITESPACE
+    SELECT count(*) AS n
+    FROM (SELECT some_table.a AS a, some_table.b AS b, some_table.c AS c
+    FROM some_table) AS anon_1 ORDER BY n DESC
+    """
+
+    return src
+
+
+@tbl.register
+def _tbl_sqla(src: SqlaEngine, table_name, columns=None):
+    from siuba.sql import LazyTbl
+
+    # TODO: once we subclass LazyTbl per dialect (e.g. duckdb), we can move out
+    # this dialect specific logic.
+    if src.dialect.name == "duckdb" and isinstance(columns, pd.DataFrame):
+        src.execute("register", (table_name, columns))
+        return LazyTbl(src, table_name)
+    
+    return LazyTbl(src, table_name, columns=columns)
+
+
+@tbl.register(object)
+def _tbl(__data, *args, **kwargs):
+    raise NotImplementedError(
+        f"Unsupported type {type(__data)}. "
+        "Note that tbl currently can be used at the start of a pipe, but not as "
+        "a step in the pipe."
+    )
 
 # Install Siu =================================================================
 
