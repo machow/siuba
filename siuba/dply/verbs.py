@@ -2293,6 +2293,7 @@ def _extract_gdf(__data, *args, **kwargs):
 
 
 # tbl ----
+
 from siuba.siu._databackend import SqlaEngine
 
 @singledispatch2((pd.DataFrame, DataFrameGroupBy))
@@ -2312,7 +2313,7 @@ def tbl(src, *args, **kwargs):
 
     A pandas DataFrame is already a table of data, so trivially returns itself.
 
-    >>> tbl(mtcars) is cars
+    >>> tbl(cars) is cars
     True
 
     tbl() is useful for quickly connecting to a SQL database table.
@@ -2321,15 +2322,15 @@ def tbl(src, *args, **kwargs):
     >>> from siuba import count, show_query, collect
 
     >>> engine = create_engine("sqlite:///:memory:")
-    >>> cars.head(2).to_sql("cars", engine, index=False)
+    >>> cars.to_sql("cars", engine, index=False)
 
     >>> tbl_sql_cars = tbl(engine, "cars")
     >>> tbl_sql_cars >> count()
     # Source: lazy query
     # DB Conn: Engine(sqlite:///:memory:)
     # Preview:
-       n
-    0  2
+        n
+    0  32
     # .. may have more rows
 
     When using duckdb, pass a DataFrame as the third argument to operate directly on it:
@@ -2337,8 +2338,8 @@ def tbl(src, *args, **kwargs):
     >>> engine2 = create_engine("duckdb:///:memory:")
     >>> tbl_cars_duck = tbl(engine, "cars", cars.head(2)) 
     >>> tbl_cars_duck >> count() >> collect()
-       n
-    0  2
+        n
+    0  32
 
     """
 
@@ -2360,7 +2361,8 @@ tbl.register(object)
 def _tbl(__data, *args, **kwargs):
     raise NotImplementedError(
         f"Unsupported type {type(__data)}. "
-        "Note that tbl currently cannot be used in a pipe."
+        "Note that tbl currently can be used at the start of a pipe, but not as "
+        "a step in the pipe."
     )
 
 # Install Siu =================================================================
