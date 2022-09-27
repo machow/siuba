@@ -1,7 +1,10 @@
-from functools import singledispatch
+from functools import singledispatch, wraps
 from pandas import DataFrame
+
 import pandas as pd
 import numpy as np
+import warnings
+
 
 from pandas.core.groupby import DataFrameGroupBy
 from pandas.core.dtypes.inference import is_scalar
@@ -81,6 +84,21 @@ def _repr_grouped_df_html_(self):
 def _repr_grouped_df_console_(self):
     return "(grouped data frame)\n" + repr(self.obj)
 
+
+def _bounce_groupby(f):
+    @wraps(f)
+    def wrapper(__data: "pd.DataFrame | DataFrameGroupBy", *args, **kwargs):
+        if isinstance(__data, pd.DataFrame):
+            return f(__data, *args, **kwargs)
+
+        groupings = __data.grouper.groupings
+        group_cols = [ping.name for ping in groupings]
+
+        res = f(__data.obj, *args, **kwargs)
+
+        return res.groupby(group_cols)
+
+    return wrapper
 
 
 def _regroup(df):
@@ -539,6 +557,26 @@ def _transmute(__data, *args, **kwargs):
 
 # Select ======================================================================
 
+def _insert_missing_groups(dst, orig, missing_groups):
+    if missing_groups:
+        warnings.warn(f"Adding missing grouping variables: {missing_groups}")
+
+        for ii, colname in enumerate(missing_groups):
+            dst.insert(ii, colname, orig[colname])
+
+
+def _select_group_renames(selection: dict, group_cols):
+    """Returns a 2-tuple: groups missing in the select, new group keys."""
+    renamed = {k: v for k,v in selection.items() if v is not None}
+
+    sel_groups = [
+        renamed[colname] or colname for colname in group_cols if colname in renamed
+    ]
+    missing_groups = [colname for colname in group_cols if colname not in selection]
+
+    return missing_groups, (*missing_groups, *sel_groups)
+
+
 @singledispatch2(DataFrame)
 def select(__data, *args, **kwargs):
     """Select columns of a table to keep or drop (and optionally rename).
@@ -611,10 +649,21 @@ def select(__data, *args, **kwargs):
 
     return __data[list(od)].rename(columns = to_rename)
     
+
 @select.register(DataFrameGroupBy)
 def _select(__data, *args, **kwargs):
-    raise Exception("Selecting columns of grouped DataFrame currently not allowed")
+    # tidyselect
+    var_list = var_create(*args)
+    od = var_select(__data.obj.columns, *var_list)
 
+    group_cols = [ping.name for ping in __data.grouper.groupings]
+
+    res = select(__data.obj, *args, **kwargs)
+
+    missing_groups, group_keys = _select_group_renames(od, group_cols)
+    _insert_missing_groups(res, __data.obj, missing_groups)
+
+    return res.groupby(list(group_keys))
 
 
 # Rename ======================================================================
@@ -655,10 +704,17 @@ def rename(__data, **kwargs):
 
     return __data.rename(columns  = col_names)
 
+
 @rename.register(DataFrameGroupBy)
 def _rename(__data, **kwargs):
-    raise NotImplementedError("Selecting columns of grouped DataFrame currently not allowed")
+    col_names = {simple_varname(v):k for k,v in kwargs.items()}
+    group_cols = [ping.name for ping in __data.grouper.groupings]
 
+    res = rename(__data.obj, **kwargs)
+
+    missing_groups, group_keys = _select_group_renames(col_names, group_cols)
+
+    return res.groupby(list(group_keys))
 
 
 # Arrange =====================================================================
@@ -788,6 +844,19 @@ def _arrange(__data, *args):
 
 # Distinct ====================================================================
 
+
+def _var_select_simple(args) -> "dict[str, bool]":
+    """Return an 'ordered set' of selected column names."""
+    cols = {simple_varname(x): True for x in args}
+    if None in cols:
+        raise Exception(
+            "Positional arguments must be simple column. "
+            "e.g. _.colname or _['colname']\n\n"
+            f"Received: {repr(cols[None])}"
+        )
+
+    return cols
+
 @singledispatch2(DataFrame)
 def distinct(__data, *args, _keep_all = False, **kwargs):
     """Keep only distinct (unique) rows from a table.
@@ -832,11 +901,7 @@ def distinct(__data, *args, _keep_all = False, **kwargs):
     2  Chinstrap      Dream            46.5           17.9
     """
     # using dict as ordered set
-    cols = {simple_varname(x): True for x in args}
-    if None in cols:
-        raise Exception("positional arguments must be simple column, "
-                        "e.g. _.colname or _['colname']"
-                        )
+    cols = _var_select_simple(args)
 
     # mutate kwargs
     cols.update(kwargs)
@@ -851,12 +916,33 @@ def distinct(__data, *args, _keep_all = False, **kwargs):
 
     return tmp_data
         
+
 @distinct.register(DataFrameGroupBy)
 def _distinct(__data, *args, _keep_all = False, **kwargs):
-    df = __data.apply(lambda x: distinct(x, *args, _keep_all = _keep_all, **kwargs))
-    return _regroup(df)
 
-# if_else
+    cols = _var_select_simple(args)
+    cols.update(kwargs)
+
+    # special case: use all variables when none are specified
+    if not len(cols): cols = __data.columns
+
+    group_cols_ordered = {ping.name: True for ping in __data.grouper.groupings}
+    final_cols = list({**group_cols_ordered, **cols, **kwargs})
+
+    mutated = mutate(__data, **kwargs).obj
+
+    if not _keep_all:
+        pre_df = mutated[final_cols]
+    else:
+        pre_df = mutated
+
+    res = pre_df.drop_duplicates(list(final_cols)).reset_index(drop = True)
+    return res.groupby(list(group_cols_ordered))
+
+
+
+# if_else, case_when ==========================================================
+
 # TODO: move to vector.py
 @singledispatch
 def if_else(condition, true, false):
@@ -1102,7 +1188,7 @@ def count(__data, *args, wt = None, sort = False, **kwargs):
     return counts
 
 
-@singledispatch2(pd.DataFrame)
+@singledispatch2((pd.DataFrame, DataFrameGroupBy))
 def add_count(__data, *args, wt = None, sort = False, **kwargs):
     """Add a column that is the number of observations for each grouping of data.
 
@@ -1153,8 +1239,8 @@ def add_count(__data, *args, wt = None, sort = False, **kwargs):
     """
     counts = count(__data, *args, wt = wt, sort = sort, **kwargs)
 
-    on = list(counts.columns)[:-1]
-    return __data.merge(counts, on = on)
+    by = list(counts.columns)[:-1]
+    return inner_join(__data, counts, by = by)
     
 
 
@@ -1324,7 +1410,8 @@ from pandas.core.reshape.merge import _MergeOperation
 
 
 # TODO: will need to use multiple dispatch
-@singledispatch2(pd.DataFrame)
+@singledispatch2((pd.DataFrame, DataFrameGroupBy))
+@_bounce_groupby
 def join(left, right, on = None, how = None, *args, by = None, **kwargs):
     """Join two tables together, by matching on specified columns.
 
@@ -1429,6 +1516,8 @@ def join(left, right, on = None, how = None, *args, by = None, **kwargs):
 
     """
 
+    if isinstance(right, DataFrameGroupBy):
+        right = right.obj
     if not isinstance(right, DataFrame):
         raise Exception("right hand table must be a DataFrame")
     if how is None:
@@ -1456,8 +1545,9 @@ def _join(left, right, on = None, how = None):
     raise Exception("Unsupported type %s" %type(left))
 
 
-@singledispatch2(pd.DataFrame)
-def semi_join(left, right = None, on = None):
+@singledispatch2((pd.DataFrame, DataFrameGroupBy))
+@_bounce_groupby
+def semi_join(left, right = None, on = None, *args, by = None):
     """Return the left table with every row that would be kept in an inner join.
 
     Parameters
@@ -1493,6 +1583,10 @@ def semi_join(left, right = None, on = None):
        id  x
     0   1  a
     """
+
+    if on is None and by is not None:
+        on = by
+
     if isinstance(on, Mapping):
         # coerce colnames to list, to avoid indexing with tuples
         on_cols, right_on = map(list, zip(*on.items()))
@@ -1529,8 +1623,9 @@ def semi_join(left, right = None, on = None):
     return left.loc[range_indx.isin(l_indx)]
 
 
-@singledispatch2(pd.DataFrame)
-def anti_join(left, right = None, on = None):
+@singledispatch2((pd.DataFrame, DataFrameGroupBy))
+@_bounce_groupby
+def anti_join(left, right = None, on = None, *args, by = None):
     """Return the left table with every row that would *not* be kept in an inner join.
 
     Parameters
@@ -1566,11 +1661,18 @@ def anti_join(left, right = None, on = None):
        id  x
     0   1  a
     """
+
+    if on is None and by is not None:
+        on = by
+
     # copied from semi_join
     if isinstance(on, Mapping):
         left_on, right_on = zip(*on.items())
     else: 
         left_on = right_on = on
+
+    if isinstance(right, DataFrameGroupBy):
+        right = right.obj
 
     # manually perform merge, up to getting pieces need for indexing
     merger = _MergeOperation(left, right, left_on = left_on, right_on = right_on)
@@ -1682,7 +1784,7 @@ def top_n(__data, n, wt = None):
 
 # Gather ======================================================================
 
-@singledispatch2(pd.DataFrame)
+@singledispatch2((pd.DataFrame, DataFrameGroupBy))
 def gather(__data, key = "key", value = "value", *args, drop_na = False, convert = False):
     """Reshape table by gathering it in to long format.
 
@@ -1730,6 +1832,9 @@ def gather(__data, key = "key", value = "value", *args, drop_na = False, convert
     # TODO: implement var selection over *args
     if convert:
         raise NotImplementedError("convert not yet implemented")
+
+    if isinstance(__data, DataFrameGroupBy):
+        __data = __data.obj
 
     # TODO: copied from nest and select
     var_list = var_create(*args)
@@ -2027,8 +2132,6 @@ def complete(__data, *args, fill = None, explicit=True):
     
 
 # Separate/Unit/Extract ============================================================
-
-import warnings
 
 @singledispatch2(pd.DataFrame)
 def separate(__data, col, into, sep = r"[^a-zA-Z0-9]",
