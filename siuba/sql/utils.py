@@ -190,21 +190,3 @@ def _sql_simplify_select(select):
 
     return clone_el
 
-
-@contextmanager
-def _use_simple_names():
-    from sqlalchemy import sql
-    from sqlalchemy.ext.compiler import compiles, deregister
-
-    get_col_name = lambda el, *args, **kwargs: str(el.element.name)
-    get_lab_name = lambda el, *args, **kwargs: str(el.element.name)
-    get_col_name = lambda el, *args, **kwargs: str(el.name)
-    compiles(sql.compiler._CompileLabel)(get_lab_name)
-    compiles(sql.elements.ColumnClause)(get_col_name)
-    compiles(sql.schema.Column)(get_col_name)
-    try:
-        yield 1
-    except:
-        pass
-    finally:
-        deregister(sql.compiler._CompileLabel)

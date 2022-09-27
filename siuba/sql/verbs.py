@@ -42,7 +42,6 @@ from .utils import (
     _sql_add_columns,
     _sql_with_only_columns,
     _sql_simplify_select,
-    _use_simple_names,
     MockConnection
 )
 
@@ -465,8 +464,7 @@ def _show_query(tbl, simplify = False, return_table = True):
         # try to strip table names and labels where unnecessary
         simple_sel = _sql_simplify_select(tbl.last_select)
 
-        with _use_simple_names():
-            explained = compile_query(simple_sel)
+        explained = compile_query(simple_sel)
     else:
         # use a much more verbose query
         explained = compile_query(tbl.last_select)

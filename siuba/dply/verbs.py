@@ -2447,11 +2447,14 @@ def tbl(src, *args, **kwargs):
     You can analyze a mock table
 
     >>> from sqlalchemy import create_mock_engine
+    >>> from siuba import _
+
     >>> mock_engine = create_mock_engine("postgresql:///", lambda *args, **kwargs: None)
     >>> tbl_mock = tbl(mock_engine, "some_table", columns = ["a", "b", "c"])
+
     >>> q = tbl_mock >> count(_.a) >> show_query()    # doctest: +NORMALIZE_WHITESPACE
-    SELECT a, count(*) AS n
-    FROM some_table AS some_table_1 GROUP BY a ORDER BY n DESC
+    SELECT some_table_1.a, count(*) AS n
+    FROM some_table AS some_table_1 GROUP BY some_table_1.a ORDER BY n DESC
     """
 
     return src
