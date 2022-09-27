@@ -48,5 +48,7 @@ class AbstractBackend(metaclass=_AbstractBackendMeta):
 # Implementations -------------------------------------------------------------
 
 class SqlaEngine(AbstractBackend): pass
+class SiubaLazyTbl(AbstractBackend): pass
 
 SqlaEngine.register_backend("sqlalchemy.engine", "Connectable")
+SiubaLazyTbl.register_backend("siuba.sql", "LazyTbl")

@@ -6,6 +6,7 @@ from functools import wraps, partial
 from contextlib import contextmanager
 
 from siuba.siu import Symbolic
+from siuba.siu._databackend import SiubaLazyTbl
 
 
 def order_results_cols_first(completions: "iter[Any]", df) -> "list[Any]":
@@ -28,6 +29,12 @@ def wrap_jedi_matches(_jedi_matches):
 
         # insert dataframe and autocomplete ----
         df = self.namespace[df_name]
+
+        if isinstance(df, SiubaLazyTbl):
+            import pandas as pd
+            colnames = [c.name for c in df.last_op.inner_columns]
+            df = pd.DataFrame(columns = colnames)
+
         self.namespace = {**self.namespace, "_": df}
 
         try:
@@ -78,7 +85,7 @@ def _match_df_name(dfs, commands):
 
 
 def _find_df_in_history(shell):
-    dfs = shell.run_line_magic("who_ls", "DataFrame")
+    dfs = shell.run_line_magic("who_ls", "DataFrame LazyTbl")
 
     history = HistoryAccessor()
     commands = [command for _, _, command in history.get_tail(include_latest=True)]
