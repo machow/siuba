@@ -2449,10 +2449,9 @@ def tbl(src, *args, **kwargs):
     >>> from sqlalchemy import create_mock_engine
     >>> mock_engine = create_mock_engine("postgresql:///", lambda *args, **kwargs: None)
     >>> tbl_mock = tbl(mock_engine, "some_table", columns = ["a", "b", "c"])
-    >>> q = tbl_mock >> count() >> show_query()    # doctest: +NORMALIZE_WHITESPACE
-    SELECT count(*) AS n
-    FROM (SELECT some_table.a AS a, some_table.b AS b, some_table.c AS c
-    FROM some_table) AS anon_1 ORDER BY n DESC
+    >>> q = tbl_mock >> count(_.a) >> show_query()    # doctest: +NORMALIZE_WHITESPACE
+    SELECT a, count(*) AS n
+    FROM some_table AS some_table_1 GROUP BY a ORDER BY n DESC
     """
 
     return src
