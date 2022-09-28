@@ -42,7 +42,6 @@ from .utils import (
     _sql_add_columns,
     _sql_with_only_columns,
     _sql_simplify_select,
-    _use_simple_names,
     MockConnection
 )
 
@@ -297,7 +296,7 @@ class LazyTbl:
         self.tbl = self._create_table(tbl, columns, self.source)
 
         # important states the query can be in (e.g. grouped)
-        self.ops = [self.tbl.select()] if ops is None else ops
+        self.ops = [self.tbl] if ops is None else ops
 
         self.group_by = group_by
         self.order_by = order_by
@@ -340,8 +339,21 @@ class LazyTbl:
 
 
     @property
-    def last_op(self):
-        return self.ops[-1] if len(self.ops) else None
+    def last_op(self) -> "sql.Table | sql.Select":
+        last_op = self.ops[-1]
+
+        if last_op is None:
+            raise TypeError()
+
+        return last_op
+
+    @property
+    def last_select(self):
+        last_op = self.last_op
+        if not isinstance(last_op, sql.selectable.SelectBase):
+            return last_op.select()
+
+        return last_op
 
     @staticmethod
     def _create_table(tbl, columns = None, source = None):
@@ -385,7 +397,7 @@ class LazyTbl:
 
     def _get_preview(self):
         # need to make prev op a cte, so we don't override any previous limit
-        new_sel = self.last_op.alias().select().limit(5)
+        new_sel = self.last_select.limit(5)
         tbl_small = self.append_op(new_sel)
         return collect(tbl_small)
 
@@ -450,13 +462,12 @@ def _show_query(tbl, simplify = False, return_table = True):
 
     if simplify:
         # try to strip table names and labels where unnecessary
-        simple_sel = _sql_simplify_select(tbl.last_op)
+        simple_sel = _sql_simplify_select(tbl.last_select)
 
-        with _use_simple_names():
-            explained = compile_query(simple_sel)
+        explained = compile_query(simple_sel)
     else:
         # use a much more verbose query
-        explained = compile_query(tbl.last_op)
+        explained = compile_query(tbl.last_select)
 
     if return_table:
         print(str(explained))
@@ -483,13 +494,13 @@ def _collect(__data, as_df = True):
     if _is_dialect_duckdb(__data.source):
         # TODO: can be removed once next release of duckdb fixes:
         # https://github.com/duckdb/duckdb/issues/2972
-        query = __data.last_op
+        query = __data.last_select
         compiled = query.compile(
             dialect = __data.source.dialect,
             compile_kwargs = {"literal_binds": True}
         )
     else:
-        compiled = __data.last_op
+        compiled = __data.last_select
 
     # execute query ----
 
@@ -519,8 +530,8 @@ def _select(__data, *args, **kwargs):
                 "Using kwargs in select not currently supported. "
                 "Use _.newname == _.oldname instead"
                 )
-    last_op = __data.last_op
-    columns = {c.key: c for c in last_op.inner_columns}
+    last_sel = __data.last_select
+    columns = {c.key: c for c in last_sel.inner_columns}
 
     # same as for DataFrame
     colnames = Series(list(columns))
@@ -541,7 +552,7 @@ def _select(__data, *args, **kwargs):
         col_list.append(col if v is None else col.label(v))
 
     return __data.append_op(
-        last_op.with_only_columns(col_list),
+        last_sel.with_only_columns(col_list),
         group_by = group_keys
     )
 
@@ -610,7 +621,10 @@ def _mutate(__data, **kwargs):
     # TODO: verify it can follow a renaming select
 
     # track labeled columns in set
-    sel = __data.last_op
+    if not len(kwargs):
+        return __data.append_op(__data.last_op)
+
+    sel = __data.last_select
 
     # evaluate each call
     for colname, func in kwargs.items():
@@ -664,7 +678,7 @@ def _transmute(__data, **kwargs):
     # transmute keeps grouping cols, and any defined in kwargs
     cols_to_keep = ordered_union(__data.group_by, kwargs)
 
-    sel = f_mutate(__data, **kwargs).last_op
+    sel = f_mutate(__data, **kwargs).last_select
 
     columns = lift_inner_cols(sel)
     sel_stripped = sel.with_only_columns([columns[k] for k in cols_to_keep])
@@ -679,8 +693,8 @@ def _arrange(__data, *args):
     # and handle when new columns are named the same as order by vars.
     # see: https://dba.stackexchange.com/q/82930
 
-    last_op = __data.last_op
-    cols = lift_inner_cols(last_op)
+    last_sel = __data.last_select
+    cols = lift_inner_cols(last_sel)
 
     
     new_calls = []
@@ -700,7 +714,7 @@ def _arrange(__data, *args):
     sort_cols = _create_order_by_clause(cols, *new_calls)
 
     order_by = __data.order_by + tuple(new_calls)
-    return __data.append_op(last_op.order_by(*sort_cols), order_by = order_by)
+    return __data.append_op(last_sel.order_by(*sort_cols), order_by = order_by)
 
 
 # TODO: consolidate / pull expr handling funcs into own file?
@@ -746,8 +760,7 @@ def _count(__data, *args, sort = False, wt = None, **kwargs):
                     )
         arg_names.append(name)
 
-    tbl_inner = mutate(__data, **kwargs)
-    sel_inner = tbl_inner.last_op
+    sel_inner = mutate(__data, **kwargs).last_op
     group_cols = arg_names + list(kwargs)
 
     # create outer select ----
@@ -756,7 +769,7 @@ def _count(__data, *args, sort = False, wt = None, **kwargs):
     inner_cols = sel_inner_cte.columns
 
     # apply any group vars from a group_by verb call first
-    tbl_group_cols = [inner_cols[k] for k in tbl_inner.group_by]
+    tbl_group_cols = [inner_cols[k] for k in __data.group_by]
     count_group_cols = [inner_cols[k] for k in group_cols]
 
     # combine with any defined in the count verb call
@@ -769,7 +782,7 @@ def _count(__data, *args, sort = False, wt = None, **kwargs):
             .group_by(*outer_group_cols)
 
     # count is like summarize, so removes order_by
-    return tbl_inner.append_op(
+    return __data.append_op(
             sel_outer.order_by(count_col.desc()),
             order_by = tuple()
             )
@@ -778,7 +791,7 @@ def _count(__data, *args, sort = False, wt = None, **kwargs):
 @add_count.register(LazyTbl)
 def _add_count(__data, *args, wt = None, sort = False, **kwargs):
     counts = count(__data, *args, wt = wt, sort = sort, **kwargs)
-    by = list(c.name for c in counts.last_op.inner_columns)[:-1]
+    by = list(c.name for c in counts.last_select.inner_columns)[:-1]
 
     return inner_join(__data, counts, by = by)
 
@@ -789,7 +802,7 @@ def _summarize(__data, **kwargs):
     # what if windowed mutate or filter has been done? 
     #   - filter is fine, since it uses a CTE
     #   - need to detect any window functions...
-    old_sel = __data.last_op._clone()
+    old_sel = __data.last_select._clone()
 
     new_calls = {}
     for k, expr in kwargs.items():
@@ -1136,7 +1149,7 @@ def _create_join_conds(left_sel, right_sel, on):
 
 @head.register(LazyTbl)
 def _head(__data, n = 5):
-    sel = __data.last_op
+    sel = __data.last_select
     
     return __data.append_op(sel.limit(n))
 
@@ -1145,7 +1158,7 @@ def _head(__data, n = 5):
 
 @rename.register(LazyTbl)
 def _rename(__data, **kwargs):
-    sel = __data.last_op
+    sel = __data.last_select
     columns = lift_inner_cols(sel)
 
     # old_keys uses dict as ordered set
@@ -1172,7 +1185,7 @@ def _distinct(__data, *args, _keep_all = False, **kwargs):
     if (args or kwargs) and _keep_all:
         raise NotImplementedError("Distinct with variables specified in sql requires _keep_all = False")
     
-    inner_sel = mutate(__data, **kwargs).last_op if kwargs else __data.last_op
+    inner_sel = mutate(__data, **kwargs).last_select if kwargs else __data.last_select
 
     # TODO: this is copied from the df distinct version
     # cols dict below is used as ordered set
