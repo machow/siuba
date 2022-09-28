@@ -1833,23 +1833,39 @@ def gather(__data, key = "key", value = "value", *args, drop_na = False, convert
     if convert:
         raise NotImplementedError("convert not yet implemented")
 
-    if isinstance(__data, DataFrameGroupBy):
-        __data = __data.obj
-
     # TODO: copied from nest and select
-    var_list = var_create(*args)
+    var_list = var_create(*(args or __data.columns))
     od = var_select(__data.columns, *var_list)
 
-    value_vars = list(od) or None
+    if not od:
+        return __data
 
     id_vars = [col for col in __data.columns if col not in od]
-    long = pd.melt(__data, id_vars, value_vars, key, value)
+    long = pd.melt(__data, id_vars, list(od), key, value)
 
     if drop_na:
         return long[~long[value].isna()].reset_index(drop = True)
 
     return long
 
+
+@gather.register(DataFrameGroupBy)
+def _gather(__data, key = "key", value = "value", *args, **kwargs):
+    group_cols = [ping.name for ping in __data.grouper.groupings]
+
+    res = gather(__data.obj, key, value, *args, **kwargs)
+
+    # regroup on any grouping vars we did not gather ----
+    candidates = set(res.columns) - {key, value}
+    regroup_cols = [name for name in group_cols if name in candidates]
+
+    if res is __data.obj:
+        # special case where nothing happened
+        return __data
+    elif regroup_cols:
+        return res.groupby(regroup_cols)
+
+    return res
 
 
 # Spread ======================================================================

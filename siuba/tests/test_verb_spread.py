@@ -20,6 +20,13 @@ def wide_df():
         'b': [2., 3.]
         })
 
+@pytest.fixture
+def df_no_drop():
+    return pd.DataFrame({
+        'id': [1,2,1,2],
+        'm': ['a', 'a', 'b', 'b'],
+        'v': [1, None, 2, 3]
+        })
 
 @pytest.mark.parametrize('key, value', [
     ("m", "v"),
@@ -76,4 +83,57 @@ def test_gather_drop_na_varselect(df, wide_df):
 
     # note that .dropna doesn't work here, since coerces floats to ints
     assert_frame_equal(res, df.assign(v = df.v.astype(float)))
+
+
+def test_gather_no_selection_gathers_all(wide_df):
+    res_implicit = gather(wide_df, "m", "v")
+    res_explicit = gather(wide_df, "m", "v", _[:])
+
+    assert res_implicit.columns.tolist() == ["m", "v"]
+    assert "id" in res_implicit["m"].values
+
+    assert_frame_equal(res_implicit, res_explicit)
+
+
+def test_gather_no_match_gathers_none(wide_df):
+    res = gather(wide_df, "m", "v", _.startswith("zzzz"))
+
+    assert_frame_equal(res, wide_df)
+
+
+def test_gather_group_by_no_match_still_grouped(wide_df):
+    wide_gdf = wide_df.groupby("id")
+    res = gather(wide_gdf, "m", "v", _.startswith("zzzz"))
+
+    assert res is wide_gdf
+
+
+def test_gather_group_by_preserves_groups(df_no_drop, wide_df):
+    res = gather(wide_df.groupby("id"), "m", "v", _.a, _.b)
+    
+    groupings = res.grouper.groupings
+    
+    assert len(groupings) == 1
+    assert groupings[0].name == "id"
+
+    assert_frame_equal(res.obj, df_no_drop)
+
+
+def test_gather_group_by_drops_gathered_groups(df_no_drop, wide_df):
+    g_res = gather(wide_df.groupby(["id", "a"]), "m", "v", _.a, _.b)
+
+    groupings = g_res.grouper.groupings
+    assert len(groupings) == 1
+    assert groupings[0].name == "id"
+
+    assert_frame_equal(g_res.obj, df_no_drop)
+
+
+def test_gather_group_by_drops_all_groups(df_no_drop, wide_df):
+    res = gather(wide_df.groupby(["a", "b"]), "m", "v", _.a, _.b)
+
+    assert isinstance(res, pd.DataFrame)
+
+    assert_frame_equal(res, df_no_drop)
+
 
