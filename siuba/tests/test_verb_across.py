@@ -7,14 +7,24 @@ from siuba.siu import symbolic_dispatch, Symbolic, Fx
 from siuba.dply.verbs import mutate, filter, summarize
 from siuba.dply.across import across
 
+from siuba.experimental.pivot.test_pivot import assert_equal_query2
+from siuba.sql.translate import SqlColumn, SqlColumnAgg, sql_scalar
+
 
 # Helpers =====================================================================
+
 _ = Symbolic()
+
+# round function ----
 
 @symbolic_dispatch(cls = pd.Series)
 def f_round(x) -> pd.Series:
     return round(x)
 
+
+f_round.register(SqlColumn, sql_scalar("round"))
+
+# mean function ----
 
 @symbolic_dispatch(cls = pd.Series)
 def f_mean(x) -> pd.Series:
@@ -45,14 +55,26 @@ def df():
 
 # Tests =======================================================================
 
-@pytest.mark.parametrize("func", [
-    (f_round),
-    (Fx.round()),
-    (f_round(Fx)),
-    (lambda x: x.round()),
-])
+TRANSFORMATION_FUNCS = [
+    f_round,
+    Fx.round(),
+    f_round(Fx),
+]
+
+
+@pytest.mark.parametrize("func", TRANSFORMATION_FUNCS)
 def test_across_func_transform(df, func):
     res = across(df, _[_.a_x, _.a_y], func)
+    dst = pd.DataFrame({
+        "a_x": df.a_x.round(),
+        "a_y": df.a_y.round()
+    })
+
+    assert_equal_query2(res, dst)
+
+
+def test_across_func_transform_lambda(df):
+    res = across(df, _[_.a_x, _.a_y], lambda x: x.round())
     dst = pd.DataFrame({
         "a_x": df.a_x.round(),
         "a_y": df.a_y.round()
@@ -114,16 +136,18 @@ def test_across_selection_rename(df):
     assert_frame_equal(res, (df[["a_x"]] + 1).rename(columns={"a_x": "zzz"}))
 
 
-def test_across_in_mutate(df):
-    res_explicit = mutate(df, across(_, _[_.a_x, _.a_y], f_round))
-    res_implicit = mutate(df, across(_[_.a_x, _.a_y], f_round))
+@pytest.mark.parametrize("func", TRANSFORMATION_FUNCS)
+def test_across_in_mutate(backend, df, func):
+    src = backend.load_df(df)
+    res_explicit = mutate(src, across(_, _[_.a_x, _.a_y], f_round))
+    res_implicit = mutate(src, across(_[_.a_x, _.a_y], f_round))
 
     dst = df.copy()
     dst["a_x"] = df.a_x.round()
     dst["a_y"] = df.a_y.round()
 
-    assert_frame_equal(res_explicit, dst)
-    assert_frame_equal(res_implicit, dst)
+    assert_equal_query2(res_explicit, dst, sql_kwargs={"check_dtype": False})
+    assert_equal_query2(res_implicit, dst, sql_kwargs={"check_dtype": False})
 
 
 def test_across_in_mutate_grouped_equiv_ungrouped(df):

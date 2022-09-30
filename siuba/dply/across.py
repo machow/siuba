@@ -3,14 +3,40 @@ from pandas.api import types as pd_types
 
 from pandas.core.groupby import DataFrameGroupBy
 from .verbs import var_select, var_create
-from ..siu import FormulaContext, Call, strip_symbolic, Fx, call
-from ..siu.dispatchers import verb_dispatch, symbolic_dispatch
+from ..siu import FormulaContext, Call, strip_symbolic, Fx, FuncArg
+from ..siu.dispatchers import verb_dispatch, symbolic_dispatch, create_eager_pipe_call
 
 from collections.abc import Mapping
+from contextvars import ContextVar
 from typing import Callable, Any
 
 DEFAULT_MULTI_FUNC_TEMPLATE = "{col}_{fn}"
 DEFAULT_SINGLE_FUNC_TEMPLATE = "{col}"
+
+
+ctx_verb_data = ContextVar("data")
+
+
+def _is_symbolic_operator(f):
+    # TODO: consolidate these checks, make the result of symbolic_dispatch a class.
+    return callable(f) and getattr(f, "_siu_symbolic_operator", False)
+
+
+def _require_across(call, verb_name):
+    if not isinstance(call, Call) or (call.args and call.args[0] is across):
+        raise NotImplementedError(
+            "{verb_name} currently only allows a top-level across as an unnamed argument.\n\n"
+            "Example: {verb_name}(some_data, across(...))"
+        )
+
+
+def _eval_with_context(ctx, data, expr):
+    token = ctx_verb_data.set(ctx)
+
+    try:
+        return expr(data)
+    finally:
+        ctx_verb_data.reset(token)
 
 
 # TODO: handle DataFrame manipulation in pandas / sql backends
@@ -42,19 +68,23 @@ def _across_setup_fns(fns) -> "dict[str, Callable[[FormulaContext], Any]]":
             # these are inside a dictionary, so need to strip manually.
             fn_call = strip_symbolic(fn_call_raw)
 
-            if not isinstance(fn_call, Call):
+            if isinstance(fn_call, Call):
+                final_calls[name] = fn_call
+
+            elif callable(fn_call):
+                final_calls[name] = create_eager_pipe_call(FuncArg(fn_call), Fx)
+
+            else:
                 raise TypeError(
                     "All functions to be applied in across must be a siuba.siu.Call, "
                     f"but received a function of type {type(fn_call)}"
                 )
 
-            final_calls[name]  = fn_call
-
     elif isinstance(fns, Call):
         final_calls["fn1"] = fns
 
     elif callable(fns):
-        final_calls["fn1"] = call(fns, Fx)
+        final_calls["fn1"] = create_eager_pipe_call(FuncArg(fns), Fx)
 
     else:
         raise NotImplementedError(f"Unsupported function type in across: {type(fns)}")
@@ -70,6 +100,7 @@ def _get_name_template(fns, names: "str | None") -> str:
         return DEFAULT_SINGLE_FUNC_TEMPLATE
 
     return DEFAULT_MULTI_FUNC_TEMPLATE
+
 
 @verb_dispatch(pd.DataFrame)
 def across(__data, cols, fns, names: "str | None" = None) -> pd.DataFrame:

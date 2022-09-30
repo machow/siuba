@@ -53,7 +53,6 @@ from pandas import Series
 
 from sqlalchemy.sql import schema
 
-
 # TODO:
 #   - distinct
 #   - annotate functions using sel.prefix_with("\n/*<Mutate Statement>*/\n") ?
@@ -154,6 +153,29 @@ class WindowReplacer(CallListener):
         return windows
 
 
+class SqlLabelReplacer:
+    """Create a visitor to replace source labels with destination.
+
+    Note that this is meant to be used with sqlalchemy visitors.
+    """
+
+    def __init__(self, src_columns, dst_columns):
+        self.src_labels = [x for x in src_columns if isinstance(x, sql.elements.Label)]
+        self.dst_columns = dst_columns
+        self.applied = False
+
+    def __call__(self, clause):
+        return sql.util.visitors.replacement_traverse(clause, {}, self.visit)
+    
+    def visit(self, el):
+        if el in self.src_labels:
+            import pdb; pdb.set_trace()
+            self.applied = True
+            return self.dst_columns[el.name]
+        
+        return None
+            
+
 #def track_call_windows(call, columns, group_by, order_by, window_cte = None):
 #    listener = WindowReplacer(columns, group_by, order_by, window_cte)
 #    col = listener.enter(call)
@@ -205,9 +227,8 @@ def replace_call_windows(col_expr, group_by, order_by, window_cte = None):
 
 def lift_inner_cols(tbl):
     cols = list(tbl.inner_columns)
-    data = {col.key: col for col in cols}
 
-    return _sql_column_collection(data, cols)
+    return _sql_column_collection(cols)
 
 def col_expr_requires_cte(call, sel, is_mutate = False):
     """Return whether a variable assignment needs a CTE"""
@@ -614,19 +635,44 @@ def _filter(__data, *args):
 
 
 @mutate.register(LazyTbl)
-def _mutate(__data, **kwargs):
-    # Cases
-    #  - work with group by
-    #  - window functions
+def _mutate(__data, *args, **kwargs):
+    from siuba.dply.across import _require_across, _eval_with_context
+
     # TODO: verify it can follow a renaming select
 
     # track labeled columns in set
-    if not len(kwargs):
+    if not (len(args) or len(kwargs)):
         return __data.append_op(__data.last_op)
 
-    sel = __data.last_select
+    across_sel = __data.last_select
+
+    # special support for across
+    for ii, func in enumerate(args):
+        _require_across(func, "Mutate")
+        _candidate_sel_alias = across_sel.alias()
+
+        inner_cols = lift_inner_cols(across_sel)
+
+        #new_call = __data.shape_call(func, verb_name = "Mutate", arg_name = f"*arg entry {ii}")
+        cols_result = _eval_with_context(__data, inner_cols, func)
+
+        # TODO: remove or raise a more informative error
+        assert isinstance(cols_result, sql.base.ImmutableColumnCollection), type(cols_result)
+
+        # replace any labels that require a subquery ----
+        replacer = SqlLabelReplacer(set(inner_cols), _candidate_sel_alias.columns)
+        replaced_cols = list(map(replacer, cols_result))
+
+        if replacer.applied:
+            # TODO: use replace logic from _mutate_select
+            next_sel = _candidate_sel_alias.select()
+        else:
+            next_sel = across_sel
+
+        across_sel = _sql_upsert_columns(across_sel, replaced_cols)
 
     # evaluate each call
+    sel = across_sel
     for colname, func in kwargs.items():
         # keep set of columns labeled (aliased) in this select statement
         # need to use inner cols, since sel.columns uses ColumnClause, not Label
@@ -636,6 +682,16 @@ def _mutate(__data, **kwargs):
         sel = _mutate_select(sel, colname, new_call, labs, __data)
 
     return __data.append_op(sel)
+
+
+def _sql_upsert_columns(sel, new_columns: "list[base.Label | base.Column]"):
+    orig_cols = lift_inner_cols(sel)
+    replaced = {**orig_cols}
+
+    for new_col in new_columns:
+        replaced[new_col.name] = new_col
+    return _sql_with_only_columns(sel, list(replaced.values()))
+
 
 
 def _mutate_select(sel, colname, func, labs, __data):
