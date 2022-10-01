@@ -4,7 +4,7 @@ import pytest
 from pandas.testing import assert_frame_equal
 from pandas.core.groupby import DataFrameGroupBy
 from siuba.siu import symbolic_dispatch, Symbolic, Fx
-from siuba.dply.verbs import mutate, filter, summarize
+from siuba.dply.verbs import mutate, filter, summarize, group_by, collect, ungroup
 from siuba.dply.across import across
 
 from siuba.experimental.pivot.test_pivot import assert_equal_query2
@@ -32,12 +32,16 @@ def f_mean(x) -> pd.Series:
 
 
 def assert_grouping_names(gdf, names):
-    assert isinstance(gdf, DataFrameGroupBy)
-    groupings = gdf.grouper.groupings
+    from siuba.sql import LazyTbl
 
-    assert len(groupings) == len(names)
+    if isinstance(gdf, LazyTbl):
+        grouping_names = list(gdf.group_by)
+    else:
+        assert isinstance(gdf, DataFrameGroupBy)
+        groupings = gdf.grouper.groupings
+        grouping_names = [g.name for g in groupings]
 
-    grouping_names = [g.name for g in groupings]
+    assert len(grouping_names) == len(names)
     assert grouping_names == names
 
 
@@ -150,15 +154,16 @@ def test_across_in_mutate(backend, df, func):
     assert_equal_query2(res_implicit, dst, sql_kwargs={"check_dtype": False})
 
 
-def test_across_in_mutate_grouped_equiv_ungrouped(df):
-    gdf = df.groupby("g")
+def test_across_in_mutate_grouped_equiv_ungrouped(backend, df):
+    src = backend.load_df(df)
+    g_src = group_by(src, "g")
 
     expr_across = across(_, _[_.a_x, _.a_y], f_round)
-    g_res = mutate(gdf, expr_across)
-    dst = mutate(df, expr_across)
+    g_res = mutate(g_src, expr_across)
+    dst = mutate(src, expr_across)
 
     assert_grouping_names(g_res, ["g"])
-    assert_frame_equal(g_res.obj, dst)
+    assert_equal_query2(ungroup(g_res), collect(dst))
 
 
 def test_across_in_summarize(df):
@@ -192,12 +197,13 @@ def test_across_in_summarize_equiv_ungrouped():
     assert_frame_equal(g_res.drop(columns="g"), dst)
 
 
-def test_across_in_filter(df):
-    res = filter(df, across(_, _[_.a_x, _.a_y], lambda x: x % 2 > 0))
+def test_across_in_filter(backend, df):
+    src = backend.load_df(df)
+    res = filter(src, across(_, _[_.a_x, _.a_y], Fx % 2 > 0))
 
     dst = df[(df[["a_x", "a_y"]] % 2 > 0).all(axis=1)]
 
-    assert_frame_equal(res, dst)
+    assert_equal_query2(res, dst)
 
 
 def test_across_in_filter_equiv_ungrouped(df):

@@ -50,6 +50,7 @@ import sqlalchemy
 from siuba.siu import Call, Lazy, FunctionLookupError, singledispatch2
 # TODO: currently needed for select, but can we remove pandas?
 from pandas import Series
+from functools import singledispatch
 
 from sqlalchemy.sql import schema
 
@@ -195,10 +196,28 @@ def track_call_windows(call, columns, group_by, order_by, window_cte = None):
 
 
 
+@singledispatch
 def replace_call_windows(col_expr, group_by, order_by, window_cte = None):
+    raise TypeError(str(type(col_expr)))
 
-    if not isinstance(col_expr, sql.elements.ClauseElement):
-        return col_expr
+
+@replace_call_windows.register(sql.base.ImmutableColumnCollection)
+def _(col_expr, group_by, order_by, window_cte = None):
+    all_over_clauses = []
+    for col in col_expr:
+        _, over_clauses, window_cte = replace_call_windows(
+            col,
+            group_by,
+            order_by,
+            window_cte
+        )
+        all_over_clauses.extend(over_clauses)
+
+    return col_expr, all_over_clauses, window_cte
+
+
+@replace_call_windows.register(sql.elements.ClauseElement)
+def _(col_expr, group_by, order_by, window_cte = None):
 
     over_clauses = WindowReplacer._get_over_clauses(col_expr)
 
@@ -581,32 +600,39 @@ def _select(__data, *args, **kwargs):
 
 @filter.register(LazyTbl)
 def _filter(__data, *args):
-    # TODO: aggregate funcs
+    from siuba.dply.across import _require_across, _set_data_context
+
     # Note: currently always produces 2 additional select statements,
     #       1 for window/aggs, and 1 for the where clause
+
     sel = __data.last_op.alias()                   # original select
     win_sel = sel.select()
 
     conds = []
     windows = []
-    for ii, arg in enumerate(args):
+    with _set_data_context(__data):
+        for ii, arg in enumerate(args):
 
-        if isinstance(arg, Call):
-            new_call = __data.shape_call(arg, verb_name = "Filter", arg_name = ii)
-            #var_cols = new_call.op_vars(attr_calls = False)
+            if isinstance(arg, Call):
+                new_call = __data.shape_call(arg, verb_name = "Filter", arg_name = ii)
+                #var_cols = new_call.op_vars(attr_calls = False)
 
-            # note that a new win_sel is returned, w/ window columns appended
-            col_expr, win_cols, win_sel = __data.track_call_windows(
-                    new_call,
-                    sel.columns,
-                    window_cte = win_sel
-                    )
+                # note that a new win_sel is returned, w/ window columns appended
+                col_expr, win_cols, win_sel = __data.track_call_windows(
+                        new_call,
+                        sel.columns,
+                        window_cte = win_sel
+                        )
 
-            conds.append(col_expr)
-            windows.extend(win_cols)
-            
-        else:
-            conds.append(arg)
+                if isinstance(col_expr, sql.base.ImmutableColumnCollection):
+                    conds.extend(col_expr)
+                else:
+                    conds.append(col_expr)
+
+                windows.extend(win_cols)
+                
+            else:
+                conds.append(arg)
 
     bool_clause = sql.and_(*conds)
 
@@ -614,12 +640,6 @@ def _filter(__data, *args):
     if len(windows):
         
         win_alias = win_sel.alias()
-
-        # because track_call_windows in the loop above used select.append_column
-        # multiple times, sqlalchemy doesn't know our window columns are the ones
-        # in the final mutated for of win_sel
-        #col_key_map = {col.key: col for col in win_alias.columns.values()}
-        #equivalents = {col: [col_key_map[col.key]] for col in windows}
 
         # move non-window functions to refer to win_sel clause (not the innermost) ---
         bool_clause = sql.util.ClauseAdapter(win_alias) \
@@ -669,7 +689,7 @@ def _mutate(__data, *args, **kwargs):
         else:
             next_sel = across_sel
 
-        across_sel = _sql_upsert_columns(across_sel, replaced_cols)
+        across_sel = _sql_upsert_columns(next_sel, replaced_cols)
 
     # evaluate each call
     sel = across_sel

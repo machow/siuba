@@ -3,7 +3,7 @@
 from functools import singledispatch, update_wrapper, wraps
 import inspect
 
-from .calls import Call, FuncArg, MetaArg, Lazy, PipeCall
+from .calls import Call, FuncArg, MetaArg, Lazy, PipeCall, _Isolate
 from .symbolic import Symbolic, create_sym_call, strip_symbolic
 
 from typing import Callable
@@ -268,13 +268,13 @@ class Pipeable:
             res = f(res)
         return res
 
-def _prep_lazy_args(*args):
+def _prep_isolate_args(*args):
     result = []
     for ii, arg in enumerate(args):
         if ii == 0:
             result.append(strip_symbolic(arg))
         else:
-            result.append(Lazy(strip_symbolic(arg)))
+            result.append(_Isolate(strip_symbolic(arg)))
 
     return result
 
@@ -282,13 +282,13 @@ def _prep_lazy_args(*args):
 def create_pipe_call(obj, *args, **kwargs) -> Call:
     """Return a Call of a function on its args and kwargs, wrapped in a Pipeable."""
 
-    stripped_args = _prep_lazy_args(*args)
+    stripped_args = _prep_isolate_args(*args)
 
     return Call(
             "__call__",
             strip_symbolic(obj),
             *stripped_args,
-            **{k: Lazy(strip_symbolic(v)) for k,v in kwargs.items()}
+            **{k: _Isolate(strip_symbolic(v)) for k,v in kwargs.items()}
             )
 
 def create_eager_pipe_call(obj, *args, **kwargs) -> Call:

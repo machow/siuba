@@ -8,6 +8,7 @@ from ..siu.dispatchers import verb_dispatch, symbolic_dispatch, create_eager_pip
 
 from collections.abc import Mapping
 from contextvars import ContextVar
+from contextlib import contextmanager
 from typing import Callable, Any
 
 DEFAULT_MULTI_FUNC_TEMPLATE = "{col}_{fn}"
@@ -23,10 +24,13 @@ def _is_symbolic_operator(f):
 
 
 def _require_across(call, verb_name):
-    if not isinstance(call, Call) or (call.args and call.args[0] is across):
+    if (
+        not isinstance(call, Call) 
+        or not (call.args and getattr(call.args[0], "__name__", None) == "across")
+    ):
         raise NotImplementedError(
-            "{verb_name} currently only allows a top-level across as an unnamed argument.\n\n"
-            "Example: {verb_name}(some_data, across(...))"
+            f"{verb_name} currently only allows a top-level across as an unnamed argument.\n\n"
+            f"Example: {verb_name}(some_data, across(...))"
         )
 
 
@@ -37,6 +41,16 @@ def _eval_with_context(ctx, data, expr):
         return expr(data)
     finally:
         ctx_verb_data.reset(token)
+
+
+@contextmanager
+def _set_data_context(ctx):
+    try:
+        token = ctx_verb_data.set(ctx)
+        yield
+    finally:
+        ctx_verb_data.reset(token)
+
 
 
 # TODO: handle DataFrame manipulation in pandas / sql backends

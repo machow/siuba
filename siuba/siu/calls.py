@@ -330,6 +330,16 @@ class Lazy(Call):
         return self.args[0]
 
 
+class _Isolate(Lazy):
+    """Lazily return calls, and do dispatch visitors."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.func = "<isolate>"
+
+    def map_subcalls(self, f, args = tuple(), kwargs = None):
+        return self.args, {**self.kwargs}
+
 
 class UnaryOp(Call):
     """Represent unary call operations."""
