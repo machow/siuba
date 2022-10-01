@@ -112,6 +112,40 @@ def _regroup(df):
     return df.groupby(level = grp_levels)
 
 
+def _mutate_cols(__data, args, kwargs):
+    from pandas.core.common import apply_if_callable
+
+    result_names = {}          # used as ordered set
+    df_tmp = __data.copy()
+
+    for arg in args:
+
+        # case 1: a simple, existing name is a no-op ----
+        simple_name = simple_varname(arg)
+        if simple_name is not None and simple_name in df_tmp.columns:
+            result_names[simple_name] = True
+            continue
+
+        # case 2: across ----
+        # TODO: make robust. validate input. validate output (e.g. shape).
+        res_arg = arg(df_tmp)
+
+        if not isinstance(res_arg, pd.DataFrame):
+            raise NotImplementedError("Only across() can be used as positional argument.")
+
+        for col_name, col_ser in res_arg.items():
+            # need to put on the frame so subsequent args, kwargs can use
+            df_tmp[col_name] = col_ser
+            result_names[col_name] = True
+
+    for col_name, expr in kwargs.items():
+        # this is exactly what DataFrame.assign does
+        df_tmp[col_name] = apply_if_callable(expr, df_tmp)
+        result_names[col_name] = True
+
+    return result_names, df_tmp
+
+
 MSG_TYPE_ERROR = "The first argument to {func} must be one of: {types}"
 
 def raise_type_error(f):
@@ -208,29 +242,8 @@ def mutate(__data, *args, **kwargs):
         
     """
 
-    args_result_df = __data.copy()
-
-    # handle across ----
-    for arg in args:
-        # TODO: make robust. validate input. validate output (e.g. shape).
-        new_col_map = arg(args_result_df)
-
-        if not isinstance(new_col_map, pd.DataFrame):
-            raise NotImplementedError("Only across() can be used as positional argument.")
-
-        for col_name, col_ser in new_col_map.items():
-            args_result_df[col_name] = col_ser
-
-    # handle everything else ----
-    # TODO: what if kw expr returns DataFrame?
-
-    orig_cols = args_result_df.columns
-    result = args_result_df.assign(**kwargs)
-
-    new_cols = result.columns[~result.columns.isin(orig_cols)]
-
-    return result.loc[:, [*orig_cols, *new_cols]]
-
+    new_names, df_res = _mutate_cols(__data, args, kwargs)
+    return df_res
 
 
 @mutate.register(DataFrameGroupBy)
