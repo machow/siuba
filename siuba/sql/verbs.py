@@ -54,6 +54,8 @@ from functools import singledispatch
 
 from sqlalchemy.sql import schema
 
+from siuba.dply.across import _require_across, _set_data_context, _eval_with_context
+
 # TODO:
 #   - distinct
 #   - annotate functions using sel.prefix_with("\n/*<Mutate Statement>*/\n") ?
@@ -161,7 +163,8 @@ class SqlLabelReplacer:
     """
 
     def __init__(self, src_columns, dst_columns):
-        self.src_labels = [x for x in src_columns if isinstance(x, sql.elements.Label)]
+        self.src_columns = src_columns
+        self.src_labels = set([x for x in src_columns if isinstance(x, sql.elements.Label)])
         self.dst_columns = dst_columns
         self.applied = False
 
@@ -169,10 +172,24 @@ class SqlLabelReplacer:
         return sql.util.visitors.replacement_traverse(clause, {}, self.visit)
     
     def visit(self, el):
-        if el in self.src_labels:
-            import pdb; pdb.set_trace()
-            self.applied = True
-            return self.dst_columns[el.name]
+        from sqlalchemy.sql.elements import ColumnClause, Label, ClauseElement, TypeClause
+        from sqlalchemy.sql.schema import Column
+
+        if isinstance(el, TypeClause):
+            # TODO: for some reason this type throws an error if unguarded
+            return None
+
+        if isinstance(el, ClauseElement):
+            if el in self.src_labels:
+                self.applied = True
+                return self.dst_columns[el.name]
+            elif el in self.src_columns:
+                return self.dst_columns[el.name]
+
+            elif isinstance(el, ColumnClause) and not isinstance(el, Column):
+                # Raw SQL, which will need a subquery, but not substitution
+                if el.key != "*":
+                    self.applied = True
         
         return None
             
@@ -600,8 +617,6 @@ def _select(__data, *args, **kwargs):
 
 @filter.register(LazyTbl)
 def _filter(__data, *args):
-    from siuba.dply.across import _require_across, _set_data_context
-
     # Note: currently always produces 2 additional select statements,
     #       1 for window/aggs, and 1 for the where clause
 
@@ -656,52 +671,14 @@ def _filter(__data, *args):
 
 @mutate.register(LazyTbl)
 def _mutate(__data, *args, **kwargs):
-    from siuba.dply.across import _require_across, _eval_with_context
-
     # TODO: verify it can follow a renaming select
 
     # track labeled columns in set
     if not (len(args) or len(kwargs)):
         return __data.append_op(__data.last_op)
 
-    across_sel = __data.last_select
-
-    # special support for across
-    for ii, func in enumerate(args):
-        _require_across(func, "Mutate")
-        _candidate_sel_alias = across_sel.alias()
-
-        inner_cols = lift_inner_cols(across_sel)
-
-        #new_call = __data.shape_call(func, verb_name = "Mutate", arg_name = f"*arg entry {ii}")
-        cols_result = _eval_with_context(__data, inner_cols, func)
-
-        # TODO: remove or raise a more informative error
-        assert isinstance(cols_result, sql.base.ImmutableColumnCollection), type(cols_result)
-
-        # replace any labels that require a subquery ----
-        replacer = SqlLabelReplacer(set(inner_cols), _candidate_sel_alias.columns)
-        replaced_cols = list(map(replacer, cols_result))
-
-        if replacer.applied:
-            # TODO: use replace logic from _mutate_select
-            next_sel = _candidate_sel_alias.select()
-        else:
-            next_sel = across_sel
-
-        across_sel = _sql_upsert_columns(next_sel, replaced_cols)
-
-    # evaluate each call
-    sel = across_sel
-    for colname, func in kwargs.items():
-        # keep set of columns labeled (aliased) in this select statement
-        # need to use inner cols, since sel.columns uses ColumnClause, not Label
-        labs = set(k for k,v in lift_inner_cols(sel).items() if isinstance(v, sql.elements.Label))
-        new_call = __data.shape_call(func, verb_name = "Mutate", arg_name = colname)
-
-        sel = _mutate_select(sel, colname, new_call, labs, __data)
-
-    return __data.append_op(sel)
+    names, sel_out = _mutate_cols(__data, args, kwargs, "Mutate")
+    return __data.append_op(sel_out)
 
 
 def _sql_upsert_columns(sel, new_columns: "list[base.Label | base.Column]"):
@@ -711,6 +688,71 @@ def _sql_upsert_columns(sel, new_columns: "list[base.Label | base.Column]"):
     for new_col in new_columns:
         replaced[new_col.name] = new_col
     return _sql_with_only_columns(sel, list(replaced.values()))
+
+
+def _select_mutate_result(src_sel, expr_result):
+    dst_alias = src_sel.alias()
+    src_columns = set(lift_inner_cols(src_sel))
+    replacer = SqlLabelReplacer(set(src_columns), dst_alias.columns)
+
+    if isinstance(expr_result, sql.base.ImmutableColumnCollection):
+        replaced_cols = list(map(replacer, expr_result))
+        orig_cols = expr_result
+    #elif isinstance(expr_result, None):
+    #    pass
+    else:
+        replaced_cols = [replacer(expr_result)]
+        orig_cols = [expr_result]
+
+    if replacer.applied:
+        return _sql_upsert_columns(dst_alias.select(), replaced_cols)
+
+    return _sql_upsert_columns(src_sel, orig_cols)
+
+
+def _mutate_cols(__data, args, kwargs, verb_name):
+    result_names = {}     # used as ordered set
+    sel = __data.last_select
+
+    for ii, func in enumerate(args):
+        # case 1: simple names ----
+        simple_name = simple_varname(func)
+        if simple_name is not None:
+            result_names[simple_name] = True
+            continue
+
+        # case 2: across ----
+        _require_across(func, verb_name)
+
+        inner_cols = lift_inner_cols(sel)
+        cols_result = _eval_with_context(__data, inner_cols, func)
+
+        # TODO: remove or raise a more informative error
+        assert isinstance(cols_result, sql.base.ImmutableColumnCollection), type(cols_result)
+
+        # replace any labels that require a subquery ----
+        sel = _select_mutate_result(sel, cols_result)
+
+        result_names.update({k: True for k in cols_result.keys()})
+    
+    for new_name, func in kwargs.items():
+        inner_cols = lift_inner_cols(sel)
+
+        expr_shaped = __data.shape_call(func, verb_name = verb_name, arg_name = new_name)
+        new_col, windows, _ = __data.track_call_windows(expr_shaped, inner_cols)
+
+        if isinstance(new_col, sql.base.ImmutableColumnCollection):
+            raise TyepError(
+                f"{verb_name} named arguments must return a single column, but `{k}` "
+                "returned multiple columns."
+            )
+        
+        labeled = new_col.label(new_name)
+        sel = _select_mutate_result(sel, labeled)
+
+        result_names[new_name] = True
+
+    return list(result_names), sel
 
 
 
@@ -747,14 +789,13 @@ def _mutate_select(sel, colname, func, labs, __data):
 
 
 @transmute.register(LazyTbl)
-def _transmute(__data, **kwargs):
+def _transmute(__data, *args, **kwargs):
     # will use mutate, then select some cols
-    f_mutate = mutate.registry[type(__data)]
+    result_names, sel = _mutate_cols(__data, args, kwargs, "Transmute")
 
     # transmute keeps grouping cols, and any defined in kwargs
-    cols_to_keep = ordered_union(__data.group_by, kwargs)
-
-    sel = f_mutate(__data, **kwargs).last_select
+    missing = [x for x in __data.group_by if x not in result_names]
+    cols_to_keep = [*missing, *result_names]
 
     columns = lift_inner_cols(sel)
     sel_stripped = sel.with_only_columns([columns[k] for k in cols_to_keep])
@@ -873,11 +914,8 @@ def _add_count(__data, *args, wt = None, sort = False, **kwargs):
 
 
 @summarize.register(LazyTbl)
-def _summarize(__data, **kwargs):
+def _summarize(__data, *args, **kwargs):
     # https://stackoverflow.com/questions/14754994/why-is-sqlalchemy-count-much-slower-than-the-raw-query
-    # what if windowed mutate or filter has been done? 
-    #   - filter is fine, since it uses a CTE
-    #   - need to detect any window functions...
     old_sel = __data.last_select._clone()
 
     new_calls = {}
@@ -938,26 +976,23 @@ def _summarize(__data, **kwargs):
 
 @group_by.register(LazyTbl)
 def _group_by(__data, *args, add = False, **kwargs):
-    if kwargs:
-        data = mutate(__data, **kwargs)
-    else:
-        data = __data
+    if not (args or kwargs):
+        return __data.copy()
 
-    # put kwarg grouping vars last, so similar order to function call
-    groups =  tuple(simple_varname(arg) for arg in args) + tuple(kwargs)
-    if None in groups:
-        raise NotImplementedError("Complex expressions not supported in sql group_by")
+    group_names, sel = _mutate_cols(__data, args, kwargs, "Group by")
 
-    # ensure group_by variables are in the select columns
-    cols = data.last_op.alias().columns
-    unmatched = set(groups) - set(cols.keys())
-    if unmatched:
-        raise KeyError("group_by specifies columns missing from table: %s" %unmatched)
+    if None in group_names:
+        raise NotImplementedError("Complex, unnamed expressions not supported in sql group_by")
+
+    # check whether we can just use underlying table ----
+    new_cols = lift_inner_cols(sel)
+    if set(new_cols).issubset(set(__data.last_op.columns)):
+        sel = __data.last_op
 
     if add:
-        groups = ordered_union(data.group_by, groups)
+        group_names = ordered_union(__data.group_by, group_names)
 
-    return data.copy(group_by = groups)
+    return __data.append_op(sel, group_by = tuple(group_names))
 
 
 @ungroup.register(LazyTbl)
