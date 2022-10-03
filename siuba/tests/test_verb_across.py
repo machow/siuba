@@ -10,6 +10,13 @@ from siuba.dply.across import across
 from siuba.experimental.pivot.test_pivot import assert_equal_query2
 from siuba.sql.translate import SqlColumn, SqlColumnAgg, sql_scalar
 
+# TODO: test transmute
+# TODO: test verb(data, _.simple_name)
+# TODO: test changing a group var (e.g. mutate, transmute, add_count), then summarizing
+# TODO: group_by(cyl) >> count(cyl = cyl + 1)
+# TODO: SQL mutate requires immediate CTE (e.g. due to GROUP BY clause)
+# TODO: count "n" name
+
 
 # Helpers =====================================================================
 
@@ -150,8 +157,9 @@ def test_across_in_mutate(backend, df, func):
     dst["a_x"] = df.a_x.round()
     dst["a_y"] = df.a_y.round()
 
-    assert_equal_query2(res_explicit, dst, sql_kwargs={"check_dtype": False})
-    assert_equal_query2(res_implicit, dst, sql_kwargs={"check_dtype": False})
+    sql_kwargs = {"check_dtype": False}
+    assert_equal_query2(res_explicit, dst, sql_kwargs=sql_kwargs, sql_ordered=False)
+    assert_equal_query2(res_implicit, dst, sql_kwargs=sql_kwargs, sql_ordered=False)
 
 
 def test_across_in_mutate_grouped_equiv_ungrouped(backend, df):
