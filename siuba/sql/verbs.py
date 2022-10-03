@@ -877,8 +877,7 @@ def _count(__data, *args, sort = False, wt = None, **kwargs):
                     )
         arg_names.append(name)
 
-    sel_inner = mutate(__data, **kwargs).last_op
-    group_cols = arg_names + list(kwargs)
+    result_names, sel_inner = _mutate_cols(__data, args, kwargs, "Count")
 
     # create outer select ----
     # holds selected columns and tally (n)
@@ -886,11 +885,11 @@ def _count(__data, *args, sort = False, wt = None, **kwargs):
     inner_cols = sel_inner_cte.columns
 
     # apply any group vars from a group_by verb call first
-    tbl_group_cols = [inner_cols[k] for k in __data.group_by]
-    count_group_cols = [inner_cols[k] for k in group_cols]
+    missing = [k for k in __data.group_by if k not in result_names]
 
-    # combine with any defined in the count verb call
-    outer_group_cols = ordered_union(tbl_group_cols, count_group_cols)
+    all_group_names = ordered_union(__data.group_by, result_names)
+    outer_group_cols = [inner_cols[k] for k in all_group_names]
+
     # holds the actual count (e.g. n)
     count_col = sql.functions.count().label(res_name)
 
