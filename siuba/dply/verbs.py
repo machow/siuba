@@ -143,7 +143,7 @@ def _mutate_cols(__data, args, kwargs):
         df_tmp[col_name] = apply_if_callable(expr, df_tmp)
         result_names[col_name] = True
 
-    return result_names, df_tmp
+    return list(result_names), df_tmp
 
 
 MSG_TYPE_ERROR = "The first argument to {func} must be one of: {types}"
@@ -215,7 +215,7 @@ def show_query(__data, simplify = False):
 
 # Mutate ======================================================================
 
-# TODO: support for unnamed args
+
 @singledispatch2(pd.DataFrame)
 def mutate(__data, *args, **kwargs):
     """Assign new variables to a DataFrame, while keeping existing ones.
@@ -331,19 +331,24 @@ def group_by(__data, *args, add = False, **kwargs):
     1    6  21.0  110  (20.2, 21.4]
     
     """
+    
+    if isinstance(__data, DataFrameGroupBy):
+        tmp_df = __data.obj.copy()
+    else:
+        tmp_df = __data.copy()
 
-    tmp_df = mutate(__data, **kwargs) if kwargs else __data
+    # TODO: super inefficient, since it makes multiple copies of data
+    #       need way to get the by_vars and apply (grouped) computation
+    computed = ungroup(transmute(__data, *args, **kwargs))
+    by_vars = list(computed.columns)
 
-    by_vars = list(map(simple_varname, args))
-    for ii, name in enumerate(by_vars):
-        if name is None: raise Exception("group by variable %s is not a column name" %ii)
+    for k in by_vars:
+        tmp_df[k] = computed[k]
 
-    by_vars.extend(kwargs.keys())
-
-    if isinstance(tmp_df, DataFrameGroupBy) and add:
+    if isinstance(__data, DataFrameGroupBy) and add:
         prior_groups = [el.name for el in __data.grouper.groupings]
         all_groups = ordered_union(prior_groups, by_vars)
-        return tmp_df.obj.groupby(list(all_groups))
+        return tmp_df.groupby(list(all_groups))
 
     return tmp_df.groupby(by = by_vars)
 
@@ -595,14 +600,10 @@ def transmute(__data, *args, **kwargs):
 
     """
     arg_vars = list(map(simple_varname, args))
-    for ii, name in enumerate(arg_vars):
-        if name is None: raise Exception("complex, unnamed expression at pos %s not supported"%ii)
 
-    f_mutate = mutate.registry[pd.DataFrame]
+    col_names, df_res = _mutate_cols(__data, args, kwargs)
+    return df_res[col_names]
 
-    df = f_mutate(__data, **kwargs) 
-
-    return df[[*arg_vars, *kwargs.keys()]]
 
 @transmute.register(DataFrameGroupBy)
 def _transmute(__data, *args, **kwargs):
