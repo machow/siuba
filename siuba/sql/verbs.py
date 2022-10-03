@@ -710,8 +710,9 @@ def _select_mutate_result(src_sel, expr_result):
     return _sql_upsert_columns(src_sel, orig_cols)
 
 
-def _mutate_cols(__data, args, kwargs, verb_name):
+def _mutate_cols(__data, args, kwargs, verb_name, arrange_clause=False):
     result_names = {}     # used as ordered set
+    result_expr = []
     sel = __data.last_select
 
     for ii, func in enumerate(args):
@@ -731,9 +732,12 @@ def _mutate_cols(__data, args, kwargs, verb_name):
         assert isinstance(cols_result, sql.base.ImmutableColumnCollection), type(cols_result)
 
         # replace any labels that require a subquery ----
-        sel = _select_mutate_result(sel, cols_result)
+        if arrange_clause:
+            result_expr.extend(cols_result)
+        else:
+            sel = _select_mutate_result(sel, cols_result)
+            result_names.update({k: True for k in cols_result.keys()})
 
-        result_names.update({k: True for k in cols_result.keys()})
     
     for new_name, func in kwargs.items():
         inner_cols = lift_inner_cols(sel)
@@ -748,9 +752,16 @@ def _mutate_cols(__data, args, kwargs, verb_name):
             )
         
         labeled = new_col.label(new_name)
-        sel = _select_mutate_result(sel, labeled)
 
-        result_names[new_name] = True
+        if arrange_clause:
+            result_expr.append(labeled)
+        else:
+            sel = _select_mutate_result(sel, labeled)
+            result_names[new_name] = True
+
+
+    if arrange_clause:
+        return result_expr, sel
 
     return list(result_names), sel
 
@@ -813,7 +824,9 @@ def _arrange(__data, *args):
     last_sel = __data.last_select
     cols = lift_inner_cols(last_sel)
 
-    
+    # TODO: implement across in arrange
+    #exprs, _ = _mutate_cols(__data, args, kwargs, "Arrange", arrange_clause=True)
+
     new_calls = []
     for ii, expr in enumerate(args):
         if callable(expr):
