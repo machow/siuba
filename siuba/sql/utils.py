@@ -185,7 +185,7 @@ def _sql_simplify_select(select):
 
     # TODO: find simpler way to clone an element. We cannot use the visitors
     # argument of cloned_traverse, since it visits the inner-most element first.
-    clone_el = cloned_traverse(select, {}, {})
+    clone_el = select._clone()
 
     # modify in-place
     traverse(clone_el, {}, {"select": simplify_sel})
