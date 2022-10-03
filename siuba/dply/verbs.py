@@ -146,6 +146,10 @@ def _mutate_cols(__data, args, kwargs):
     return list(result_names), df_tmp
 
 
+def _make_groupby_safe(gdf):
+    return gdf.obj.groupby(gdf.grouper, group_keys=False)
+
+
 MSG_TYPE_ERROR = "The first argument to {func} must be one of: {types}"
 
 def raise_type_error(f):
@@ -248,20 +252,20 @@ def mutate(__data, *args, **kwargs):
 
 @mutate.register(DataFrameGroupBy)
 def _mutate(__data, *args, **kwargs):
-    groupings = __data.grouper.groupings
-    orig_index = __data.obj.index
+    out = __data.obj.copy()
+    groupings = {ping.name: ping for ping in __data.grouper.groupings}
 
-    f_mutate = mutate.dispatch(pd.DataFrame)
+    f_transmute = transmute.dispatch(pd.DataFrame)
 
-    df = __data.apply(lambda d: f_mutate(d, *args, **kwargs))
-    
-    # will drop all but original index
-    group_by_lvls = list(range(df.index.nlevels - 1))
-    g_df = df.reset_index(group_by_lvls, drop = True).loc[orig_index].groupby(groupings)
+    df = _make_groupby_safe(__data).apply(lambda d: f_transmute(d, *args, **kwargs))
 
-    return g_df
+    for varname, ser in df.items():
+        if varname in groupings:
+            groupings[varname] = varname
 
+        out[varname] = ser
 
+    return out.groupby(list(groupings.values()))
 
 
 # Group By ====================================================================
@@ -339,16 +343,20 @@ def group_by(__data, *args, add = False, **kwargs):
 
     # TODO: super inefficient, since it makes multiple copies of data
     #       need way to get the by_vars and apply (grouped) computation
-    computed = ungroup(transmute(__data, *args, **kwargs))
+    computed = transmute(tmp_df, *args, **kwargs)
     by_vars = list(computed.columns)
 
     for k in by_vars:
         tmp_df[k] = computed[k]
 
     if isinstance(__data, DataFrameGroupBy) and add:
-        prior_groups = [el.name for el in __data.grouper.groupings]
-        all_groups = ordered_union(prior_groups, by_vars)
-        return tmp_df.groupby(list(all_groups))
+        groupings = {el.name: el for el in __data.grouper.groupings}
+
+        for varname in by_vars:
+            # ensures group levels are recalculated if varname was in transmute
+            groupings[varname] = varname
+
+        return tmp_df.groupby(list(groupings.values()))
 
     return tmp_df.groupby(by = by_vars)
 
@@ -376,10 +384,10 @@ def ungroup(__data):
     #       the groupby?
     if isinstance(__data, pd.DataFrame):
         return __data
-    if isinstance(__data, pd.Series):
-        return __data.reset_index()
-
-    return __data.obj.reset_index(drop = True)
+    elif isinstance(__data, DataFrameGroupBy):
+        return __data.obj
+    else:
+        raise TypeError(f"Unsupported type {type(__data)}")
 
 
 
@@ -607,23 +615,20 @@ def transmute(__data, *args, **kwargs):
 
 @transmute.register(DataFrameGroupBy)
 def _transmute(__data, *args, **kwargs):
-    arg_vars = list(map(simple_varname, args))
-    for ii, name in enumerate(arg_vars):
-        if name is None: raise Exception("complex, unnamed expression at pos %s not supported"%ii)
+    groupings = {ping.name: ping for ping in __data.grouper.groupings}
 
-    f_mutate = mutate.registry[DataFrameGroupBy]
+    f_transmute = transmute.dispatch(pd.DataFrame)
 
-    gdf = f_mutate(__data, **kwargs)
-    groupings = gdf.grouper.groupings
+    df = _make_groupby_safe(__data).apply(lambda d: f_transmute(d, *args, **kwargs))
 
-    group_names = [x.name for x in groupings]
-    if None in group_names:
-        raise ValueError("Passed a grouped DataFrame to transmute, but not all "
-                         "its groups are named. Groups: %s" % group_names)
+    
+    for varname in reversed(list(groupings)):
+        if varname in df.columns:
+            groupings[varname] = varname
+        else:
+            df.insert(0, varname, __data.obj[varname])
 
-    subset = ungroup(gdf)[[*group_names, *arg_vars, *kwargs.keys()]]
-
-    return subset.groupby(groupings)
+    return df.groupby(list(groupings.values()))
 
 
 
@@ -1260,8 +1265,24 @@ def count(__data, *args, wt = None, sort = False, **kwargs):
     return counts
 
 
+def _check_name(name, columns):
+    if name is None:
+        name = "n"
+        while name in columns:
+            name = name + "n"
+
+        if name != "n":
+            # TODO: warning
+            pass
+    
+    elif not isinstance(name, str):
+        raise TypeError("`name` must be a single string.")
+
+    return name
+        
+
 @singledispatch2((pd.DataFrame, DataFrameGroupBy))
-def add_count(__data, *args, wt = None, sort = False, **kwargs):
+def add_count(__data, *args, wt = None, sort = False, name = None, **kwargs):
     """Add a column that is the number of observations for each grouping of data.
 
     Note that this function is similar to count(), but does not aggregate. It's
@@ -1309,10 +1330,48 @@ def add_count(__data, *args, wt = None, sort = False, **kwargs):
 
 
     """
-    counts = count(__data, *args, wt = wt, sort = sort, **kwargs)
 
-    by = list(counts.columns)[:-1]
-    return inner_join(__data, counts, by = by)
+    no_grouping_vars = not args and not kwargs and isinstance(__data, pd.DataFrame)
+
+    if no_grouping_vars:
+        out = __data
+    else:
+        out = group_by(__data, *args, add=True, **kwargs)
+
+    var_names = ungroup(out).columns
+    name = _check_name(name, set(var_names))
+
+    if wt is None:
+        if no_grouping_vars: 
+            # no groups, just use number of rows
+            counts = __data.copy()
+            counts[name] = counts.shape[0]
+        else:
+            # note that it's easy to transform tally using single grouped column, so
+            # we arbitrarily grab the first column..
+            counts = out.obj.copy()
+            counts[name] = out[var_names[0]].transform("size")
+
+    else:
+        wt_col = simple_varname(wt)
+        if wt_col is None:
+            raise Exception("wt argument has to be simple column name")
+
+        if no_grouping_vars:
+            # no groups, sum weights
+            counts = __data.copy()
+            counts[name] = counts[wt_col].sum()
+        else:
+            # TODO: should flip topmost if/else so grouped code is together
+            # do weighted tally
+            counts = out.obj.copy()
+            counts[name] = out[wt_col].transform("sum")
+
+    if sort:
+        return counts.sort_values(out_col, ascending = False)
+
+    return counts
+
     
 
 
