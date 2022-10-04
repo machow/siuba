@@ -24,7 +24,7 @@ _ = Symbolic()
 
 
 
-def assert_equal_query2(left, right, *args, sql_ordered=True, sql_kwargs=None, **kwargs):
+def assert_equal_query2(left, right, *args, sql_ordered=False, sql_kwargs=None, **kwargs):
     from siuba.sql import LazyTbl
     from siuba.sql.utils import _is_dialect_duckdb
     from pandas.core.groupby import DataFrameGroupBy
@@ -111,7 +111,7 @@ def test_preserves_original_keys(backend):
         
     pv = pivot_longer(remote, _["y":"z"])
 
-    assert_equal_query2(pv, dst, sql_ordered=False)
+    assert_equal_query2(pv, dst)
 
 
 def test_can_drop_missing_values(backend):
@@ -123,7 +123,7 @@ def test_can_drop_missing_values(backend):
 
     # TODO: sql databases sometimes return float. we need assertions to take
     # backend (or sql vs pandas) specific options.
-    assert_equal_query2(pv, dst, sql_ordered=False, check_dtype=False)
+    assert_equal_query2(pv, dst, check_dtype=False)
 
 
 def test_can_handle_missing_combinations(backend):
@@ -139,7 +139,7 @@ def test_can_handle_missing_combinations(backend):
     src = backend.load_df(df)
     pv = pivot_longer(src, -_.id, names_to = (".value", "n"), names_sep = "_")
 
-    assert_equal_query2(pv, dst, sql_ordered=False)
+    assert_equal_query2(pv, dst)
 
 
 @pytest.mark.xfail

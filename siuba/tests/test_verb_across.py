@@ -158,8 +158,8 @@ def test_across_in_mutate(backend, df, func):
     dst["a_y"] = df.a_y.round()
 
     sql_kwargs = {"check_dtype": False}
-    assert_equal_query2(res_explicit, dst, sql_kwargs=sql_kwargs, sql_ordered=False)
-    assert_equal_query2(res_implicit, dst, sql_kwargs=sql_kwargs, sql_ordered=False)
+    assert_equal_query2(res_explicit, dst, sql_kwargs=sql_kwargs)
+    assert_equal_query2(res_implicit, dst, sql_kwargs=sql_kwargs)
 
 
 def test_across_in_mutate_grouped_equiv_ungrouped(backend, df):
