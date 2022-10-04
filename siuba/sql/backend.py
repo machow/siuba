@@ -25,18 +25,6 @@ from functools import singledispatch
 
 class SqlFunctionLookupError(FunctionLookupError): pass
 
-
-class CallListener:
-    """Generic listener. Each exit is called on a node's copy."""
-    def enter(self, node):
-        args, kwargs = node.map_subcalls(self.enter)
-
-        return self.exit(node.__class__(node.func, *args, **kwargs))
-
-    def exit(self, node):
-        return node
-
-
 class WindowReplacer:
 
     @staticmethod
@@ -99,12 +87,6 @@ class SqlLabelReplacer:
         
         return None
             
-
-#def track_call_windows(call, columns, group_by, order_by, window_cte = None):
-#    listener = WindowReplacer(columns, group_by, order_by, window_cte)
-#    col = listener.enter(call)
-#    return col, listener.windows, listener.window_cte
-
 
 # TODO: consolidate / pull expr handling funcs into own file?
 def _create_order_by_clause(columns, *args):
@@ -202,40 +184,6 @@ def lift_inner_cols(tbl):
     cols = list(tbl.inner_columns)
 
     return _sql_column_collection(cols)
-
-def col_expr_requires_cte(call, sel, is_mutate = False):
-    """Return whether a variable assignment needs a CTE"""
-
-    call_vars = set(call.op_vars(attr_calls = False))
-
-    sel_labs = get_inner_labels(sel)
-
-    # I use the acronym fwg sol (frog soul) to remember sql clause eval order
-    # from, where, group by, select, order by, limit
-    # group clause evaluated before select clause, so not issue for mutate
-    group_needs_cte = not is_mutate and len(sel._group_by_clause)
-    
-    return (   group_needs_cte
-            # TODO: detect when a new var in mutate conflicts w/ order by
-            #or len(sel._order_by_clause)
-            or not sel_labs.isdisjoint(call_vars)
-            )
-
-def get_inner_labels(sel):
-    columns = lift_inner_cols(sel)
-    sel_labs = set(k for k,v in columns.items() if isinstance(v, sql.elements.Label))
-    return sel_labs
-
-def get_missing_columns(call, columns):
-    missing_cols = set(call.op_vars(attr_calls = False)) - set(columns.keys())
-    return missing_cols
-
-def compile_el(tbl, el):
-    compiled = el.compile(
-         dialect = tbl.source.dialect,
-         compile_kwargs = {"literal_binds": True}
-    )
-    return compiled
 
 # Misc utilities --------------------------------------------------------------
 
