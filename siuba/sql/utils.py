@@ -136,9 +136,15 @@ def _sql_add_columns(select, columns):
 
 def _sql_with_only_columns(select, columns):
     if is_sqla_12() or is_sqla_13():
-        return select.with_only_columns(columns)
+        out = select.with_only_columns(columns)
+    else:
+        out = select.with_only_columns(*columns)
 
-    return select.with_only_columns(*columns)
+    # ensure removing all columns doesn't remove from clause table reference
+    for _from in select.froms:
+        out = out.select_from(_from)
+
+    return out
 
 
 def _sql_case(*args, **kwargs):

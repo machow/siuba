@@ -1,4 +1,4 @@
-from siuba.dply.across import across, _get_name_template, _across_setup_fns, ctx_verb_data
+from siuba.dply.across import across, _get_name_template, _across_setup_fns, ctx_verb_data, ctx_verb_window
 from siuba.dply.tidyselect import var_select, var_create
 from siuba.siu import FormulaContext, Call
 
@@ -34,6 +34,7 @@ def _across_sql_cols(
 ) -> sql.base.ImmutableColumnCollection:
 
     lazy_tbl = ctx_verb_data.get()
+    window = ctx_verb_window.get()
 
     name_template = _get_name_template(fns, names)
     selected_cols = var_select(__data, *var_create(cols), data=__data)
@@ -56,6 +57,7 @@ def _across_sql_cols(
 
             new_call = lazy_tbl.shape_call(
                 fn,
+                window,
                 verb_name="Across",
                 arg_name = f"function {fn_name} of {len(fns_map)}"
             )

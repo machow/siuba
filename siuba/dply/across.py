@@ -16,6 +16,7 @@ DEFAULT_SINGLE_FUNC_TEMPLATE = "{col}"
 
 
 ctx_verb_data = ContextVar("data")
+ctx_verb_window = ContextVar("window")
 
 
 def _is_symbolic_operator(f):
@@ -34,22 +35,27 @@ def _require_across(call, verb_name):
         )
 
 
-def _eval_with_context(ctx, data, expr):
+def _eval_with_context(ctx, window_ctx, data, expr):
+    # TODO: should just set the translator as context (e.g. agg translater, etc..)
     token = ctx_verb_data.set(ctx)
+    token_win = ctx_verb_window.set(window_ctx)
 
     try:
         return expr(data)
     finally:
         ctx_verb_data.reset(token)
+        ctx_verb_window.reset(token_win)
 
 
 @contextmanager
-def _set_data_context(ctx):
+def _set_data_context(ctx, window):
     try:
         token = ctx_verb_data.set(ctx)
+        token_win = ctx_verb_window.set(window)
         yield
     finally:
         ctx_verb_data.reset(token)
+        ctx_verb_window.reset(token_win)
 
 
 

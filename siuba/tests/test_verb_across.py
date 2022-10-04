@@ -8,7 +8,7 @@ from siuba.dply.verbs import mutate, filter, summarize, group_by, collect, ungro
 from siuba.dply.across import across
 
 from siuba.experimental.pivot.test_pivot import assert_equal_query2
-from siuba.sql.translate import SqlColumn, SqlColumnAgg, sql_scalar
+from siuba.sql.translate import SqlColumn, SqlColumnAgg, sql_scalar, win_agg, sql_agg
 
 # TODO: test transmute
 # TODO: test verb(data, _.simple_name)
@@ -36,6 +36,9 @@ f_round.register(SqlColumn, sql_scalar("round"))
 @symbolic_dispatch(cls = pd.Series)
 def f_mean(x) -> pd.Series:
     return x.mean()
+
+f_mean.register(SqlColumn, win_agg("avg"))
+f_mean.register(SqlColumnAgg, sql_agg("avg"))
 
 
 def assert_grouping_names(gdf, names):
@@ -174,14 +177,15 @@ def test_across_in_mutate_grouped_equiv_ungrouped(backend, df):
     assert_equal_query2(ungroup(g_res), collect(dst))
 
 
-def test_across_in_summarize(df):
-    res = summarize(df, across(_, _[_.a_x, _.a_y], f_mean))
+def test_across_in_summarize(backend, df):
+    src = backend.load_df(df)
+    res = summarize(src, across(_, _[_.a_x, _.a_y], f_mean))
     dst = pd.DataFrame({
         "a_x": [df.a_x.mean()],
         "a_y": [df.a_y.mean()]
     })
 
-    assert_frame_equal(res, dst)
+    assert_equal_query2(res, dst)
 
 
 def test_across_in_summarize_equiv_ungrouped():
