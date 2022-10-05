@@ -22,7 +22,9 @@ def dfs(backend):
     (mutate(x = _.a + _.b) >> summarize(ttl = _.x.sum().astype(float)), data_frame(ttl = 30.0)),
     (mutate(x = _.a + 1, y = _.b - 1), DATA.assign(x = [2,3,4], y = [8,7,6])),
     (mutate(x = _.a + 1) >> mutate(y = _.b - 1), DATA.assign(x = [2,3,4], y = [8,7,6])),
-    (mutate(x = _.a + 1, y = _.x + 1), DATA.assign(x = [2,3,4], y = [3,4,5]))
+    (mutate(x = _.a + 1, y = _.x + 1), DATA.assign(x = [2,3,4], y = [3,4,5])),
+    (mutate(_, _.a), DATA.copy()),
+    (mutate(_, _.a, _.a), DATA.copy()),
     ])
 def test_mutate_basic(dfs, query, output):
     assert_equal_query(dfs, query, output)
@@ -30,7 +32,7 @@ def test_mutate_basic(dfs, query, output):
 @pytest.mark.parametrize("query, output", [
     (mutate(x = 1), DATA.assign(x = 1)),
     (mutate(x = "a"), DATA.assign(x = "a")),
-    (mutate(x = 1.2), DATA.assign(x = 1.2))
+    (mutate(x = 1.2), DATA.assign(x = 1.2)),
     ])
 def test_mutate_literal(dfs, query, output):
     assert_equal_query(dfs, query, output)
@@ -66,7 +68,6 @@ def test_mutate_reassign_column_ordering(dfs):
             data_frame(a = [1,1,1], b = [9,8,7], c = [3,3,3])
             )
 
-@pytest.mark.skip("TODO: in SQL this returns a table with 1 row")
 def test_mutate_reassign_all_cols_keeps_rowsize(dfs):
     assert_equal_query(
             dfs,
@@ -116,6 +117,7 @@ def test_mutate_overwrites_prev(backend):
             mutate(x = _.x + 1) >> mutate(x = _.x + 1),
             data_frame(x = [3,4,5,6], g = [1,1,2,2])
             )
+
 
 
 

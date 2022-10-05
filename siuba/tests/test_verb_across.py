@@ -4,18 +4,13 @@ import pytest
 from pandas.testing import assert_frame_equal
 from pandas.core.groupby import DataFrameGroupBy
 from siuba.siu import symbolic_dispatch, Symbolic, Fx
+from siuba.dply import verbs
 from siuba.dply.verbs import mutate, filter, summarize, group_by, collect, ungroup
 from siuba.dply.across import across
 
 from siuba.experimental.pivot.test_pivot import assert_equal_query2
 from siuba.sql.translate import SqlColumn, SqlColumnAgg, sql_scalar, win_agg, sql_agg
-
-# TODO: test transmute
-# TODO: test verb(data, _.simple_name)
-# TODO: test changing a group var (e.g. mutate, transmute, add_count), then summarizing
-# TODO: group_by(cyl) >> count(cyl = cyl + 1)
-# TODO: SQL mutate requires immediate CTE (e.g. due to GROUP BY clause)
-# TODO: count "n" name
+from siuba.tests.helpers import assert_frame_sort_equal
 
 
 # Helpers =====================================================================
@@ -188,25 +183,28 @@ def test_across_in_summarize(backend, df):
     assert_equal_query2(res, dst)
 
 
-def test_across_in_summarize_equiv_ungrouped():
+def test_across_in_summarize_equiv_ungrouped(backend):
     # note that summarize does not automatically regroup on any keys
-    src = pd.DataFrame({
+    df = pd.DataFrame({
         "a_x": [1, 2],
         "a_y": [3, 4],
         "b_x": [5., 6.],
         "g": ["ZZ", "ZZ"]   # Note: all groups the same
     })
+    src = backend.load_df(df)
 
-    g_src = src.groupby("g")
+    g_src = group_by(src, _.g)
 
     expr_across = across(_, _[_.a_x, _.a_y], f_mean)
     g_res = summarize(g_src, expr_across)
     dst = summarize(src, expr_across)
 
-    assert g_res.columns.tolist() == ["g", "a_x", "a_y"]
-    assert g_res["g"].tolist() == ["ZZ"]
+    
+    collected = collect(g_res)
+    assert collected.columns.tolist() == ["g", "a_x", "a_y"]
+    assert collected["g"].tolist() == ["ZZ"]
 
-    assert_frame_equal(g_res.drop(columns="g"), dst)
+    assert_frame_sort_equal(collected.drop(columns="g"), collect(dst))
 
 
 def test_across_in_filter(backend, df):
@@ -218,15 +216,41 @@ def test_across_in_filter(backend, df):
     assert_equal_query2(res, dst)
 
 
-def test_across_in_filter_equiv_ungrouped(df):
-    gdf = df.groupby("g")
+def test_across_in_filter_equiv_ungrouped(backend, df):
+    src = backend.load_df(df)
 
     expr_across = across(_, _[_.a_x, _.a_y], lambda x: x % 2 > 0)
-    g_res = filter(gdf, expr_across)
+    g_res = filter(group_by(df, _.g), expr_across)
     dst = filter(df, expr_across)
 
     assert_grouping_names(g_res, ["g"])
-    assert_frame_equal(g_res.obj, dst)
+    assert_equal_query2(g_res.obj, dst)
+
+
+@pytest.mark.parametrize("f", [
+    #(arrange),
+    (verbs.count),
+    #(add_count),
+    #(verbs.distinct),
+    (verbs.group_by),
+    (verbs.transmute),
+    
+])
+def test_across_in_verb(backend, df, f):
+    src = backend.load_df(df)
+    expr_across = across(_, _[_.a_x, _.a_y], Fx % 2 > 0)
+    expr_manual = {"a_x": _.a_x % 2 > 0, "a_y": _.a_y % 2 > 0}
+
+    res = f(src, expr_across)
+    dst = f(df, **expr_manual)
+
+    if isinstance(dst, DataFrameGroupBy):
+        assert_grouping_names(res, ["a_x", "a_y"])
+
+    assert_equal_query2(ungroup(res), ungroup(dst))
+
+# TODO: test verb(data, _.simple_name)
+# TODO: count "n" name
 
 
 def test_across_formula_and_underscore(df):

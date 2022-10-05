@@ -82,3 +82,10 @@ def test_count_on_grouped_df(df2):
             )
 
 
+def test_count_on_grouped_df_when_mutating_group_key(df):
+    assert_equal_query(
+            df,
+            group_by(_.g) >> count(g = _.g + "z"),
+            pd.DataFrame({"g": ["az", "bz"], "n": [2, 2]})
+    )
+
