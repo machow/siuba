@@ -11,8 +11,9 @@ from sqlalchemy import sql
 
 from siuba.dply.verbs import count, add_count, inner_join
 
-from ..utils import _sql_select, lift_inner_cols
+from ..utils import _sql_select, _sql_add_columns, lift_inner_cols
 from ..backend import LazyTbl, ordered_union
+from ..translate import AggOver
 
 from .mutate import _mutate_cols
 
@@ -73,7 +74,29 @@ def _count(__data, *args, sort = False, wt = None, **kwargs):
 
 @add_count.register(LazyTbl)
 def _add_count(__data, *args, wt = None, sort = False, **kwargs):
-    counts = count(__data, *args, wt = wt, sort = sort, **kwargs)
-    by = list(c.name for c in counts.last_select.inner_columns)[:-1]
 
-    return inner_join(__data, counts, by = by)
+    res_name = "n"
+
+    result_names, sel_inner = _mutate_cols(__data, args, kwargs, "Count")
+
+    # TODO: if clause copied from count
+    # remove unnecessary select, if we're operating on a table ----
+    if set(lift_inner_cols(sel_inner)) == set(lift_inner_cols(__data.last_select)):
+        sel_inner = __data.last_select
+
+    inner_cols = lift_inner_cols(sel_inner)
+
+
+    # TODO: this code to append groups to columns copied a lot inside verbs
+    # apply any group vars from a group_by verb call first
+    missing = [k for k in __data.group_by if k not in result_names]
+
+    all_group_names = ordered_union(__data.group_by, result_names)
+    outer_group_cols = [inner_cols[k] for k in all_group_names]
+
+
+    count_col = AggOver(sql.functions.count(), partition_by=outer_group_cols)
+
+    sel_appended = _sql_add_columns(sel_inner, [count_col.label(res_name)])
+
+    return __data.append_op(sel_appended)

@@ -230,7 +230,7 @@ def test_across_in_filter_equiv_ungrouped(backend, df):
 @pytest.mark.parametrize("f", [
     #(arrange),
     (verbs.count),
-    #(verbs.add_count),
+    (verbs.add_count),
     (verbs.distinct),
     (verbs.group_by),
     (verbs.transmute),
