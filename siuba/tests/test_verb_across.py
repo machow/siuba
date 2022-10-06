@@ -230,8 +230,8 @@ def test_across_in_filter_equiv_ungrouped(backend, df):
 @pytest.mark.parametrize("f", [
     #(arrange),
     (verbs.count),
-    #(add_count),
-    #(verbs.distinct),
+    #(verbs.add_count),
+    (verbs.distinct),
     (verbs.group_by),
     (verbs.transmute),
     
@@ -248,9 +248,6 @@ def test_across_in_verb(backend, df, f):
         assert_grouping_names(res, ["a_x", "a_y"])
 
     assert_equal_query2(ungroup(res), ungroup(dst))
-
-# TODO: test verb(data, _.simple_name)
-# TODO: count "n" name
 
 
 def test_across_formula_and_underscore(df):

@@ -922,18 +922,6 @@ def _arrange(__data, *args):
 # Distinct ====================================================================
 
 
-def _var_select_simple(args) -> "dict[str, bool]":
-    """Return an 'ordered set' of selected column names."""
-    cols = {simple_varname(x): True for x in args}
-    if None in cols:
-        raise Exception(
-            "Positional arguments must be simple column. "
-            "e.g. _.colname or _['colname']\n\n"
-            f"Received: {repr(cols[None])}"
-        )
-
-    return cols
-
 @singledispatch2(DataFrame)
 def distinct(__data, *args, _keep_all = False, **kwargs):
     """Keep only distinct (unique) rows from a table.
@@ -977,45 +965,38 @@ def distinct(__data, *args, _keep_all = False, **kwargs):
     1     Gentoo     Biscoe            46.1           13.2
     2  Chinstrap      Dream            46.5           17.9
     """
-    # using dict as ordered set
-    cols = _var_select_simple(args)
 
-    # mutate kwargs
-    cols.update(kwargs)
+    if not (args or kwargs):
+        return __data.drop_duplicates().reset_index(drop=True)
 
-    # special case: use all variables when none are specified
-    if not len(cols): cols = __data.columns
-
-    tmp_data = mutate(__data, **kwargs).drop_duplicates(list(cols)).reset_index(drop = True)
+    new_names, df_res = _mutate_cols(__data, args, kwargs)
+    tmp_data = df_res.drop_duplicates(new_names).reset_index(drop=True)
 
     if not _keep_all:
-        return tmp_data[list(cols)]
+        return tmp_data[new_names]
 
     return tmp_data
-        
+
 
 @distinct.register(DataFrameGroupBy)
 def _distinct(__data, *args, _keep_all = False, **kwargs):
 
-    cols = _var_select_simple(args)
-    cols.update(kwargs)
+    group_names = [ping.name for ping in __data.grouper.groupings]
 
-    # special case: use all variables when none are specified
-    if not len(cols): cols = __data.columns
 
-    group_cols_ordered = {ping.name: True for ping in __data.grouper.groupings}
-    final_cols = list({**group_cols_ordered, **cols, **kwargs})
+    f_distinct = distinct.dispatch(type(__data.obj))
 
-    mutated = mutate(__data, **kwargs).obj
+    tmp_data = (__data
+        .apply(f_distinct, *args, _keep_all=_keep_all, **kwargs)
+    )
 
-    if not _keep_all:
-        pre_df = mutated[final_cols]
-    else:
-        pre_df = mutated
+    index_keys = tmp_data.index.names[:-1]
+    keys_to_drop = [k for k in index_keys if k in tmp_data.columns]
+    keys_to_keep = [k for k in index_keys if k not in tmp_data.columns]
 
-    res = pre_df.drop_duplicates(list(final_cols)).reset_index(drop = True)
-    return res.groupby(list(group_cols_ordered))
+    final = tmp_data.reset_index(keys_to_drop, drop=True).reset_index(keys_to_keep)
 
+    return final.groupby(group_names)
 
 
 # if_else, case_when ==========================================================
