@@ -2,9 +2,10 @@
 __version__ = "0.3.0"
 
 # default imports--------------------------------------------------------------
-from .siu import _, Lam
+from .siu import _, Fx, Lam
+from .dply.across import across
 from .dply.verbs import *
 from .dply.verbs import __all__ as ALL_DPLY
 
 # necessary, since _ won't be exposed in import * by default
-__all__ = ['_', *ALL_DPLY]
+__all__ = ['_', "Fx", "across", *ALL_DPLY]
