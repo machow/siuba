@@ -9,7 +9,7 @@ translate.py handles translating column operations.
 
 from sqlalchemy import sql
 
-from siuba.dply.verbs import count, add_count, inner_join
+from siuba.dply.verbs import count, add_count, inner_join, _check_name
 
 from ..utils import _sql_select, _sql_add_columns, lift_inner_cols
 from ..backend import LazyTbl, ordered_union
@@ -18,28 +18,10 @@ from ..translate import AggOver
 from .mutate import _mutate_cols
 
 
-
 @count.register(LazyTbl)
-def _count(__data, *args, sort = False, wt = None, **kwargs):
-    # TODO: if already col named n, use name nn, etc.. get logic from tidy.py
+def _count(__data, *args, sort = False, wt = None, name=None, **kwargs):
     if wt is not None:
-        raise NotImplementedError("TODO")
-
-    res_name = "n"
-    # similar to filter verb, we need two select statements,
-    # an inner one for derived cols, and outer to group by them
-
-    # inner select ----
-    # holds any mutation style columns
-    #arg_names = []
-    #for arg in args:
-    #    name = simple_varname(arg)
-    #    if name is None:
-    #        raise NotImplementedError(
-    #                "Count positional arguments must be single column name. "
-    #                "Use a named argument to count using complex expressions."
-    #                )
-    #    arg_names.append(name)
+        raise NotImplementedError("wt argument is currently not implemented")
 
     result_names, sel_inner = _mutate_cols(__data, args, kwargs, "Count")
 
@@ -59,7 +41,8 @@ def _count(__data, *args, sort = False, wt = None, **kwargs):
     outer_group_cols = [inner_cols[k] for k in all_group_names]
 
     # holds the actual count (e.g. n)
-    count_col = sql.functions.count().label(res_name)
+    label_n = _check_name(name, set(inner_cols.keys()))
+    count_col = sql.functions.count().label(label_n)
 
     sel_outer = _sql_select([*outer_group_cols, count_col]) \
             .select_from(sel_inner_cte) \
@@ -73,9 +56,9 @@ def _count(__data, *args, sort = False, wt = None, **kwargs):
 
 
 @add_count.register(LazyTbl)
-def _add_count(__data, *args, wt = None, sort = False, **kwargs):
-
-    res_name = "n"
+def _add_count(__data, *args, wt = None, sort = False, name=None, **kwargs):
+    if wt is not None:
+        raise NotImplementedError("wt argument is currently not implemented")
 
     result_names, sel_inner = _mutate_cols(__data, args, kwargs, "Count")
 
@@ -96,7 +79,8 @@ def _add_count(__data, *args, wt = None, sort = False, **kwargs):
 
 
     count_col = AggOver(sql.functions.count(), partition_by=outer_group_cols)
+    label_n = _check_name(name, set(inner_cols.keys()))
 
-    sel_appended = _sql_add_columns(sel_inner, [count_col.label(res_name)])
+    sel_appended = _sql_add_columns(sel_inner, [count_col.label(label_n)])
 
     return __data.append_op(sel_appended)

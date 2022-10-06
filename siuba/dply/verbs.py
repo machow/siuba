@@ -1154,16 +1154,8 @@ def _case_when(__data, cases):
 
 # Count =======================================================================
 
-def _count_group(data, *args):
-    crnt_cols = set(data.columns)
-    out_col = "n"
-    while out_col in crnt_cols: out_col = out_col + "n"
-
-    return 
-
-
 @singledispatch2((pd.DataFrame, DataFrameGroupBy))
-def count(__data, *args, wt = None, sort = False, **kwargs):
+def count(__data, *args, wt = None, sort = False, name=None, **kwargs):
     """Summarize data with the number of rows for each grouping of data.
 
     Parameters
@@ -1233,9 +1225,7 @@ def count(__data, *args, wt = None, sort = False, **kwargs):
 
 
     # count col named, n. If that col already exists, add more "n"s...
-    crnt_cols = set(counts.columns)
-    out_col = "n"
-    while out_col in crnt_cols: out_col = out_col + "n"
+    out_col = _check_name(name, set(counts.columns))
 
     # rename the tally column to correct name
     counts.rename(columns = {counts.columns[-1]: out_col}, inplace = True)
@@ -1252,9 +1242,10 @@ def _check_name(name, columns):
         while name in columns:
             name = name + "n"
 
-        if name != "n":
-            # TODO: warning
-            pass
+    elif name != "n" and name in columns:
+        raise ValueError(
+            f"Column name `{name}` specified for count name, but is already present in data."
+        )
     
     elif not isinstance(name, str):
         raise TypeError("`name` must be a single string.")
