@@ -1,6 +1,6 @@
 from siuba.siu import Symbolic
-from siuba.sql.verbs import collect, show_query, LazyTbl
-from siuba.dply.verbs import Call
+from siuba.dply.verbs import collect, show_query, Call
+from siuba.sql import LazyTbl
 from .helpers import data_frame
 import pandas as pd
 

@@ -198,3 +198,10 @@ def _sql_simplify_select(select):
 
     return clone_el
 
+
+
+def lift_inner_cols(tbl):
+    cols = list(tbl.inner_columns)
+
+    return _sql_column_collection(cols)
+

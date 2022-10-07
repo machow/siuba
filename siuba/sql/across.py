@@ -2,7 +2,7 @@ from siuba.dply.across import across, _get_name_template, _across_setup_fns, ctx
 from siuba.dply.tidyselect import var_select, var_create
 from siuba.siu import FormulaContext, Call
 
-from . verbs import LazyTbl
+from .backend import LazyTbl
 from .utils import _sql_select, _sql_column_collection
 
 from sqlalchemy import sql
