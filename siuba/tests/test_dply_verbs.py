@@ -107,20 +107,6 @@ def test_VarList_getitem():
     assert res[1].name == "c"
 
 
-
-# Select ----------------------------------------------------------------------
-
-from siuba.dply.verbs import select
-
-def test_varlist_multi_slice(df1):
-    out = select(df1, lambda _: _["repo", "owner"])
-    assert out.columns.tolist() == ["repo", "owner"]
-
-def test_varlist_multi_slice_negate(df1):
-    out = select(df1, lambda _: -_["repo", "owner"])
-    assert out.columns.tolist() == ["language", "stars", "x"]
-
-
 # Distinct --------------------------------------------------------------------
 
 from siuba.dply.verbs import distinct
