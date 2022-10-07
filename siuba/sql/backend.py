@@ -80,10 +80,10 @@ class SqlLabelReplacer:
             elif el in self.src_columns:
                 return self.dst_columns[el.name]
 
-            elif isinstance(el, ColumnClause) and not isinstance(el, Column):
-                # Raw SQL, which will need a subquery, but not substitution
-                if el.key != "*":
-                    self.applied = True
+            #elif isinstance(el, ColumnClause) and not isinstance(el, Column):
+            #    # Raw SQL, which will need a subquery, but not substitution
+            #    if el.key != "*":
+            #        self.applied = True
         
         return None
             
