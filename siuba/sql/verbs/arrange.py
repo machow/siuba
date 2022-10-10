@@ -1,6 +1,10 @@
-from siuba.dply.verbs import arrange
+from sqlalchemy.sql.base import ImmutableColumnCollection
+
+from siuba.dply.verbs import arrange, _call_strip_ascending
+from siuba.dply.across import _set_data_context
+
 from ..utils import lift_inner_cols
-from ..backend import LazyTbl, _create_order_by_clause
+from ..backend import LazyTbl
 
 # Helpers ---------------------------------------------------------------------
 
@@ -15,23 +19,35 @@ def _arrange(__data, *args):
     cols = lift_inner_cols(last_sel)
 
     # TODO: implement across in arrange
-    #exprs, _ = _mutate_cols(__data, args, kwargs, "Arrange", arrange_clause=True)
+    sort_cols = _eval_arrange_args(__data, args, cols)
 
-    new_calls = []
-    for ii, expr in enumerate(args):
-        if callable(expr):
-
-            res = __data.shape_call(
-                    expr, window = False,
-                    verb_name = "Arrange", arg_name = ii
-                    )
-
-        else:
-            res = expr
-
-        new_calls.append(res)
-
-    sort_cols = _create_order_by_clause(cols, *new_calls)
-
-    order_by = __data.order_by + tuple(new_calls)
+    order_by = __data.order_by + tuple(args)
     return __data.append_op(last_sel.order_by(*sort_cols), order_by = order_by)
+
+
+def _eval_arrange_args(__data, args, cols):
+    sort_cols = []
+    for ii, expr in enumerate(args):
+        shaped = __data.shape_call(
+                expr, window = False, str_accessors = True,
+                verb_name = "Arrange", arg_name = ii,
+                )
+        
+        new_call, ascending = _call_strip_ascending(shaped)
+
+        with _set_data_context(__data, window=True):
+            res = new_call(cols)
+
+        if isinstance(res, ImmutableColumnCollection):
+            raise NotImplementedError(
+                f"`arrange()` expression {ii} of {len(args)} returned multiple columns, "
+                "which is currently unsupported."
+            )
+
+        if not ascending:
+            res = res.desc()
+
+        sort_cols.append(res)
+
+    return sort_cols
+

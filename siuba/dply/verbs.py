@@ -884,6 +884,7 @@ def arrange(__data, *args):
     ascending = []
     for ii, arg in enumerate(args):
         f, asc = _call_strip_ascending(arg)
+
         ascending.append(asc)
 
         col = simple_varname(f)
@@ -894,7 +895,15 @@ def arrange(__data, *args):
             sort_cols.append(n_cols + ii)
             tmp_cols.append(n_cols + ii)
 
-            df[n_cols + ii] = f(df)
+            res = f(df)
+
+            if isinstance(res, pd.DataFrame):
+                raise NotImplementedError(
+                    f"`arrange()` expression {ii} of {len(args)} returned a "
+                    "DataFrame, which is currently unsupported."
+                )
+
+            df[n_cols + ii] = res
 
 
     return df.sort_values(by = sort_cols, kind = "mergesort", ascending = ascending) \

@@ -250,6 +250,17 @@ def test_across_in_verb(backend, df, f):
     assert_equal_query2(ungroup(res), ungroup(dst))
 
 
+def test_across_in_arrange_unsupported(backend, df):
+    src = backend.load_df(df)
+    expr_across = across(_, _[_.a_x, _.a_y], Fx % 2 > 0)
+
+    with pytest.raises(NotImplementedError) as exc_info:
+        res = verbs.arrange(src, expr_across)
+
+    assert "`arrange()` expression 0 of 1 returned" in exc_info.value.args[0]
+
+
+
 def test_across_formula_and_underscore(df):
     res = across(df, _[_.a_x, _.a_y], f_round(Fx) / _.b_x)
 

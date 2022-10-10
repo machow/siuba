@@ -88,36 +88,15 @@ class SqlLabelReplacer:
         return None
             
 
-# TODO: consolidate / pull expr handling funcs into own file?
-def _create_order_by_clause(columns, *args):
-    from siuba.dply.verbs import _call_strip_ascending
-
-    sort_cols = []
-    for arg in args:
-        # simple named column
-        if isinstance(arg, str):
-            sort_cols.append(columns[arg])
-        # an expression
-        elif callable(arg):
-            # handle special case where -_.colname -> colname DESC
-            f, asc = _call_strip_ascending(arg)
-            col_op = f(columns) if asc else f(columns).desc()
-            #col_op = arg(columns)
-            sort_cols.append(col_op)
-        else:
-            raise NotImplementedError("Must be string or callable")
-
-    return sort_cols
-
 def track_call_windows(call, columns, group_by, order_by, window_cte = None):
     col_expr = call(columns)
 
     crnt_group_by = sql.elements.ClauseList(
             *[columns[name] for name in group_by]
             )
-    crnt_order_by = sql.elements.ClauseList(
-            *_create_order_by_clause(columns, *order_by)
-            )
+
+    crnt_order_by = sql.elements.ClauseList(*order_by)
+
     return replace_call_windows(col_expr, crnt_group_by, crnt_order_by, window_cte)
 
 
@@ -262,8 +241,13 @@ class LazyTbl:
     def track_call_windows(self, call, columns = None, window_cte = None):
         """Returns tuple of (new column expression, list of window exprs)"""
 
+        from .verbs.arrange import _eval_arrange_args
+
         columns = self.last_op.columns if columns is None else columns
-        return track_call_windows(call, columns, self.group_by, self.order_by, window_cte)
+
+        order_by = _eval_arrange_args(self, self.order_by, columns)
+
+        return track_call_windows(call, columns, self.group_by, order_by, window_cte)
 
     def get_ordered_col_names(self):
         """Return columns from current select, with grouping columns first."""
