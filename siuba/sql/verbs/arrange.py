@@ -21,8 +21,8 @@ def _arrange(__data, *args):
     # TODO: implement across in arrange
     sort_cols = _eval_arrange_args(__data, args, cols)
 
-    order_by = __data.order_by + tuple(args)
-    return __data.append_op(last_sel.order_by(*sort_cols), order_by = order_by)
+    final_sel = last_sel.order_by(None).order_by(*sort_cols)
+    return __data.append_op(final_sel, order_by = tuple(args))
 
 
 def _eval_arrange_args(__data, args, cols):
