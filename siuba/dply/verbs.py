@@ -112,6 +112,44 @@ def _regroup(df):
     return df.groupby(level = grp_levels)
 
 
+def _mutate_cols(__data, args, kwargs):
+    from pandas.core.common import apply_if_callable
+
+    result_names = {}          # used as ordered set
+    df_tmp = __data.copy()
+
+    for arg in args:
+
+        # case 1: a simple, existing name is a no-op ----
+        simple_name = simple_varname(arg)
+        if simple_name is not None and simple_name in df_tmp.columns:
+            result_names[simple_name] = True
+            continue
+
+        # case 2: across ----
+        # TODO: make robust. validate input. validate output (e.g. shape).
+        res_arg = arg(df_tmp)
+
+        if not isinstance(res_arg, pd.DataFrame):
+            raise NotImplementedError("Only across() can be used as positional argument.")
+
+        for col_name, col_ser in res_arg.items():
+            # need to put on the frame so subsequent args, kwargs can use
+            df_tmp[col_name] = col_ser
+            result_names[col_name] = True
+
+    for col_name, expr in kwargs.items():
+        # this is exactly what DataFrame.assign does
+        df_tmp[col_name] = apply_if_callable(expr, df_tmp)
+        result_names[col_name] = True
+
+    return list(result_names), df_tmp
+
+
+def _make_groupby_safe(gdf):
+    return gdf.obj.groupby(gdf.grouper, group_keys=False)
+
+
 MSG_TYPE_ERROR = "The first argument to {func} must be one of: {types}"
 
 def raise_type_error(f):
@@ -181,9 +219,9 @@ def show_query(__data, simplify = False):
 
 # Mutate ======================================================================
 
-# TODO: support for unnamed args
+
 @singledispatch2(pd.DataFrame)
-def mutate(__data, **kwargs):
+def mutate(__data, *args, **kwargs):
     """Assign new variables to a DataFrame, while keeping existing ones.
 
     Parameters
@@ -207,30 +245,27 @@ def mutate(__data, **kwargs):
     1    6  21.0  110    12    24
         
     """
-    
-    orig_cols = __data.columns
-    result = __data.assign(**kwargs)
 
-    new_cols = result.columns[~result.columns.isin(orig_cols)]
-
-    return result.loc[:, [*orig_cols, *new_cols]]
-
+    new_names, df_res = _mutate_cols(__data, args, kwargs)
+    return df_res
 
 
 @mutate.register(DataFrameGroupBy)
-def _mutate(__data, **kwargs):
-    groupings = __data.grouper.groupings
-    orig_index = __data.obj.index
+def _mutate(__data, *args, **kwargs):
+    out = __data.obj.copy()
+    groupings = {ping.name: ping for ping in __data.grouper.groupings}
 
-    df = __data.apply(lambda d: d.assign(**kwargs))
-    
-    # will drop all but original index
-    group_by_lvls = list(range(df.index.nlevels - 1))
-    g_df = df.reset_index(group_by_lvls, drop = True).loc[orig_index].groupby(groupings)
+    f_transmute = transmute.dispatch(pd.DataFrame)
 
-    return g_df
+    df = _make_groupby_safe(__data).apply(lambda d: f_transmute(d, *args, **kwargs))
 
+    for varname, ser in df.items():
+        if varname in groupings:
+            groupings[varname] = varname
 
+        out[varname] = ser
+
+    return out.groupby(list(groupings.values()))
 
 
 # Group By ====================================================================
@@ -300,19 +335,28 @@ def group_by(__data, *args, add = False, **kwargs):
     1    6  21.0  110  (20.2, 21.4]
     
     """
+    
+    if isinstance(__data, DataFrameGroupBy):
+        tmp_df = __data.obj.copy()
+    else:
+        tmp_df = __data.copy()
 
-    tmp_df = mutate(__data, **kwargs) if kwargs else __data
+    # TODO: super inefficient, since it makes multiple copies of data
+    #       need way to get the by_vars and apply (grouped) computation
+    computed = transmute(tmp_df, *args, **kwargs)
+    by_vars = list(computed.columns)
 
-    by_vars = list(map(simple_varname, args))
-    for ii, name in enumerate(by_vars):
-        if name is None: raise Exception("group by variable %s is not a column name" %ii)
+    for k in by_vars:
+        tmp_df[k] = computed[k]
 
-    by_vars.extend(kwargs.keys())
+    if isinstance(__data, DataFrameGroupBy) and add:
+        groupings = {el.name: el for el in __data.grouper.groupings}
 
-    if isinstance(tmp_df, DataFrameGroupBy) and add:
-        prior_groups = [el.name for el in __data.grouper.groupings]
-        all_groups = ordered_union(prior_groups, by_vars)
-        return tmp_df.obj.groupby(list(all_groups))
+        for varname in by_vars:
+            # ensures group levels are recalculated if varname was in transmute
+            groupings[varname] = varname
+
+        return tmp_df.groupby(list(groupings.values()))
 
     return tmp_df.groupby(by = by_vars)
 
@@ -340,10 +384,10 @@ def ungroup(__data):
     #       the groupby?
     if isinstance(__data, pd.DataFrame):
         return __data
-    if isinstance(__data, pd.Series):
-        return __data.reset_index()
-
-    return __data.obj.reset_index(drop = True)
+    elif isinstance(__data, DataFrameGroupBy):
+        return __data.obj
+    else:
+        raise TypeError(f"Unsupported type {type(__data)}")
 
 
 
@@ -385,7 +429,14 @@ def filter(__data, *args):
     """
     crnt_indx = True
     for arg in args:
-        crnt_indx &= arg(__data) if callable(arg) else arg
+        res = arg(__data) if callable(arg) else arg
+
+        if isinstance(res, pd.DataFrame):
+            crnt_indx &= res.all(axis=1)
+        elif isinstance(res, pd.Series):
+            crnt_indx &= res
+        else:
+            crnt_indx &= res
 
     # use loc or iloc to subset, depending on crnt_indx ----
     # the main issue here is that loc can't remove all rows using a slice
@@ -397,6 +448,7 @@ def filter(__data, *args):
         result = __data.loc[crnt_indx,:]
 
     return result
+
 
 @filter.register(DataFrameGroupBy)
 def _filter(__data, *args):
@@ -415,8 +467,9 @@ def _filter(__data, *args):
 
 # Summarize ===================================================================
 
+
 @singledispatch2(DataFrame)
-def summarize(__data, **kwargs):
+def summarize(__data, *args, **kwargs):
     """Assign variables that are single number summaries of a DataFrame.
 
     Grouped DataFrames will produce one row for each group. Otherwise, summarize
@@ -455,26 +508,57 @@ def summarize(__data, **kwargs):
         
     """
     results = {}
+    
+    for ii, expr in enumerate(args):
+        if not callable(expr):
+            raise TypeError(
+                "Unnamed arguments to summarize must be callable, but argument number "
+                f"{ii} was type: {type(expr)}"
+            )
+
+        res = expr(__data)
+        if isinstance(res, DataFrame):
+            if len(res) != 1:
+                raise ValueError(
+                    f"Summarize argument `{ii}` returned a DataFrame with {len(res)} rows."
+                    " Result must only be a single row."
+                )
+
+            for col_name in res.columns:
+                results[col_name] = res[col_name].array
+        else:
+            raise ValueError(
+                "Unnamed arguments to summarize must return a DataFrame, but argument "
+                f"`{ii} returned type: {type(expr)}"
+            )
+
+
+
     for k, v in kwargs.items():
+        # TODO: raise error if a named expression returns a DataFrame
         res = v(__data) if callable(v) else v
 
-        # validate operations returned single result
-        if not is_scalar(res) and len(res) > 1:
-            raise ValueError("Summarize argument, %s, must return result of length 1 or a scalar." % k)
+        if is_scalar(res) or len(res) == 1:
+            # keep result, but use underlying array to avoid crazy index issues
+            # on DataFrame construction (#138)
+            results[k] = res.array if isinstance(res, pd.Series) else res
 
-        # keep result, but use underlying array to avoid crazy index issues
-        # on DataFrame construction (#138)
-        results[k] = res.array if isinstance(res, pd.Series) else res
+        else:
+            raise ValueError(
+                f"Summarize argument `{k}` must return result of length 1 or a scalar.\n\n"
+                f"Result type: {type(res)}\n"
+                f"Result length: {len(res)}"
+            )
         
     # must pass index, or raises error when using all scalar values
     return DataFrame(results, index = [0])
 
     
 @summarize.register(DataFrameGroupBy)
-def _summarize(__data, **kwargs):
+def _summarize(__data, *args, **kwargs):
     df_summarize = summarize.registry[pd.DataFrame]
 
-    df = __data.apply(df_summarize, **kwargs)
+    df = __data.apply(df_summarize, *args, **kwargs)
         
     group_by_lvls = list(range(df.index.nlevels - 1))
     out = df.reset_index(group_by_lvls)
@@ -524,34 +608,27 @@ def transmute(__data, *args, **kwargs):
 
     """
     arg_vars = list(map(simple_varname, args))
-    for ii, name in enumerate(arg_vars):
-        if name is None: raise Exception("complex, unnamed expression at pos %s not supported"%ii)
 
-    f_mutate = mutate.registry[pd.DataFrame]
+    col_names, df_res = _mutate_cols(__data, args, kwargs)
+    return df_res[col_names]
 
-    df = f_mutate(__data, **kwargs) 
-
-    return df[[*arg_vars, *kwargs.keys()]]
 
 @transmute.register(DataFrameGroupBy)
 def _transmute(__data, *args, **kwargs):
-    arg_vars = list(map(simple_varname, args))
-    for ii, name in enumerate(arg_vars):
-        if name is None: raise Exception("complex, unnamed expression at pos %s not supported"%ii)
+    groupings = {ping.name: ping for ping in __data.grouper.groupings}
 
-    f_mutate = mutate.registry[DataFrameGroupBy]
+    f_transmute = transmute.dispatch(pd.DataFrame)
 
-    gdf = f_mutate(__data, **kwargs)
-    groupings = gdf.grouper.groupings
+    df = _make_groupby_safe(__data).apply(lambda d: f_transmute(d, *args, **kwargs))
 
-    group_names = [x.name for x in groupings]
-    if None in group_names:
-        raise ValueError("Passed a grouped DataFrame to transmute, but not all "
-                         "its groups are named. Groups: %s" % group_names)
+    
+    for varname in reversed(list(groupings)):
+        if varname in df.columns:
+            groupings[varname] = varname
+        else:
+            df.insert(0, varname, __data.obj[varname])
 
-    subset = ungroup(gdf)[[*group_names, *arg_vars, *kwargs.keys()]]
-
-    return subset.groupby(groupings)
+    return df.groupby(list(groupings.values()))
 
 
 
@@ -643,7 +720,7 @@ def select(__data, *args, **kwargs):
                 )
     var_list = var_create(*args)
 
-    od = var_select(__data.columns, *var_list)
+    od = var_select(__data.columns, *var_list, data=__data)
 
     to_rename = {k: v for k,v in od.items() if v is not None}
 
@@ -807,6 +884,7 @@ def arrange(__data, *args):
     ascending = []
     for ii, arg in enumerate(args):
         f, asc = _call_strip_ascending(arg)
+
         ascending.append(asc)
 
         col = simple_varname(f)
@@ -817,7 +895,15 @@ def arrange(__data, *args):
             sort_cols.append(n_cols + ii)
             tmp_cols.append(n_cols + ii)
 
-            df[n_cols + ii] = f(df)
+            res = f(df)
+
+            if isinstance(res, pd.DataFrame):
+                raise NotImplementedError(
+                    f"`arrange()` expression {ii} of {len(args)} returned a "
+                    "DataFrame, which is currently unsupported."
+                )
+
+            df[n_cols + ii] = res
 
 
     return df.sort_values(by = sort_cols, kind = "mergesort", ascending = ascending) \
@@ -844,18 +930,6 @@ def _arrange(__data, *args):
 
 # Distinct ====================================================================
 
-
-def _var_select_simple(args) -> "dict[str, bool]":
-    """Return an 'ordered set' of selected column names."""
-    cols = {simple_varname(x): True for x in args}
-    if None in cols:
-        raise Exception(
-            "Positional arguments must be simple column. "
-            "e.g. _.colname or _['colname']\n\n"
-            f"Received: {repr(cols[None])}"
-        )
-
-    return cols
 
 @singledispatch2(DataFrame)
 def distinct(__data, *args, _keep_all = False, **kwargs):
@@ -900,45 +974,38 @@ def distinct(__data, *args, _keep_all = False, **kwargs):
     1     Gentoo     Biscoe            46.1           13.2
     2  Chinstrap      Dream            46.5           17.9
     """
-    # using dict as ordered set
-    cols = _var_select_simple(args)
 
-    # mutate kwargs
-    cols.update(kwargs)
+    if not (args or kwargs):
+        return __data.drop_duplicates().reset_index(drop=True)
 
-    # special case: use all variables when none are specified
-    if not len(cols): cols = __data.columns
-
-    tmp_data = mutate(__data, **kwargs).drop_duplicates(list(cols)).reset_index(drop = True)
+    new_names, df_res = _mutate_cols(__data, args, kwargs)
+    tmp_data = df_res.drop_duplicates(new_names).reset_index(drop=True)
 
     if not _keep_all:
-        return tmp_data[list(cols)]
+        return tmp_data[new_names]
 
     return tmp_data
-        
+
 
 @distinct.register(DataFrameGroupBy)
 def _distinct(__data, *args, _keep_all = False, **kwargs):
 
-    cols = _var_select_simple(args)
-    cols.update(kwargs)
+    group_names = [ping.name for ping in __data.grouper.groupings]
 
-    # special case: use all variables when none are specified
-    if not len(cols): cols = __data.columns
 
-    group_cols_ordered = {ping.name: True for ping in __data.grouper.groupings}
-    final_cols = list({**group_cols_ordered, **cols, **kwargs})
+    f_distinct = distinct.dispatch(type(__data.obj))
 
-    mutated = mutate(__data, **kwargs).obj
+    tmp_data = (__data
+        .apply(f_distinct, *args, _keep_all=_keep_all, **kwargs)
+    )
 
-    if not _keep_all:
-        pre_df = mutated[final_cols]
-    else:
-        pre_df = mutated
+    index_keys = tmp_data.index.names[:-1]
+    keys_to_drop = [k for k in index_keys if k in tmp_data.columns]
+    keys_to_keep = [k for k in index_keys if k not in tmp_data.columns]
 
-    res = pre_df.drop_duplicates(list(final_cols)).reset_index(drop = True)
-    return res.groupby(list(group_cols_ordered))
+    final = tmp_data.reset_index(keys_to_drop, drop=True).reset_index(keys_to_keep)
 
+    return final.groupby(group_names)
 
 
 # if_else, case_when ==========================================================
@@ -1096,16 +1163,8 @@ def _case_when(__data, cases):
 
 # Count =======================================================================
 
-def _count_group(data, *args):
-    crnt_cols = set(data.columns)
-    out_col = "n"
-    while out_col in crnt_cols: out_col = out_col + "n"
-
-    return 
-
-
 @singledispatch2((pd.DataFrame, DataFrameGroupBy))
-def count(__data, *args, wt = None, sort = False, **kwargs):
+def count(__data, *args, wt = None, sort = False, name=None, **kwargs):
     """Summarize data with the number of rows for each grouping of data.
 
     Parameters
@@ -1175,9 +1234,7 @@ def count(__data, *args, wt = None, sort = False, **kwargs):
 
 
     # count col named, n. If that col already exists, add more "n"s...
-    crnt_cols = set(counts.columns)
-    out_col = "n"
-    while out_col in crnt_cols: out_col = out_col + "n"
+    out_col = _check_name(name, set(counts.columns))
 
     # rename the tally column to correct name
     counts.rename(columns = {counts.columns[-1]: out_col}, inplace = True)
@@ -1188,8 +1245,25 @@ def count(__data, *args, wt = None, sort = False, **kwargs):
     return counts
 
 
+def _check_name(name, columns):
+    if name is None:
+        name = "n"
+        while name in columns:
+            name = name + "n"
+
+    elif name != "n" and name in columns:
+        raise ValueError(
+            f"Column name `{name}` specified for count name, but is already present in data."
+        )
+    
+    elif not isinstance(name, str):
+        raise TypeError("`name` must be a single string.")
+
+    return name
+        
+
 @singledispatch2((pd.DataFrame, DataFrameGroupBy))
-def add_count(__data, *args, wt = None, sort = False, **kwargs):
+def add_count(__data, *args, wt = None, sort = False, name = None, **kwargs):
     """Add a column that is the number of observations for each grouping of data.
 
     Note that this function is similar to count(), but does not aggregate. It's
@@ -1237,10 +1311,48 @@ def add_count(__data, *args, wt = None, sort = False, **kwargs):
 
 
     """
-    counts = count(__data, *args, wt = wt, sort = sort, **kwargs)
 
-    by = list(counts.columns)[:-1]
-    return inner_join(__data, counts, by = by)
+    no_grouping_vars = not args and not kwargs and isinstance(__data, pd.DataFrame)
+
+    if no_grouping_vars:
+        out = __data
+    else:
+        out = group_by(__data, *args, add=True, **kwargs)
+
+    var_names = ungroup(out).columns
+    name = _check_name(name, set(var_names))
+
+    if wt is None:
+        if no_grouping_vars: 
+            # no groups, just use number of rows
+            counts = __data.copy()
+            counts[name] = counts.shape[0]
+        else:
+            # note that it's easy to transform tally using single grouped column, so
+            # we arbitrarily grab the first column..
+            counts = out.obj.copy()
+            counts[name] = out[var_names[0]].transform("size")
+
+    else:
+        wt_col = simple_varname(wt)
+        if wt_col is None:
+            raise Exception("wt argument has to be simple column name")
+
+        if no_grouping_vars:
+            # no groups, sum weights
+            counts = __data.copy()
+            counts[name] = counts[wt_col].sum()
+        else:
+            # TODO: should flip topmost if/else so grouped code is together
+            # do weighted tally
+            counts = out.obj.copy()
+            counts[name] = out[wt_col].transform("sum")
+
+    if sort:
+        return counts.sort_values(out_col, ascending = False)
+
+    return counts
+
     
 
 

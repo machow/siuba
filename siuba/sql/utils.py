@@ -114,8 +114,10 @@ def _sql_select(columns, *args, **kwargs):
     return sql.select(*columns, *args, **kwargs)
 
 
-def _sql_column_collection(data, columns):
+def _sql_column_collection(columns):
     from sqlalchemy.sql.base import ColumnCollection, ImmutableColumnCollection
+
+    data = {col.key: col for col in columns}
 
     if is_sqla_12() or is_sqla_13():
         return ImmutableColumnCollection(data, columns)
@@ -134,9 +136,15 @@ def _sql_add_columns(select, columns):
 
 def _sql_with_only_columns(select, columns):
     if is_sqla_12() or is_sqla_13():
-        return select.with_only_columns(columns)
+        out = select.with_only_columns(columns)
+    else:
+        out = select.with_only_columns(*columns)
 
-    return select.with_only_columns(*columns)
+    # ensure removing all columns doesn't remove from clause table reference
+    for _from in select.froms:
+        out = out.select_from(_from)
+
+    return out
 
 
 def _sql_case(*args, **kwargs):
@@ -183,10 +191,17 @@ def _sql_simplify_select(select):
 
     # TODO: find simpler way to clone an element. We cannot use the visitors
     # argument of cloned_traverse, since it visits the inner-most element first.
-    clone_el = cloned_traverse(select, {}, {})
+    clone_el = select._clone()
 
     # modify in-place
     traverse(clone_el, {}, {"select": simplify_sel})
 
     return clone_el
+
+
+
+def lift_inner_cols(tbl):
+    cols = list(tbl.inner_columns)
+
+    return _sql_column_collection(cols)
 

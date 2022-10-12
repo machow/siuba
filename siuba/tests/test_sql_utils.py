@@ -1,5 +1,5 @@
 from siuba.sql.utils import get_dialect_translator, mock_sqlalchemy_engine
-from siuba.sql.verbs import collect
+from siuba.dply.verbs import collect
 from siuba.sql import LazyTbl
 import pytest
 

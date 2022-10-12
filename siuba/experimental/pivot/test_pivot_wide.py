@@ -23,7 +23,7 @@ def test_pivot_all_cols(backend):
     pv = pivot_wider(src, names_from=_.key, values_from=_.val)
 
     # Note: duckdb is ordered
-    assert_equal_query2(pv, dst, sql_kwargs = {"check_like": True})
+    assert_equal_query2(pv, dst, sql_kwargs = {"check_like": True}, sql_ordered=True)
 
 
 def test_pivot_id_cols_default_preserve(backend):
@@ -35,7 +35,7 @@ def test_pivot_id_cols_default_preserve(backend):
     pv = pivot_wider(src, names_from = _.key, values_from = _.val)
 
     # Note: duckdb is ordered
-    assert_equal_query2(pv, dst, sql_kwargs = {"check_like": True})
+    assert_equal_query2(pv, dst, sql_kwargs = {"check_like": True}, sql_ordered=True)
 
 
 def test_pivot_implicit_missings_to_explicit():
@@ -44,7 +44,7 @@ def test_pivot_implicit_missings_to_explicit():
 
     pv = pivot_wider(src, names_from = _.key, values_from = _.val)
 
-    assert_equal_query2(pv, dst)
+    assert_equal_query2(pv, dst, sql_ordered=True)
 
 
 def test_pivot_implicit_missings_to_explicit_from_spec(backend):
@@ -96,7 +96,7 @@ def test_names_repair_unique(skip_backend, backend):
 
     pv = pivot_wider(src, names_repair=lambda x: [f"{v}_{ii}" for ii, v in enumerate(x)])
 
-    assert_equal_query2(pv, dst)
+    assert_equal_query2(pv, dst, sql_ordered=True)
 
 
 def test_names_repair_minimal():
@@ -131,7 +131,7 @@ def test_weird_column_name_select(skip_backend, backend):
 
     pv = pivot_wider(src, names_from = _["...8"], values_from = _.val)
 
-    assert_equal_query2(pv, dst, sql_kwargs = {"check_like": True})
+    assert_equal_query2(pv, dst, sql_kwargs = {"check_like": True}, sql_ordered=True)
 
 
 @pytest.mark.skip("Won't do")
@@ -429,7 +429,7 @@ def test_selecting_all_id_cols_excludes_names_from_values_from(backend):
     dst = data_frame(key = "x", a = 1)
     pv = pivot_wider(src, _[:])
 
-    assert_equal_query2(pv, dst)
+    assert_equal_query2(pv, dst, sql_ordered=True)
 
     # TODO: also test pivot_wider_spec
 
@@ -467,7 +467,12 @@ def test_pivot_zero_row_frame_id_excludes_values_from(backend):
     pv = pivot_wider(src, names_from = _.name, values_from = _.value)
 
     # SQL backends return a empty Index, pandas an empty RangeIndex ¯\_(ツ)_/¯
-    assert_equal_query2(pv, dst, sql_kwargs = {"check_index_type": False, "check_dtype": False})
+    assert_equal_query2(
+        pv,
+        dst,
+        sql_kwargs = {"check_index_type": False, "check_dtype": False},
+        sql_ordered=True
+    )
 
 
 #TODO:
@@ -584,7 +589,6 @@ def test_values_fn_arg_str(backend):
     assert_equal_query2(
         pv,
         data_frame(a = [1, 2], x = [3, 3]),
-        sql_ordered=False,
         sql_kwargs={"check_dtype": False}
     )
 

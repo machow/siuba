@@ -42,10 +42,31 @@ def test_distinct_keep_all_not_impl(backend, df):
         distinct(df, _.y, _keep_all = True) >> collect()
     
 
-@pytest.mark.xfail
-def test_distinct_via_group_by(df):
-    # NotImplemented
-    assert False
+def test_distinct_via_group_by_single_col(backend):
+    data = pd.DataFrame({"g": ["a", "a", "b", "b"], "x": [1, 1, 1, 2]})
+
+    src = backend.load_df(data)
+    query = group_by(_, _.g) >> distinct(_.x)
+
+    assert_equal_query(
+        src,
+        query,
+        pd.DataFrame({"g": ["a", "b", "b"], "x": [1, 1, 2]})
+    )
+
+
+def test_distinct_via_group_by_group_key_as_arg(backend):
+    data = pd.DataFrame({"g": ["a", "a", "b", "b"], "x": [1, 1, 1, 2]})
+
+    src = backend.load_df(data)
+    query = group_by(_, _.g) >> distinct(_.x, _.g)
+
+    assert_equal_query(
+        src,
+        query,
+        pd.DataFrame({"x": [1, 1, 2], "g": ["a", "b", "b"]})
+    )
+
 
 
 def test_distinct_after_summarize(df):

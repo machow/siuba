@@ -4,7 +4,7 @@ Note: this test file was heavily influenced by its dbplyr counterpart.
 https://github.com/tidyverse/dbplyr/blob/master/tests/testthat/test-verb-mutate.R
 """
     
-from siuba import _, group_by, summarize, count
+from siuba import _, group_by, summarize, count, add_count, collect
 import pandas as pd
 
 import pytest
@@ -41,13 +41,21 @@ def test_count_with_expression(df):
             )
 
 
-@pytest.mark.skip("TODO: sql support kwargs in count (#68)")
 def test_count_with_kwarg_expression(df):
     assert_equal_query(
             df,
             count(y = _.x - _.x),
             pd.DataFrame({"y": [0], "n": [4]})
             )
+
+
+def test_add_count_with_kwarg_expression(df):
+    assert_equal_query(
+            df,
+            add_count(y = _.x - _.x),
+            DATA.assign(y = 0, n = 4)
+            )
+
 
 @backend_notimpl("sql") # see (#104)
 def test_count_wt(backend, df):
@@ -57,12 +65,30 @@ def test_count_wt(backend, df):
             pd.DataFrame({'g': ['a', 'b'], 'n': [1 + 2, 3 + 4]})
             )
 
+
+@backend_notimpl("sql") # see (#104)
+def test_add_count_wt(backend, df):
+    assert_equal_query(
+            df,
+            add_count(_.g, wt = _.x),
+            DATA.assign(n = [3, 3, 7, 7])
+            )
+
+
 def test_count_no_groups(df):
     # count w/ no groups returns ttl
     assert_equal_query(
             df,
             count(),
             pd.DataFrame({'n': [4]})
+            )
+
+
+def test_add_count_no_groups(df):
+    assert_equal_query(
+            df,
+            add_count(),
+            DATA.assign(n = 4),
             )
 
 @backend_notimpl("sql")   # see (#104)
@@ -82,3 +108,63 @@ def test_count_on_grouped_df(df2):
             )
 
 
+def test_add_count_on_grouped_df(df2):
+    assert_equal_query(
+            df2,
+            group_by(_.g) >> add_count(_.h),
+            DATA2.assign(n = [2]*4)
+            )
+
+
+def test_count_on_grouped_df_when_mutating_group_key(df):
+    assert_equal_query(
+            df,
+            group_by(_.g) >> count(g = _.g + "z"),
+            pd.DataFrame({"g": ["az", "bz"], "n": [2, 2]})
+    )
+
+
+def test_add_count_on_grouped_df_when_mutating_group_key(df):
+    assert_equal_query(
+            df,
+            group_by(_.g) >> add_count(g = _.g + "z"),
+            pd.DataFrame(DATA.assign(g = ["az", "az", "bz", "bz"], n = [2]*4))
+    )
+
+
+def test_count_name_unique(backend):
+    df = data_frame(x = [1, 2], n = [3, 3])
+    src = backend.load_df(df)
+
+    res = data_frame(n = [3], nn = [2]) 
+
+    assert_equal_query(
+            df,
+            count(_, _.n),
+            res
+            )
+
+
+def test_add_count_name_unique(backend):
+    df = data_frame(x = [1, 2], n = [3, 3])
+    src = backend.load_df(df)
+
+    res = data_frame(x = [1, 2], n = [3, 3], nn = [2, 2]) 
+
+    assert_equal_query(
+            df,
+            add_count(_, _.n),
+            res
+            )
+
+
+def test_count_name_manual_conflict(backend):
+    df = data_frame(x = [1, 2], n = [3, 3])
+    src = backend.load_df(df)
+
+    res = data_frame(n = [3], nn = [2]) 
+
+    with pytest.raises(ValueError) as exc_info:
+        df >> count(_, _.x, name = "x") >> collect()
+
+    assert "Column name `x` specified for count name, but" in exc_info.value.args[0]

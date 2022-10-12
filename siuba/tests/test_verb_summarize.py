@@ -148,3 +148,16 @@ def test_summarize_subquery_op_vars(backend, df):
     text = str(query(df).last_op)
     assert text.count('FROM') == 2
 
+
+@backend_sql
+def test_summarize_back_to_back(backend, df):
+    query = group_by(_.g) >> summarize(low=_.x.min()) >> summarize(high=_.low.max())
+    assert_equal_query(
+            df,
+            query,
+            data_frame(high = 3)
+            )
+
+    # low defined in first query, high in second
+    text = str(query(df).last_op)
+    assert text.count('FROM') == 2

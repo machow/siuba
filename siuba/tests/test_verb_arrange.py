@@ -83,7 +83,7 @@ def test_arranges_back_to_back(backend):
     lazy_tbl = dfs >> arrange(_.x) >> arrange(_.g)
     order_by_vars = tuple(simple_varname(call) for call in lazy_tbl.order_by)
 
-    assert order_by_vars == ("x", "g")
-    assert [c.name for c in lazy_tbl.last_op._order_by_clause] == ["x", "g"]
+    assert order_by_vars == ("g",)
+    assert [c.name for c in lazy_tbl.last_op._order_by_clause] == ["g"]
 
 

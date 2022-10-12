@@ -1,4 +1,5 @@
-from siuba.sql.verbs import collect, show_query, mutate, LazyTbl
+from siuba.dply.verbs import collect, show_query, mutate
+from siuba.sql import LazyTbl
 from siuba.dply.verbs import Pipeable
 from siuba.tests.helpers import SqlBackend, data_frame
 from siuba import _

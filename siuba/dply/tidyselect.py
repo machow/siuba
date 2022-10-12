@@ -3,6 +3,9 @@ import pandas as pd
 from siuba.siu import Call,   MetaArg, BinaryOp
 from collections import OrderedDict
 from itertools import chain
+from functools import singledispatch
+
+from typing import List
 
 class Var:
     def __init__(self, name: "str | int | slice | Call", negated = False, alias = None):
@@ -137,7 +140,7 @@ def flatten_var(var):
     return [var]
 
 
-def var_select(colnames, *args):
+def var_select(colnames, *args, data=None):
     # TODO: don't erase named column if included again
     colnames = colnames if isinstance(colnames, pd.Series) else pd.Series(colnames)
     cols = OrderedDict()
@@ -147,12 +150,15 @@ def var_select(colnames, *args):
 
     # Add entries in pandas.rename style {"orig_name": "new_name"}
     for ii, arg in enumerate(all_vars):
+
         # strings are added directly
         if isinstance(arg, str):
             cols[arg] = None
+
         # integers add colname at corresponding index
         elif isinstance(arg, int):
             cols[colnames.iloc[arg]] = None
+
         # general var handling
         elif isinstance(arg, Var):
             # remove negated Vars, otherwise include them
@@ -165,6 +171,7 @@ def var_select(colnames, *args):
                 start, stop = var_slice(colnames, arg.name)
                 for ii in range(start, stop):
                     var_put_cols(colnames[ii], arg, cols)
+
             # method calls like endswith()
             elif callable(arg.name):
                 # TODO: not sure if this is a good idea...
@@ -176,6 +183,14 @@ def var_select(colnames, *args):
                 var_put_cols(colnames.iloc[arg.name], arg, cols)
             else:
                 var_put_cols(arg.name, arg, cols)
+        elif callable(arg) and data is not None:
+            # TODO: call on the data
+            col_mask = colwise_eval(data, arg)
+
+            for name in colnames[col_mask]:
+                cols[name] = None
+
+
         else:
             raise Exception("variable must be either a string or Var instance")
 
@@ -186,14 +201,39 @@ def var_create(*args) -> "tuple[Var]":
     vl = VarList()
     all_vars = []
     for arg in args:
-        if callable(arg) and not isinstance(arg, Var):
+        if isinstance(arg, Call):
             res = arg(vl)
             if isinstance(res, VarList):
                 raise ValueError("Must select specific column. Did you pass `_` to select?")
             all_vars.append(res)
         elif isinstance(arg, Var):
             all_vars.append(arg)
+        elif callable(arg):
+            all_vars.append(arg)
         else:
             all_vars.append(Var(arg))
      
     return tuple(all_vars)
+
+
+@singledispatch
+def colwise_eval(data, predicate):
+    raise NotImplementedError(
+        f"Cannot evaluate tidyselect predicate on data type: {type(data)}"
+    )
+
+
+@colwise_eval.register
+def _colwise_eval_pd(data: pd.DataFrame, predicate) -> List[bool]:
+    mask = []
+    for col_name in data:
+        res = predicate(data.loc[:, col_name])
+        if not pd.api.types.is_bool(res):
+            raise TypeError("TODO")
+
+        mask.append(res)
+
+    return mask
+
+    
+    

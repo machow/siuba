@@ -10,7 +10,7 @@ from siuba import (
         semi_join, anti_join
         )
 from siuba.dply.vector import row_number, n
-from siuba.sql.verbs import collect
+from siuba.dply.verbs import collect
 
 import pytest
 from .helpers import assert_equal_query, assert_frame_sort_equal, data_frame, backend_notimpl, backend_sql
