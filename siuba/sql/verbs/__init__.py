@@ -27,3 +27,5 @@ def __getattr__(name):
         )
         return LazyTbl
 
+    raise ImportError(f"cannot import name '{name}' from 'siuba.sql.verbs'")
+
