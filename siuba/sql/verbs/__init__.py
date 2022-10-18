@@ -13,3 +13,17 @@ from . import (
     select,
     summarize,
 )
+
+def __getattr__(name):
+    import warnings
+
+    if name == "LazyTbl":
+        from ..backend import LazyTbl
+
+        warnings.warn(
+            "Importing LazyTbl from siuba.sql.verbs is deprecated. Please use "
+            "`from siuba.sql import LazyTbl`",
+            DeprecationWarning
+        )
+        return LazyTbl
+
