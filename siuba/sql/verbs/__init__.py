@@ -27,5 +27,5 @@ def __getattr__(name):
         )
         return LazyTbl
 
-    raise ImportError(f"cannot import name '{name}' from 'siuba.sql.verbs'")
+    raise AttributeError(f"module 'siuba.sql.verbs' has no attribute '{name}'")
 
