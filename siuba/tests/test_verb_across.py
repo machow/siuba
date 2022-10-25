@@ -172,7 +172,7 @@ def test_across_in_mutate_grouped_equiv_ungrouped(backend, df):
     assert_equal_query2(ungroup(g_res), collect(dst))
 
 
-def test_across_in_mutate_grouped(backend):
+def test_across_in_mutate_grouped_agg(backend):
     df = pd.DataFrame({"x": [1, 2, 3], "y": [7, 8, 9], "g": [1, 1, 2]})
     src = backend.load_df(df)
     g_src = group_by(src, "g")
@@ -184,6 +184,18 @@ def test_across_in_mutate_grouped(backend):
     assert_grouping_names(g_res, ["g"])
     assert_equal_query2(ungroup(g_res), ungroup(dst))
 
+
+def test_across_in_mutate_grouped_transform(backend):
+    df = pd.DataFrame({"x": [1, 2, 3], "y": [7, 8, 9], "g": [1, 1, 2]})
+    src = backend.load_df(df)
+    g_src = group_by(src, "g")
+
+    expr_across = across(_, _[_.x, _.y], Fx.rank())
+    g_res = mutate(g_src, expr_across)
+    dst = pd.DataFrame({"x": [1., 2, 1], "y": [1., 2, 1], "g": [1, 1, 2]})
+
+    assert_grouping_names(g_res, ["g"])
+    assert_equal_query2(ungroup(g_res), dst)
 
 def test_across_in_summarize(backend, df):
     src = backend.load_df(df)
