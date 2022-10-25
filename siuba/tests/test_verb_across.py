@@ -172,6 +172,19 @@ def test_across_in_mutate_grouped_equiv_ungrouped(backend, df):
     assert_equal_query2(ungroup(g_res), collect(dst))
 
 
+def test_across_in_mutate_grouped(backend):
+    df = pd.DataFrame({"x": [1, 2, 3], "y": [7, 8, 9], "g": [1, 1, 2]})
+    src = backend.load_df(df)
+    g_src = group_by(src, "g")
+
+    expr_across = across(_, _[_.x, _.y], f_mean)
+    g_res = mutate(g_src, expr_across)
+    dst = mutate(df.groupby("g"), expr_across)
+
+    assert_grouping_names(g_res, ["g"])
+    assert_equal_query2(ungroup(g_res), ungroup(dst))
+
+
 def test_across_in_summarize(backend, df):
     src = backend.load_df(df)
     res = summarize(src, across(_, _[_.a_x, _.a_y], f_mean))
@@ -207,6 +220,18 @@ def test_across_in_summarize_equiv_ungrouped(backend):
     assert_frame_sort_equal(collected.drop(columns="g"), collect(dst))
 
 
+def test_across_in_summarize_grouped(backend):
+    df = pd.DataFrame({"x": [1, 2, 3], "y": [7, 8, 9], "g": [1, 1, 2]})
+    src = backend.load_df(df)
+    g_src = group_by(src, "g")
+
+    expr_across = across(_, _[_.x, _.y], f_mean)
+    g_res = summarize(g_src, expr_across)
+    dst = pd.DataFrame({"g": [1, 2], "x": [1.5, 3], "y": [7.5, 9]})
+
+    assert_equal_query2(ungroup(g_res), dst)
+
+
 def test_across_in_filter(backend, df):
     src = backend.load_df(df)
     res = filter(src, across(_, _[_.a_x, _.a_y], Fx % 2 > 0))
@@ -225,6 +250,18 @@ def test_across_in_filter_equiv_ungrouped(backend, df):
 
     assert_grouping_names(g_res, ["g"])
     assert_equal_query2(g_res.obj, dst)
+
+
+def test_across_in_filter_grouped(backend):
+    df = pd.DataFrame({"x": [1, 2, 3], "y": [7, 8, 9], "g": [1, 1, 2]})
+    src = backend.load_df(df)
+    g_src = group_by(src, "g")
+
+    expr_across = across(_, _[_.x, _.y], Fx >= Fx.mean())
+    g_res = filter(g_src, expr_across)
+    dst = pd.DataFrame({"x": [2, 3], "y": [8, 9], "g": [1, 2]}, index=[1, 2])
+
+    assert_equal_query2(ungroup(g_res), dst)
 
 
 @pytest.mark.parametrize("f", [
