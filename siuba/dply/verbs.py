@@ -133,9 +133,16 @@ def _mutate_cols(__data, args, kwargs):
         if not isinstance(res_arg, pd.DataFrame):
             raise NotImplementedError("Only across() can be used as positional argument.")
 
+        # unpack result
+        is_scalar = len(res_arg) == 1
+
         for col_name, col_ser in res_arg.items():
             # need to put on the frame so subsequent args, kwargs can use
-            df_tmp[col_name] = col_ser
+            if is_scalar:
+                df_tmp.loc[:, col_name] = col_ser.iloc[0]
+            else:
+                df_tmp.loc[:, col_name] = col_ser.array
+
             result_names[col_name] = True
 
     for col_name, expr in kwargs.items():
