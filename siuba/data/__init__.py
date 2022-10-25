@@ -10,6 +10,7 @@ __all__ = [
         "fish_encounters",
         "us_rent_income",
         "warpbreaks",
+        "op_support",
         ]
 
 def __dir__():
@@ -56,6 +57,11 @@ def __getattr__(name):
 
     elif name in {"band_members", "band_instruments", "band_instruments2"}:
         return _load_data_csv(name)
+    
+    elif name in {"op_support"}:
+        from ._op_support import get_op_support
+
+        return get_op_support()
 
     return _load_data_csv_gz(name)
 

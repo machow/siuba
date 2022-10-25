@@ -8,6 +8,7 @@
 | bandmembers | [dplyr] |
 | bandinstruments | [dplyr] |
 | bandinstruments2 | [dplyr] |
+| op_support | |
 
 [datasets]: https://stat.ethz.ch/R-manual/R-devel/library/datasets/html/00Index.html
 [dplyr]: https://dplyr.tidyverse.org/
