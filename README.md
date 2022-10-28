@@ -3,8 +3,8 @@ siuba
 
 *scrappy data analysis, with seamless support for pandas and SQL*
 
-[![CI](https://github.com/machow/siuba/workflows/CI/badge.svg)](https://github.com/machow/siuba/actions?query=workflow%3ACI+branch%3Amaster)
-[![Documentation Status](https://readthedocs.org/projects/siuba/badge/?version=latest)](https://siuba.readthedocs.io/en/latest/?badge=latest)
+[![CI](https://github.com/machow/siuba/workflows/CI/badge.svg)](https://github.com/machow/siuba/actions?query=workflow%3ACI+branch%3Amain)
+[![Documentation Status](https://img.shields.io/badge/docs-siuba.org-blue.svg)](https://siuba.org)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/machow/siuba/master)
 
 <img width="30%" align="right" src="./docs/siuba_small.svg">
@@ -21,7 +21,7 @@ These actions can be preceded by a `group_by()`, which causes them to be applied
 Inputs to these functions can be a pandas `DataFrame` or SQL connection (currently postgres, redshift, or sqlite).
 
 For more on the rationale behind tools like dplyr, see this [tidyverse paper](https://tidyverse.tidyverse.org/articles/paper.html). 
-For examples of siuba in action, see the [siuba documentation](https://siuba.readthedocs.io/en/latest/intro.html).
+For examples of siuba in action, see the [siuba guide](https://siuba.org/guide).
 
 Installation
 ------------
@@ -33,7 +33,7 @@ pip install siuba
 Examples
 --------
 
-See the [siuba docs](https://siuba.readthedocs.io) or this [live analysis](https://www.youtube.com/watch?v=eKuboGOoP08) for a full introduction.
+See the [siuba guide](https://siuba.org/guide) or this [live analysis](https://www.youtube.com/watch?v=eKuboGOoP08) for a full introduction.
 
 ### Basic use
 
@@ -66,7 +66,7 @@ There are three key concepts in this example:
 | pipe | `mtcars >> group_by(...)` | a syntax that allows you to chain verbs with the `>>` operator |
 
 
-See [introduction to siuba](https://siuba.readthedocs.io/en/latest/intro.html#Introduction-to-siuba).
+See the [siuba guide overview](https://siuba.org/guide) for a full introduction.
 
 ### What is a siu expression (e.g. `_.cyl == 4`)?
 
@@ -112,7 +112,7 @@ Out[3]:
 [11 rows x 11 columns]
 ```
 
-See [siu expression section here](https://siuba.readthedocs.io/en/latest/intro.html#Concise-pandas-operations-with-siu-expressions-(_)).
+See the [siuba guide](https://siuba.org/guide) or read more about [lazy expressions](https://siuba.org/guide/basics-lazy-expressions.html).
 
 ### Using with a SQL database
 
@@ -134,11 +134,10 @@ Next, we use the code from the first example, except now executed a SQL table.
 
 ```python
 # Demo SQL analysis with siuba ----
-from siuba import _, group_by, summarize, filter
-from siuba.sql import LazyTbl
+from siuba import _, tbl, group_by, summarize, filter
 
 # connect with siuba
-tbl_mtcars = LazyTbl(engine, "mtcars")
+tbl_mtcars = tbl(engine, "mtcars")
 
 (tbl_mtcars
   >> group_by(_.cyl)
@@ -158,12 +157,12 @@ Out[4]:
 # .. may have more rows
 ```
 
-See [querying SQL introduction here](https://siuba.readthedocs.io/en/latest/intro_sql_basic.html).
+See the [querying SQL introduction here](https://siuba.org/guide/basics-sql.html).
 
 ### Example notebooks
 
 Below are some examples I've kept as I've worked on siuba.
-For the most up to date explanations, see the [siuba docs](https://siuba.readthedocs.io)
+For the most up to date explanations, see the [siuba guide](https://siuba.org/guide)
 
 * [siu expressions](examples/examples-siu.ipynb)
 * [dplyr style pandas](examples/examples-dplyr-funcs.ipynb)
