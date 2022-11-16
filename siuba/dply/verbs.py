@@ -363,9 +363,9 @@ def group_by(__data, *args, add = False, **kwargs):
             # ensures group levels are recalculated if varname was in transmute
             groupings[varname] = varname
 
-        return tmp_df.groupby(list(groupings.values()), dropna=False)
+        return tmp_df.groupby(list(groupings.values()), dropna=False, group_keys=True)
 
-    return tmp_df.groupby(by = by_vars, dropna=False)
+    return tmp_df.groupby(by = by_vars, dropna=False, group_keys=True)
 
 
 @singledispatch2((pd.DataFrame, DataFrameGroupBy))
