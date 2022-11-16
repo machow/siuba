@@ -75,6 +75,17 @@ def test_mutate_reassign_all_cols_keeps_rowsize(dfs):
             data_frame(a = [1,1,1], b = [2,2,2])
             )
 
+
+def test_mutate_grouped_pandas_no_dropna():
+    src = data_frame(x = [1, 2], g = [None, None])
+
+    assert_equal_query(
+        src,
+        group_by(_.g) >> mutate(res = _.x + 1),
+        data_frame(x = [1, 2], g = [None, None], res = [2, 3])
+    )
+
+
 @backend_sql
 def test_mutate_window_funcs(backend):
     data = data_frame(idx = range(0, 4), x = range(1, 5), g = [1,1,2,2])

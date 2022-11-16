@@ -154,7 +154,7 @@ def _mutate_cols(__data, args, kwargs):
 
 
 def _make_groupby_safe(gdf):
-    return gdf.obj.groupby(gdf.grouper, group_keys=False)
+    return gdf.obj.groupby(gdf.grouper, group_keys=False, dropna=False)
 
 
 MSG_TYPE_ERROR = "The first argument to {func} must be one of: {types}"
@@ -363,9 +363,9 @@ def group_by(__data, *args, add = False, **kwargs):
             # ensures group levels are recalculated if varname was in transmute
             groupings[varname] = varname
 
-        return tmp_df.groupby(list(groupings.values()))
+        return tmp_df.groupby(list(groupings.values()), dropna=False, group_keys=True)
 
-    return tmp_df.groupby(by = by_vars)
+    return tmp_df.groupby(by = by_vars, dropna=False, group_keys=True)
 
 
 @singledispatch2((pd.DataFrame, DataFrameGroupBy))
@@ -563,6 +563,19 @@ def summarize(__data, *args, **kwargs):
     
 @summarize.register(DataFrameGroupBy)
 def _summarize(__data, *args, **kwargs):
+    if __data.dropna or not __data.group_keys:
+        warnings.warn(
+            f"Grouped data passed to summarize must have dropna=False and group_keys=True."
+            " Regrouping with these arguments set."
+        )
+
+        if __data.grouper.dropna:
+            # will need to recalculate groupings, otherwise it ignores dropna
+            group_cols = [ping.name for ping in __data.grouper.groupings]
+        else:
+            group_cols = __data.grouper.groupings
+        __data = __data.obj.groupby(group_cols, dropna=False, group_keys=True)
+
     df_summarize = summarize.registry[pd.DataFrame]
 
     df = __data.apply(df_summarize, *args, **kwargs)
