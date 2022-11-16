@@ -3,6 +3,8 @@ Note: this test file was heavily influenced by its dbplyr counterpart.
 
 https://github.com/tidyverse/dbplyr/blob/master/tests/testthat/test-verb-mutate.R
 """
+
+import numpy as np
     
 from siuba import _, mutate, select, group_by, summarize, filter, show_query, arrange
 from siuba.dply.vector import row_number, n
@@ -45,6 +47,52 @@ def test_summarize_after_mutate_cuml_win(backend, df_float):
             arrange(_.x) >> mutate(y = _.x.cumsum()) >> summarize(z = _.y.max()),
             data_frame(z = [10.])
             )
+
+
+def test_summarize_keeps_na_grouping_cols(backend):
+    df = data_frame(x = [1, 2, 3], g = [None, None, None])
+    src = backend.load_df(df)
+
+    if backend.name == "pandas":
+        missing = np.nan
+    else:
+        missing = None
+
+    assert_equal_query(
+        src,
+        group_by(_.g) >> summarize(res = _.x.min()),
+        data_frame(g = [missing], res = [1])
+    )
+
+
+def test_summarize_regroups_group_keys():
+    df = data_frame(x = [1, 2, 3], g = [None, None, None])
+
+    # bad group_keys choice
+    g_df = df.groupby("g", group_keys=False, dropna=False)
+
+    with pytest.warns(UserWarning, match="group_keys=True"):
+
+        assert_equal_query(
+            g_df,
+            summarize(res = _.x.min()),
+            data_frame(g = [np.nan], res = [1])
+        )
+
+
+def test_summarize_regroups_dropna():
+    df = data_frame(x = [1, 2, 3], g = [None, None, None])
+
+    # bad dropna choice
+    g_df = df.groupby("g", group_keys=True, dropna=True)
+
+    with pytest.warns(UserWarning, match="dropna=False"):
+
+        assert_equal_query(
+            g_df,
+            summarize(res = _.x.min()),
+            data_frame(g = [np.nan], res = [1])
+        )
 
 
 @backend_sql
