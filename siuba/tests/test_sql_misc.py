@@ -31,17 +31,11 @@ def test_raw_sql_mutate_grouped(backend, df):
             )
 
 
+@pytest.mark.skip_backend("duckdb")       # supported by duckdb
 @pytest.mark.skip_backend("snowflake")    # supported by snowflake
 @backend_sql
 def test_raw_sql_mutate_refer_previous_raise_dberror(backend, skip_backend, df):
-    # Note: unlikely will be able to support this case. Normally we analyze
-    if backend.name == "duckdb":
-        # duckdb dialect re-raises the engines exception, which is RuntimeError
-        # the expression to know whether we need to create a subquery.
-        import duckdb
-        exc = duckdb.BinderException
-    else:
-        exc = sqlalchemy.exc.DatabaseError
+    exc = sqlalchemy.exc.DatabaseError
 
     with pytest.raises(exc):
         assert_equal_query(
