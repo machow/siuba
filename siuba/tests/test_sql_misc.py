@@ -31,8 +31,7 @@ def test_raw_sql_mutate_grouped(backend, df):
             )
 
 
-@pytest.mark.skip_backend("duckdb")       # supported by duckdb
-@pytest.mark.skip_backend("snowflake")    # supported by snowflake
+@pytest.mark.skip_backend("snowflake", "duckdb")    # they support this behavior
 @backend_sql
 def test_raw_sql_mutate_refer_previous_raise_dberror(backend, skip_backend, df):
     exc = sqlalchemy.exc.DatabaseError
