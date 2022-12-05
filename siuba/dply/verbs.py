@@ -36,6 +36,7 @@ DPLY_FUNCTIONS = (
         "if_else", "case_when",
         "collect", "show_query",
         "tbl",
+        "over",
         )
 
 __all__ = [*DPLY_FUNCTIONS, "Pipeable", "pipe"]
@@ -2627,6 +2628,38 @@ def _tbl(__data, *args, **kwargs):
         f"Unsupported type {type(__data)}. "
         "Note that tbl currently can be used at the start of a pipe, but not as "
         "a step in the pipe."
+    )
+
+
+# Over ========================================================================
+
+@singledispatch
+def over(expr, by=None, order=None):
+    raise NotImplementedError()
+    
+
+@over.register
+def _over_df(__data: pd.DataFrame, expr: Call, by=None, order=None):
+    by_col = simple_varname(strip_symbolic(by))
+    order_col = simple_varname(strip_symbolic(order))
+
+    gdf = __data.sort_values(order_col).groupby(by_col)
+    res = transmute(gdf, tmp = expr)
+
+    # TODO: remove name
+    return res.obj["tmp"]
+
+
+@over.register(Symbolic)
+@over.register(Call)
+def _over_sym(expr, by=None, order=None):
+    stripped = strip_symbolic(expr)
+    return create_sym_call(
+        over,
+        MetaArg("_"),
+        Lazy(stripped),
+        by=Lazy(strip_symbolic(by)),
+        order=Lazy(strip_symbolic(order))
     )
 
 # Install Siu =================================================================
