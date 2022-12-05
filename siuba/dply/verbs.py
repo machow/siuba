@@ -18,27 +18,29 @@ from .tidyselect import var_create, var_select, Var
 
 DPLY_FUNCTIONS = (
         # Dply ----
-        "group_by", "ungroup", 
-        "select", "rename",
-        "mutate", "transmute", "filter", "summarize",
-        "arrange", "distinct",
-        "count", "add_count",
-        "head",
-        "top_n",
-        # Tidy ----
-        "spread", "gather",
-        "nest", "unnest",
-        "expand", "complete",
-        "separate", "unite", "extract",
-        # Joins ----
-        "join", "inner_join", "full_join", "left_join", "right_join", "semi_join", "anti_join",
-        # TODO: move to vectors
-        "if_else", "case_when",
-        "collect", "show_query",
-        "tbl",
         )
 
-__all__ = [*DPLY_FUNCTIONS, "Pipeable", "pipe"]
+__all__ = [
+    "group_by", "ungroup", 
+    "select", "rename",
+    "mutate", "transmute", "filter", "summarize",
+    "arrange", "distinct",
+    "count", "add_count",
+    "head",
+    "top_n",
+    # Tidy ----
+    "spread", "gather",
+    "nest", "unnest",
+    "expand", "complete",
+    "separate", "unite", "extract",
+    # Joins ----
+    "join", "inner_join", "full_join", "left_join", "right_join", "semi_join", "anti_join",
+    # TODO: move to vectors
+    "if_else", "case_when",
+    "collect", "show_query",
+    "tbl",
+    "Pipeable", "pipe"
+]
 
 
 # General TODO ================================================================
