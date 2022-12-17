@@ -1,12 +1,16 @@
 # symbolic dispatch wrapper ---------------------------------------------------
 
-from functools import singledispatch, update_wrapper, wraps
-import inspect
+from functools import singledispatch, wraps, partial
 
-from .calls import Call, FuncArg, MetaArg, Lazy, PipeCall, _Isolate
+from .calls import Call, FuncArg, MetaArg, PipeCall, _Isolate
 from .symbolic import Symbolic, create_sym_call, strip_symbolic
 
-from typing import Callable
+from typing import Callable, overload, TYPE_CHECKING, Any
+
+
+if TYPE_CHECKING:
+    from functools import _SingleDispatchCallable
+
 
 def _dispatch_not_impl(func_name):
     def f(x, *args, **kwargs):
@@ -123,6 +127,12 @@ def register_pipe_call(f):
 
 # option: no args, custom dispatch (e.g. register NoArgs)
 # strips symbols
+@overload
+def verb_dispatch(cls) -> Callable[[Callable[..., Any]], _SingleDispatchCallable[Any]]:
+    ...
+@overload
+def verb_dispatch(cls, f: Callable) -> _SingleDispatchCallable[Any]:
+    ...
 def verb_dispatch(cls, f = None):
     """Wrap singledispatch. Making sure to keep its attributes on the wrapper.
     
@@ -141,7 +151,7 @@ def verb_dispatch(cls, f = None):
 
     # classic way of allowing args to a decorator
     if f is None:
-        return lambda f: verb_dispatch(cls, f)
+        return partial(verb_dispatch, cls)
 
     # initially registers func for object, so need to change to pd.DataFrame
     dispatch_func = singledispatch(f)
