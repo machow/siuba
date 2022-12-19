@@ -11,6 +11,9 @@ from typing import Callable, overload, TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from functools import _SingleDispatchCallable
 
+    _DispatchDecorator = Callable[[Callable[..., Any]], _SingleDispatchCallable[Any]]
+    _DispatchType = type[Any] | tuple[type[Any]]
+
 
 def _dispatch_not_impl(func_name):
     def f(x, *args, **kwargs):
@@ -128,10 +131,10 @@ def register_pipe_call(f):
 # option: no args, custom dispatch (e.g. register NoArgs)
 # strips symbols
 @overload
-def verb_dispatch(cls) -> Callable[[Callable[..., Any]], _SingleDispatchCallable[Any]]:
+def verb_dispatch(cls: "_DispatchType") -> "_DispatchDecorator":
     ...
 @overload
-def verb_dispatch(cls, f: Callable) -> _SingleDispatchCallable[Any]:
+def verb_dispatch(cls: "_DispatchType", f: Callable) -> "_SingleDispatchCallable[Any]":
     ...
 def verb_dispatch(cls, f = None):
     """Wrap singledispatch. Making sure to keep its attributes on the wrapper.
