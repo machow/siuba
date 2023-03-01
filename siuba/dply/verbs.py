@@ -228,7 +228,7 @@ def show_query(__data, simplify = False):
 
 
 @singledispatch2(pd.DataFrame)
-def mutate(__data, *args, **kwargs):
+def mutate(__data = None, *args, **kwargs):
     """Assign new variables to a DataFrame, while keeping existing ones.
 
     Parameters
@@ -576,15 +576,24 @@ def _summarize(__data, *args, **kwargs):
             group_cols = __data.grouper.groupings
         __data = __data.obj.groupby(group_cols, dropna=False, group_keys=True)
 
-    df_summarize = summarize.registry[pd.DataFrame]
+    f_summarize = summarize.registry[pd.DataFrame]
 
-    df = __data.apply(df_summarize, *args, **kwargs)
+    if len(__data.obj) == 0:
+        # empty data frame gets summarized directly, since it has no group levels
+        df = f_summarize(__data.obj, *args, **kwargs)
+
+        # insert empty grouping columns to left of frame
+        for name in reversed([ping.name for ping in __data.grouper.groupings]):
+            df.insert(0, __data.iloc[:, name])
+
+    else:
+        df = __data.apply(f_summarize, *args, **kwargs)
         
-    group_by_lvls = list(range(df.index.nlevels - 1))
-    out = df.reset_index(group_by_lvls)
-    out.index = pd.RangeIndex(df.shape[0])
+        group_by_lvls = list(range(df.index.nlevels - 1))
+        out = df.reset_index(group_by_lvls)
+        out.index = pd.RangeIndex(df.shape[0])
 
-    return out
+        return out
 
 
 
