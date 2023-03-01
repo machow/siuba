@@ -16,7 +16,7 @@ from siuba.siu import (
 
 from .tidyselect import var_create, var_select, Var
 
-DPLY_FUNCTIONS = (
+__all__ = (
         # Dply ----
         "group_by", "ungroup", 
         "select", "rename",
@@ -35,10 +35,8 @@ DPLY_FUNCTIONS = (
         # TODO: move to vectors
         "if_else", "case_when",
         "collect", "show_query",
-        "tbl",
+        "tbl"
         )
-
-__all__ = [*DPLY_FUNCTIONS, "Pipeable", "pipe"]
 
 
 # General TODO ================================================================
@@ -52,7 +50,7 @@ def install_siu_methods(cls):
 
     """
     func_dict = globals()
-    for func_name in DPLY_FUNCTIONS:
+    for func_name in __all__:
         f = func_dict[func_name]
 
         method_name = "siu_{}".format(func_name)
@@ -61,7 +59,7 @@ def install_siu_methods(cls):
 def install_pd_siu():
     # https://github.com/coursera/pandas-ply/blob/master/pandas_ply/methods.py
     func_dict = globals()
-    for func_name in DPLY_FUNCTIONS:
+    for func_name in __all__:
         f = func_dict[func_name]
 
         method_name = "siu_{}".format(func_name)
