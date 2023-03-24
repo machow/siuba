@@ -1812,10 +1812,27 @@ def anti_join(left, right = None, on = None, *args, by = None):
     range_indx = pd.RangeIndex(len(left))
     return left.iloc[range_indx.difference(l_indx),:]
 
+
+# Define specific joins using partials ----
+# note that we include a docstring under the attribute, in order to generate
+# a summary of the partials in our API reference docs.
+
 left_join = partial(join, how = "left")
+"""Join two tables, and always keep the rows of the left hand table."""
+
 right_join = partial(join, how = "right")
+"""Join two tables, and always keep the rows of the right hand table."""
+
 full_join = partial(join, how = "full")
+"""Join two tables, and always keep the rows of both tables."""
+
 inner_join = partial(join, how = "inner")
+"""Join two tables, dropping rows with no matches between tables."""
+
+left_join.__doc__ = join.__doc__
+right_join.__doc__ = join.__doc__
+full_join.__doc__ = join.__doc__
+inner_join.__doc__ = join.__doc__
 
 
 # Head ========================================================================
