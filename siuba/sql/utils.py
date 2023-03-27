@@ -115,11 +115,13 @@ def _sql_select(columns, *args, **kwargs):
 
 
 def _sql_column_collection(columns):
-    from sqlalchemy.sql.base import ColumnCollection, ImmutableColumnCollection
+    from sqlalchemy.sql.base import ColumnCollection
 
     data = {col.key: col for col in columns}
 
     if is_sqla_12() or is_sqla_13():
+        from sqlalchemy.sql.base import ImmutableColumnCollection
+
         return ImmutableColumnCollection(data, columns)
 
     return ColumnCollection(list(data.items())).as_immutable()
