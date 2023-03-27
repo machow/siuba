@@ -2,7 +2,7 @@
 __version__ = "0.4.2"
 
 # default imports--------------------------------------------------------------
-from .siu import _, Fx, Lam, pipe
+from .siu import _, Fx, Lam, pipe, Pipeable
 from .dply.across import across
 from .dply.verbs import (
     # Dply ----
@@ -30,7 +30,7 @@ from .dply.verbs import (
 __all__ = [
     '_',
     "Fx",
-    "pipe",
+    "pipe", "Pipeable",
     "across",
     "group_by", "ungroup", 
     "select", "rename",
