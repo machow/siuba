@@ -7,7 +7,7 @@ from numpy.testing import assert_equal
 from siuba.tests.helpers import assert_equal_query
 
 from siuba.siu import _
-from siuba.dply.verbs import case_when, mutate
+from siuba.dply.verbs import case_when, mutate, if_else
 
 
 DATA = pd.DataFrame({
@@ -53,4 +53,21 @@ def test_case_when_cond_order(data):
         })
 
     assert_series_equal(out, pd.Series([0, 0, 999]))
+
+
+def test_case_when_preserves_index(data):
+    data.index = [5, 6, 7]
+
+    out = case_when(data, { True: 999 })
+    assert out.index.equals(data.index)
+    assert (out == 999).all()
+
+
+def test_if_else_preserves_index():
+    ser = pd.Series([1,2,3], index = [5, 6, 7])
+    out = if_else(ser == 1, 999, ser)
+
+    assert out == [999, 2, 3]
+    assert out.index.equals(ser.index)
+
 

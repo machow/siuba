@@ -1084,7 +1084,7 @@ def _if_else(condition, true, false):
 def _if_else(condition, true, false):
     result = np.where(condition.fillna(False), true, false)
 
-    return pd.Series(result)
+    return pd.Series(result, index=condition.index)
 
 
 # case_when ----------------
@@ -1167,7 +1167,7 @@ def case_when(__data, cases: dict):
             out[:] = val_res
 
     # by recreating an array, attempts to cast as best dtype
-    return pd.Series(list(out))
+    return pd.Series(list(out), index=__data.index)
 
 @case_when.register(Symbolic)
 @case_when.register(Call)
