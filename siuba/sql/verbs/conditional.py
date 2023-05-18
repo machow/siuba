@@ -6,9 +6,10 @@ from siuba.dply.verbs import case_when, if_else
 from siuba.siu import Call
 
 from ..backend import LazyTbl
+from ..translate import ColumnCollection
 
 
-@case_when.register(sql.base.ImmutableColumnCollection)
+@case_when.register(ColumnCollection)
 def _case_when(__data, cases):
     # TODO: will need listener to enter case statements, to handle when they use windows
     if isinstance(cases, Call):

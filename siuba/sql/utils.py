@@ -115,7 +115,9 @@ def _sql_select(columns, *args, **kwargs):
 
 
 def _sql_column_collection(columns):
-    from sqlalchemy.sql.base import ColumnCollection
+    # This function largely handles the removal of ImmutableColumnCollection in
+    # sqlalchemy, in favor of ColumnCollection being immutable.
+    from sqlalchemy.sql.base import ColumnCollection, ImmutableColumnCollection
 
     data = {col.key: col for col in columns}
 

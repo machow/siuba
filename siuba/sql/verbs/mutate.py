@@ -5,6 +5,7 @@ from siuba.dply.verbs import (
         )
 
 from ..backend import LazyTbl, SqlLabelReplacer
+from ..translate import ColumnCollection
 from ..utils import (
     _sql_with_only_columns,
     lift_inner_cols
@@ -42,7 +43,7 @@ def _select_mutate_result(src_sel, expr_result):
     src_columns = set(lift_inner_cols(src_sel))
     replacer = SqlLabelReplacer(set(src_columns), dst_alias.columns)
 
-    if isinstance(expr_result, sql.base.ImmutableColumnCollection):
+    if isinstance(expr_result, ColumnCollection):
         replaced_cols = list(map(replacer, expr_result))
         orig_cols = expr_result
     #elif isinstance(expr_result, None):
@@ -71,7 +72,7 @@ def _eval_expr_arg(__data, sel, func, verb_name, window=True):
     cols_result = _eval_with_context(__data, window, inner_cols, func)
 
     # TODO: remove or raise a more informative error
-    assert isinstance(cols_result, sql.base.ImmutableColumnCollection), type(cols_result)
+    assert isinstance(cols_result, ColumnCollection), type(cols_result)
 
     return cols_result
 
@@ -82,7 +83,7 @@ def _eval_expr_kwarg(__data, sel, func, new_name, verb_name, window=True):
     expr_shaped = __data.shape_call(func, window, verb_name = verb_name, arg_name = new_name)
     new_col, windows, _ = __data.track_call_windows(expr_shaped, inner_cols)
 
-    if isinstance(new_col, sql.base.ImmutableColumnCollection):
+    if isinstance(new_col, ColumnCollection):
         raise TypeError(
             f"{verb_name} named arguments must return a single column, but `{new_name}` "
             "returned multiple columns."
@@ -101,7 +102,7 @@ def _mutate_cols(__data, args, kwargs, verb_name):
         # replace any labels that require a subquery ----
         sel = _select_mutate_result(sel, cols_result)
 
-        if isinstance(cols_result, sql.base.ImmutableColumnCollection):
+        if isinstance(cols_result, ColumnCollection):
             result_names.update({k: True for k in cols_result.keys()})
         else:
             result_names[cols_result.name] = True

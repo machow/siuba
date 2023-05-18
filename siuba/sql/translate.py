@@ -53,6 +53,10 @@ class SqlColumn(SqlBase): pass
 class SqlColumnAgg(SqlBase): pass
 
 
+# Columns container ===========================================================
+
+from sqlalchemy.sql import ColumnCollection
+
 # Custom over clause handling  ================================================
 
 from sqlalchemy.sql.elements import Over
