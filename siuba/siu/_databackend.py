@@ -48,5 +48,9 @@ class AbstractBackend(metaclass=_AbstractBackendMeta):
 # Implementations -------------------------------------------------------------
 
 class SqlaEngine(AbstractBackend): pass
+class PlDataFrame(AbstractBackend): pass
+class PdDataFrame(AbstractBackend): pass
 
 SqlaEngine.register_backend("sqlalchemy.engine", "Connectable")
+PlDataFrame.register_backend("polars", "DataFrame")
+PdDataFrame.register_backend("pandas", "DataFrame")

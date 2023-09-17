@@ -308,9 +308,19 @@ class Call:
 
         return None
 
-    @classmethod
-    def _construct_pipe(cls, *args):
-        return PipeCall(*args)
+    @staticmethod
+    def _construct_pipe(meta, lhs, rhs):
+        if isinstance(lhs, PipeCall):
+            lh_args = lhs.args
+        else:
+            lh_args = [lhs]
+
+        if isinstance(rhs, PipeCall):
+            rh_args = rhs.args
+        else:
+            rh_args = [rhs]
+
+        return PipeCall(meta, *lh_args, *rh_args)
 
 
 class Lazy(Call):
@@ -674,8 +684,15 @@ class PipeCall(Call):
     """
 
     def __init__(self, func, *args, **kwargs):
-        self.func = "__siu_pipe_call__"
-        self.args = (func, *args)
+        if func == "__siu_pipe_call__":
+            # it was a mistake to make func the first parameter to Call
+            # but basically we need to catch when it is passed, so
+            # we can ignore it
+            self.func = func
+            self.args = args
+        else:
+            self.func = "__siu_pipe_call__"
+            self.args = (func, *args)
         if kwargs:
             raise ValueError("Keyword arguments are not allowed.")
         self.kwargs = {}
