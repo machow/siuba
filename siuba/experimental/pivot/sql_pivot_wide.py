@@ -131,7 +131,8 @@ def _pivot_wider_spec(
 
     wide_id_cols = [sel_cols[id_] for id_ in id_vars]
 
-    repaired_names = vec_as_names([*id_vars, *spec[".name"]], repair=names_repair)
+    _all_raw_names = list(map(str, [*id_vars, *spec[".name"]]))
+    repaired_names = vec_as_names(_all_raw_names, repair=names_repair)
     labeled_cols = [
         col.label(name) for name, col in
         zip(repaired_names, [*wide_id_cols, *wide_name_cols])
