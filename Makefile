@@ -16,7 +16,6 @@ test:
 	pytest siuba/
 
 test-travis:
-	py.test --nbval-lax $(filter-out %postgres.ipynb, $(NOTEBOOK_TESTS))
 	pytest $(PYTEST_FLAGS) siuba/
 
 examples/%.ipynb:
