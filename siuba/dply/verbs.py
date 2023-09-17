@@ -2545,7 +2545,7 @@ def _extract_gdf(__data, *args, **kwargs):
 
 # tbl ----
 
-from siuba.siu._databackend import SqlaEngine
+from siuba.siu._databackend import SqlaEngine, PlDataFrame, PdDataFrame
 
 @singledispatch2((pd.DataFrame, DataFrameGroupBy))
 def tbl(src, *args, **kwargs):
@@ -2614,7 +2614,7 @@ def _tbl_sqla(src: SqlaEngine, table_name, columns=None):
 
     # TODO: once we subclass LazyTbl per dialect (e.g. duckdb), we can move out
     # this dialect specific logic.
-    if src.dialect.name == "duckdb" and isinstance(columns, pd.DataFrame):
+    if src.dialect.name == "duckdb" and isinstance(columns, (PdDataFrame, PlDataFrame)):
         src.execute("register", (table_name, columns))
         return LazyTbl(src, table_name)
     
