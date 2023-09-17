@@ -5,7 +5,7 @@ from siuba.dply.verbs import simple_varname
 from pandas import Series
 
 from ..backend import LazyTbl, _warn_missing
-from ..utils import lift_inner_cols
+from ..utils import lift_inner_cols, _sql_with_only_columns
 
 
 @select.register(LazyTbl)
@@ -38,7 +38,7 @@ def _select(__data, *args, **kwargs):
         col_list.append(col if v is None else col.label(v))
 
     return __data.append_op(
-        last_sel.with_only_columns(col_list),
+        _sql_with_only_columns(last_sel, col_list),
         group_by = group_keys
     )
 
@@ -58,7 +58,7 @@ def _rename(__data, **kwargs):
 
     labs = [c.label(old_to_new[k]) if k in old_to_new else c for k,c in columns.items()]
 
-    new_sel = sel.with_only_columns(labs)
+    new_sel = _sql_with_only_columns(sel, labs)
 
     missing_groups, group_keys = _select_group_renames(old_to_new, __data.group_by)
 

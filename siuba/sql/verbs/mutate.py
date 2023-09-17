@@ -128,6 +128,6 @@ def _transmute(__data, *args, **kwargs):
     cols_to_keep = [*missing, *result_names]
 
     columns = lift_inner_cols(sel)
-    sel_stripped = sel.with_only_columns([columns[k] for k in cols_to_keep])
+    sel_stripped = _sql_with_only_columns(sel, [columns[k] for k in cols_to_keep])
 
     return __data.append_op(sel_stripped)

@@ -38,8 +38,8 @@ def db():
         result = conn.execute(ins)
 
 
-        ins = users.insert()
-        conn.execute(ins, id=2, name='wendy', fullname='Wendy Williams')
+        ins = users.insert().values(id=2, name='wendy', fullname='Wendy Williams')
+        conn.execute(ins)
 
     yield engine
 

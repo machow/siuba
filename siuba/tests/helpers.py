@@ -266,7 +266,7 @@ def copy_to_sql(df, name, engine):
     if isinstance(engine, str):
         engine = sqla.create_engine(engine)
 
-    bool_cols = [k for k, v in df.iteritems() if v.dtype.kind == "b"]
+    bool_cols = [k for k, v in df.items() if v.dtype.kind == "b"]
     columns = [sqla.Column(name, sqla.types.Boolean) for name in bool_cols]
 
 
@@ -299,7 +299,7 @@ def copy_to_sql(df, name, engine):
     # which mostly works, but returns ints from the query
     table = sqla.Table(
             name,
-            sqla.MetaData(bind = engine),
+            sqla.MetaData(),
             *columns,
             autoload_with = autoload_with
             )

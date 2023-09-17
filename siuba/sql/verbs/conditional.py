@@ -5,6 +5,7 @@ from sqlalchemy import sql
 from siuba.dply.verbs import case_when, if_else
 from siuba.siu import Call
 
+from ..utils import _sql_case
 from ..backend import LazyTbl
 from ..translate import ColumnCollection
 
@@ -36,7 +37,7 @@ def _case_when(__data, cases):
         else:
             whens.append((expr, val))
 
-    return sql.case(whens, else_ = else_val)
+    return _sql_case(whens, else_ = else_val)
 
 
 @case_when.register(LazyTbl)
@@ -52,4 +53,4 @@ def _case_when(__data, cases):
 @if_else.register(sql.elements.ColumnElement)
 def _if_else(cond, true_vals, false_vals):
     whens = [(cond, true_vals)]
-    return sql.case(whens, else_ = false_vals)
+    return _sql_case(whens, else_ = false_vals)

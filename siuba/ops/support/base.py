@@ -148,7 +148,7 @@ pandas_methods = pd.DataFrame(read_pandas_ops())
 
 wide_backends = (
         pd.concat([sql_methods, pandas_methods])
-        .pivot("full_name", "backend", "metadata")
+        .pivot(index="full_name", columns="backend", values="metadata")
         )
 
 full_methods = methods.merge(wide_backends, how = "left", on = "full_name")

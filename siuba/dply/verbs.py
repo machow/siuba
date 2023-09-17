@@ -2573,7 +2573,7 @@ def tbl(src, *args, **kwargs):
     >>> from siuba import count, show_query, collect
 
     >>> engine = create_engine("sqlite:///:memory:")
-    >>> cars.to_sql("cars", engine, index=False)
+    >>> _rows = cars.to_sql("cars", engine, index=False)
 
     >>> tbl_sql_cars = tbl(engine, "cars")
     >>> tbl_sql_cars >> count()

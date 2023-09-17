@@ -315,7 +315,7 @@ class LazyTbl:
 
         return sqlalchemy.Table(
                 table_name,
-                sqlalchemy.MetaData(bind = source),
+                sqlalchemy.MetaData(),
                 *columns,
                 schema = schema,
                 autoload_with = source if not columns else None

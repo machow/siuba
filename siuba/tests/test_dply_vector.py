@@ -93,9 +93,16 @@ def test_mutate_vector(backend, func, simple_data):
 
 @pytest.mark.parametrize('func', VECTOR_AGG_FUNCS)
 def test_agg_vector(backend, func, simple_data):
+    # This test uses pandas .apply method, which no longer works with
+    # symbolic expressions. This was unsafe to do anyway. Now, we
+    # explicitly convert it to a call.
+    from siuba.siu import strip_symbolic
+
     df = backend.load_cached_df(simple_data)
 
-    res = data_frame(y = func(simple_data))
+    call = strip_symbolic(func)
+
+    res = data_frame(y = call(simple_data))
 
     assert_equal_query(
             df,
@@ -107,7 +114,7 @@ def test_agg_vector(backend, func, simple_data):
     assert_equal_query(
             df,
             group_by(_.g) >> summarize(y = func),
-            simple_data.groupby('g').apply(func).reset_index().rename(columns = {0: 'y'})
+            simple_data.groupby('g').apply(call).reset_index().rename(columns = {0: 'y'})
             )
 
 
