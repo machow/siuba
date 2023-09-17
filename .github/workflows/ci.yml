@@ -44,7 +44,9 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install $REQUIREMENTS 
+          if [ -n "$REQUIREMENTS" ]; then
+            python -m pip install $REQUIREMENTS
+          else
           python -m pip install .[dev,test]
           # step to test duckdb
           # TODO: move these requirements into the test matrix
