@@ -47,7 +47,7 @@ jobs:
           if [ -n "$REQUIREMENTS" ]; then
             python -m pip install $REQUIREMENTS
           fi
-          python -m pip install .[dev,test]
+          python -m pip install .[test,docs]
           # step to test duckdb
           # TODO: move these requirements into the test matrix
           pip install duckdb_engine
