@@ -125,7 +125,7 @@ def _pivot_wider_spec(
         when_clause = sql.and_(sel_cols[k] == row[k] for k in name_vars)
         when_then = (when_clause, sel_cols[row[".value"]])
 
-        col = values_fn(dispatch_cls(), _sql_case(when_then))
+        col = values_fn(dispatch_cls(), _sql_case([when_then]))
 
         wide_name_cols.append(col)
 
