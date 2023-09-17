@@ -201,7 +201,7 @@ class Call:
         stripped = strip_symbolic(x)
 
         if isinstance(stripped, Call):
-            return self._construct_pipe(MetaArg("_"), self, x)
+            return self._construct_pipe(self, x)
 
         raise TypeError()
 
@@ -309,7 +309,7 @@ class Call:
         return None
 
     @staticmethod
-    def _construct_pipe(meta, lhs, rhs):
+    def _construct_pipe(lhs, rhs):
         if isinstance(lhs, PipeCall):
             lh_args = lhs.args
         else:
@@ -320,7 +320,7 @@ class Call:
         else:
             rh_args = [rhs]
 
-        return PipeCall(meta, *lh_args, *rh_args)
+        return PipeCall(*lh_args, *rh_args)
 
 
 class Lazy(Call):
