@@ -41,7 +41,7 @@ setup(
             "duckdb_engine",
             # duckdb 0.8.0 has a bug which always errors for pandas v2+
             # it's been fixed, but we need to pin until duckdb v0.9.0
-            "duckdb<0.8.0",
+            "duckdb<0.8.1",
         ],
         "docs": [
             "plotnine",
