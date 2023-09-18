@@ -1,5 +1,6 @@
 import sqlalchemy as sqla
 import uuid
+import re
 
 from siuba.sql import LazyTbl
 from siuba.sql.utils import _is_dialect_duckdb
@@ -352,3 +353,13 @@ def backend_pandas(msg):
                 return f(backend, *args, **kwargs)
         return wrapper
     return outer
+
+
+# Versions --------------------------------------------------------------------
+
+re_version=r"(?P<major>\d+)\.(?P<minor>\d+).(?P<patch>\d+)"  
+
+
+sqla_version=tuple(map(int, re.match(re_version, sqla.__version__).groups()))
+pd_version=tuple(map(int, re.match(re_version, pd.__version__).groups()))
+

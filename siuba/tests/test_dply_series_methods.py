@@ -1,6 +1,13 @@
 from siuba.siu import Symbolic, strip_symbolic
 from siuba.ops.support import spec
-from .helpers import data_frame, assert_equal_query, backend_pandas, SqlBackend, PandasBackend
+from .helpers import (
+    data_frame,
+    assert_equal_query,
+    backend_pandas,
+    pd_version,
+    SqlBackend,
+    PandasBackend
+)
 import pytest
 # TODO: dot, corr, cov
 
@@ -9,6 +16,7 @@ from pandas.testing import assert_frame_equal, assert_series_equal
 import numpy as np
 import pandas as pd
 import pkg_resources
+
 
 def get_action_kind(spec_entry):
     return spec_entry["kind"]
@@ -28,6 +36,13 @@ def filter_entry(spec, f):
 SPEC_IMPLEMENTED = filter_entry(spec, lambda k, s: s == "Supported")
 SPEC_NOTIMPLEMENTED = filter_entry(spec, lambda k, s: s != "Supported")
 SPEC_AGG = filter_entry(spec, lambda k, s: k in {"Agg"} and s == "Supported")
+
+REMOVED_IN_PANDAS_V2 = {
+    "week",
+    "weekofyear",
+    "mad",
+}
+
 
 _ = Symbolic()
 
@@ -57,6 +72,11 @@ def assert_src_array_equal(src, dst):
         assert_series_equal(src, dst, check_names = False)
     else:
         assert src == dst
+
+
+def skip_if_removed(entry):
+    if pd_version >= (2, 0, 0) and entry["name"] in REMOVED_IN_PANDAS_V2:
+        pytest.skip()
     
 # Data ========================================================================
 data_dt = data_frame(
@@ -182,6 +202,9 @@ def test_series_against_call(entry):
     # TODO: this test originally was evaluating string representations created
     # by calls. I've changed it to just executing the calls directly.
     # not sure the original intent of the test?
+
+    skip_if_removed(entry)
+
     if entry['kind'] == "window":
         pytest.skip()
 
@@ -199,6 +222,8 @@ def test_series_against_call(entry):
 
 
 def test_frame_expr(entry):
+    skip_if_removed(entry)
+
     # TODO: remove this test, not checking anything new
     df = data[entry['accessor']]
     # TODO: once reading from yaml, no need to repr
@@ -235,6 +260,7 @@ def test_frame_mutate(skip_backend, backend, entry):
     do_test_missing_implementation(entry, backend)
     skip_no_mutate(entry, backend)
 
+    skip_if_removed(entry)
 
     # Prepare input data ------------------------------------------------------
     # case: inputs must be boolean
@@ -274,6 +300,9 @@ def test_frame_mutate(skip_backend, backend, entry):
 
 def test_pandas_grouped_frame_fast_mutate(entry):
     from siuba.experimental.pd_groups.dialect import fast_mutate, DataFrameGroupBy
+
+    skip_if_removed(entry)
+    
     gdf = get_data(entry, DATA).groupby('g')
 
     # Execute mutate ----------------------------------------------------------
