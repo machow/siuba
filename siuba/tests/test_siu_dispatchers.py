@@ -14,7 +14,7 @@ def test_siu_pipe_call_is_flat():
 
     assert isinstance(pipe_expr, Symbolic)
     assert isinstance(pipe_call, PipeCall)
-    assert len(pipe_call.args) == 3
+    assert len(pipe_call.args) == 4
 
 def test_siu_call_no_args():
     assert 1 >> call(range) == range(1)

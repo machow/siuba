@@ -312,15 +312,24 @@ class Call:
     def _construct_pipe(lhs, rhs):
         if isinstance(lhs, PipeCall):
             lh_args = lhs.args
+
+            # ensure we don't keep adding MetaArg to the left when
+            # combining two pipes
+            if lh_args and isinstance(lh_args[0], MetaArg):
+                lh_args = lh_args[1:]
         else:
             lh_args = [lhs]
 
         if isinstance(rhs, PipeCall):
             rh_args = rhs.args
+
+            # similar to above, but for rh args
+            if rh_args and isinstance(rh_args[0], MetaArg):
+                rh_args = rh_args[1:]
         else:
             rh_args = [rhs]
 
-        return PipeCall(*lh_args, *rh_args)
+        return PipeCall(MetaArg("_"), *lh_args, *rh_args)
 
 
 class Lazy(Call):
@@ -684,7 +693,7 @@ class PipeCall(Call):
     """
 
     def __init__(self, func, *args, **kwargs):
-        if func == "__siu_pipe_call__":
+        if isinstance(func, str) and func == "__siu_pipe_call__":
             # it was a mistake to make func the first parameter to Call
             # but basically we need to catch when it is passed, so
             # we can ignore it
