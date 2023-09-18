@@ -8,6 +8,7 @@ from ..translate import (
         annotate,
         wrap_annotate
         )
+from ..utils import SQLA_VERSION
 
 from .base import base_nowin
 #from .postgresql import PostgresqlColumn as SqlColumn, PostgresqlColumnAgg as SqlColumnAgg
@@ -90,7 +91,11 @@ def sql_week_of_year(_, col):
     # adapted from: https://stackoverflow.com/a/15511864
     iso_dow = (fn.strftime("%j", fn.date(col, "-3 days", "weekday 4")) - 1)
 
-    return (iso_dow // 7) + 1
+    if SQLA_VERSION >= (2, 0, 0):
+        # in v2, regular division will cause sqlalchemy to coerce the 7 to a float
+        return (iso_dow // 7) + 1
+
+    return (iso_dow / 7) + 1
 
 
 # misc ------------------------------------------------------------------------
