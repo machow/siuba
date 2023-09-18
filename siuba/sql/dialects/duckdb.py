@@ -92,6 +92,8 @@ returns_int([
 
 extend_base(
     DuckdbColumn,
+    __floordiv__ = lambda _, x, y: x.op("//")(y),
+    __rfloordiv__ = lambda _, y, x: x.op("//")(y),
     rank = sql_func_rank,
     #quantile = sql_quantile(is_analytic=True),
 )

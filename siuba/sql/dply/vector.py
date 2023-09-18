@@ -1,7 +1,6 @@
 import warnings
 
 from sqlalchemy.sql.elements import ClauseElement 
-from sqlalchemy.sql.base import ImmutableColumnCollection
 from sqlalchemy import sql
 
 from ..translate import (

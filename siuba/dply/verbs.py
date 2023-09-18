@@ -2573,7 +2573,7 @@ def tbl(src, *args, **kwargs):
     >>> from siuba import count, show_query, collect
 
     >>> engine = create_engine("sqlite:///:memory:")
-    >>> cars.to_sql("cars", engine, index=False)
+    >>> _rows = cars.to_sql("cars", engine, index=False)
 
     >>> tbl_sql_cars = tbl(engine, "cars")
     >>> tbl_sql_cars >> count()
@@ -2607,7 +2607,6 @@ def tbl(src, *args, **kwargs):
 
     return src
 
-
 @tbl.register
 def _tbl_sqla(src: SqlaEngine, table_name, columns=None):
     from siuba.sql import LazyTbl
@@ -2623,6 +2622,16 @@ def _tbl_sqla(src: SqlaEngine, table_name, columns=None):
 
 @tbl.register(object)
 def _tbl(__data, *args, **kwargs):
+    # sqlalchemy v2 does not have MockConnection inherit from anything
+    # even though it is a mock :/.
+    try:
+        from sqlalchemy.engine.mock import MockConnection
+
+        if isinstance(__data, MockConnection):
+            return tbl.dispatch(SqlaEngine)(__data, *args, **kwargs)
+    except ImportError:
+        pass
+
     raise NotImplementedError(
         f"Unsupported type {type(__data)}. "
         "Note that tbl currently can be used at the start of a pipe, but not as "

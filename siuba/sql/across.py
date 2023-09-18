@@ -6,6 +6,7 @@ from siuba.siu.visitors import CallListener
 
 from .backend import LazyTbl
 from .utils import _sql_select, _sql_column_collection
+from .translate import ColumnCollection
 
 from sqlalchemy import sql
 
@@ -39,13 +40,13 @@ def _across_lazy_tbl(__data: LazyTbl, cols, fns, names: "str | None" = None) -> 
     #return __data.append_op(_sql_select(res_cols))
 
 
-@across.register(sql.base.ImmutableColumnCollection)
+@across.register(ColumnCollection)
 def _across_sql_cols(
-    __data: sql.base.ImmutableColumnCollection,
+    __data: ColumnCollection,
     cols,
     fns,
     names: "str | None" = None
-) -> sql.base.ImmutableColumnCollection:
+) -> ColumnCollection:
 
     lazy_tbl = ctx_verb_data.get()
     window = ctx_verb_window.get()

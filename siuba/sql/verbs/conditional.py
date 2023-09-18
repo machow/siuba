@@ -5,10 +5,12 @@ from sqlalchemy import sql
 from siuba.dply.verbs import case_when, if_else
 from siuba.siu import Call
 
+from ..utils import _sql_case
 from ..backend import LazyTbl
+from ..translate import ColumnCollection
 
 
-@case_when.register(sql.base.ImmutableColumnCollection)
+@case_when.register(ColumnCollection)
 def _case_when(__data, cases):
     # TODO: will need listener to enter case statements, to handle when they use windows
     if isinstance(cases, Call):
@@ -35,7 +37,7 @@ def _case_when(__data, cases):
         else:
             whens.append((expr, val))
 
-    return sql.case(whens, else_ = else_val)
+    return _sql_case(whens, else_ = else_val)
 
 
 @case_when.register(LazyTbl)
@@ -51,4 +53,4 @@ def _case_when(__data, cases):
 @if_else.register(sql.elements.ColumnElement)
 def _if_else(cond, true_vals, false_vals):
     whens = [(cond, true_vals)]
-    return sql.case(whens, else_ = false_vals)
+    return _sql_case(whens, else_ = false_vals)

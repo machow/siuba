@@ -10,7 +10,6 @@ import siuba.sql.dply
 from siuba.dply import vector as v
 from datetime import timedelta
 
-from hypothesis import given, settings, example
 from hypothesis.strategies import text, floats, integers
 from hypothesis.extra.pandas import data_frames, column, indexes 
 
@@ -93,9 +92,16 @@ def test_mutate_vector(backend, func, simple_data):
 
 @pytest.mark.parametrize('func', VECTOR_AGG_FUNCS)
 def test_agg_vector(backend, func, simple_data):
+    # This test uses pandas .apply method, which no longer works with
+    # symbolic expressions. This was unsafe to do anyway. Now, we
+    # explicitly convert it to a call.
+    from siuba.siu import strip_symbolic
+
     df = backend.load_cached_df(simple_data)
 
-    res = data_frame(y = func(simple_data))
+    call = strip_symbolic(func)
+
+    res = data_frame(y = call(simple_data))
 
     assert_equal_query(
             df,
@@ -107,7 +113,7 @@ def test_agg_vector(backend, func, simple_data):
     assert_equal_query(
             df,
             group_by(_.g) >> summarize(y = func),
-            simple_data.groupby('g').apply(func).reset_index().rename(columns = {0: 'y'})
+            simple_data.groupby('g').apply(call).reset_index().rename(columns = {0: 'y'})
             )
 
 
@@ -133,33 +139,3 @@ def test_filter_vector(backend, func, simple_data):
             simple_data >> group_by(_.g) >> filter(func),
             check_dtype = False
             )
-
-
-#@given(DATA_SPEC)
-#@settings(max_examples = 50, deadline = 1000)
-#def test_hypothesis_mutate_vector_funcs(backend, data):
-#
-#    df = backend.load_df(data)
-#    
-#    for func in OMNIBUS_VECTOR_FUNCS:
-#        assert_equal_query(
-#                df,
-#                mutate(y = func),
-#                data.assign(y = func),
-#                check_dtype = False
-#                )
-
-
-
-@pytest.mark.parametrize('func', [
-    v.n_distinct(_.x),
-    ])
-@given(DATA_SPEC)
-def test_pandas_only_vector_funcs(func, data):
-    res = mutate(data, y = func)
-    dst = data.assign(y = func)
-
-    assert_frame_equal(res, dst)
-
-
-

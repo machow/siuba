@@ -1,10 +1,9 @@
-from sqlalchemy.sql.base import ImmutableColumnCollection
-
 from siuba.dply.verbs import arrange, _call_strip_ascending
 from siuba.dply.across import _set_data_context
 
 from ..utils import lift_inner_cols
 from ..backend import LazyTbl
+from ..translate import ColumnCollection
 
 # Helpers ---------------------------------------------------------------------
 
@@ -38,7 +37,7 @@ def _eval_arrange_args(__data, args, cols):
         with _set_data_context(__data, window=True):
             res = new_call(cols)
 
-        if isinstance(res, ImmutableColumnCollection):
+        if isinstance(res, ColumnCollection):
             raise NotImplementedError(
                 f"`arrange()` expression {ii} of {len(args)} returned multiple columns, "
                 "which is currently unsupported."
