@@ -325,6 +325,8 @@ def test_pandas_grouped_frame_fast_mutate(entry):
 
 
 def test_frame_summarize(skip_backend, backend, agg_entry):
+    skip_if_removed(agg_entry)
+
     entry = agg_entry
 
     do_test_missing_implementation(entry, backend)
@@ -371,6 +373,9 @@ def test_frame_summarize(skip_backend, backend, agg_entry):
 
 def test_pandas_grouped_frame_fast_summarize(agg_entry):
     from siuba.experimental.pd_groups.dialect import fast_summarize, DataFrameGroupBy
+
+    skip_if_removed(agg_entry)
+
     gdf = get_data(agg_entry, DATA).groupby('g')
 
     # Execute summarize ----------------------------------------------------------
