@@ -249,10 +249,10 @@ def test_frame_mutate(skip_backend, backend, entry):
     dst['result'] = cast_result_type(entry, backend, dst['result'])
 
     result_type = get_spec_sql_type(entry, backend)
-    if result_type == "variable":
-        kwargs = {"check_dtype": False, "atol": 1e-03}
-    else:
-        kwargs = {}
+
+    # relax dtype checking, since database queries sometimes return
+    # int64 instead of int32, etc..
+    kwargs = {"check_dtype": False, "atol": 1e-03}
 
     assert_equal_query(
             df,

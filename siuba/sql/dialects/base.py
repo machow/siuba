@@ -65,7 +65,7 @@ def sql_func_diff(_, col, periods = 1):
     raise ValueError("periods argument to sql diff cannot be 0")
 
 def sql_func_floordiv(_, x, y):
-    return sql.cast(x / y, sa_types.Integer())
+    return sql.cast(sql.func.floor(x / y), sa_types.Integer())
 
 def sql_func_rank(_, col):
     # see https://stackoverflow.com/a/36823637/1144523
