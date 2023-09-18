@@ -17,7 +17,7 @@ jobs:
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.11"]
         # unset doctests for earlier versions of python.
-        pytest_flags: ["-o addopts='' -m 'not bigquery and not snowflake'"]
+        pytest_flags: ["-v -o addopts='' -m 'not bigquery and not snowflake'"]
         requirements: [""]
         include:
           # historical requirements
