@@ -43,6 +43,8 @@ from siuba.sql.translate import (
         FunctionLookupBound
         )
 
+from siuba.sql.utils import SQLA_VERSION
+
 
 # =============================================================================
 # Column data classes 
@@ -65,6 +67,9 @@ def sql_func_diff(_, col, periods = 1):
     raise ValueError("periods argument to sql diff cannot be 0")
 
 def sql_func_floordiv(_, x, y):
+    if SQLA_VERSION >= (2, 0, 0):
+        return sql.cast(x // y, sa_types.Integer())
+
     return sql.cast(x / y, sa_types.Integer())
 
 def sql_func_rank(_, col):

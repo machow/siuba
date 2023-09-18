@@ -26,7 +26,7 @@ setup(
     url='https://github.com/machow/siuba',
     keywords=['package', ],
     install_requires=[
-        "pandas>=0.24.0",
+        "pandas>=0.24.0,<2.1.0",
         "numpy>=1.12.0",
         "SQLAlchemy>=1.2.19",
         "PyYAML>=3.0.0"
@@ -35,6 +35,13 @@ setup(
         "test": [
             "pytest",
             "hypothesis",
+            "IPython",
+            "pymysql",
+            "psycopg2-binary",
+            "duckdb_engine",
+            # duckdb 0.8.0 has a bug which always errors for pandas v2+
+            # it's been fixed, but we need to pin until duckdb v0.9.0
+            "duckdb",
         ],
         "docs": [
             "plotnine",

@@ -9,7 +9,7 @@ translate.py handles translating column operations.
 
 import warnings
 
-from .translate import CustomOverClause
+from .translate import CustomOverClause, ColumnCollection
 from .utils import (
     get_dialect_translator,
     _sql_column_collection,
@@ -106,7 +106,7 @@ def replace_call_windows(col_expr, group_by, order_by, window_cte = None):
     raise TypeError(str(type(col_expr)))
 
 
-@replace_call_windows.register(sql.base.ImmutableColumnCollection)
+@replace_call_windows.register(ColumnCollection)
 def _(col_expr, group_by, order_by, window_cte = None):
     all_over_clauses = []
     for col in col_expr:
@@ -315,7 +315,7 @@ class LazyTbl:
 
         return sqlalchemy.Table(
                 table_name,
-                sqlalchemy.MetaData(bind = source),
+                sqlalchemy.MetaData(),
                 *columns,
                 schema = schema,
                 autoload_with = source if not columns else None

@@ -1,5 +1,6 @@
 import sqlalchemy as sqla
 import uuid
+import re
 
 from siuba.sql import LazyTbl
 from siuba.sql.utils import _is_dialect_duckdb
@@ -266,7 +267,7 @@ def copy_to_sql(df, name, engine):
     if isinstance(engine, str):
         engine = sqla.create_engine(engine)
 
-    bool_cols = [k for k, v in df.iteritems() if v.dtype.kind == "b"]
+    bool_cols = [k for k, v in df.items() if v.dtype.kind == "b"]
     columns = [sqla.Column(name, sqla.types.Boolean) for name in bool_cols]
 
 
@@ -299,7 +300,7 @@ def copy_to_sql(df, name, engine):
     # which mostly works, but returns ints from the query
     table = sqla.Table(
             name,
-            sqla.MetaData(bind = engine),
+            sqla.MetaData(),
             *columns,
             autoload_with = autoload_with
             )
@@ -352,3 +353,13 @@ def backend_pandas(msg):
                 return f(backend, *args, **kwargs)
         return wrapper
     return outer
+
+
+# Versions --------------------------------------------------------------------
+
+re_version=r"(?P<major>\d+)\.(?P<minor>\d+).(?P<patch>\d+)"  
+
+
+sqla_version=tuple(map(int, re.match(re_version, sqla.__version__).groups()))
+pd_version=tuple(map(int, re.match(re_version, pd.__version__).groups()))
+

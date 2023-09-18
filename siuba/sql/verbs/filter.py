@@ -1,6 +1,7 @@
 from siuba.dply.verbs import filter
 
 from ..backend import LazyTbl
+from ..translate import ColumnCollection
 from ..utils import _sql_select
 
 from sqlalchemy import sql
@@ -33,7 +34,7 @@ def _filter(__data, *args):
                         window_cte = win_sel
                         )
 
-                if isinstance(col_expr, sql.base.ImmutableColumnCollection):
+                if isinstance(col_expr, ColumnCollection):
                     conds.extend(col_expr)
                 else:
                     conds.append(col_expr)

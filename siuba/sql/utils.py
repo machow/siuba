@@ -82,7 +82,10 @@ from pandas.io import sql as _pd_sql
 
 class _FixedSqlDatabase(_pd_sql.SQLDatabase):
     def execute(self, *args, **kwargs):
-        return self.connectable.execute(*args, **kwargs)
+        if hasattr(self, "connectable"):
+            return self.connectable.execute(*args, **kwargs)
+        
+        return self.con.execute(*args, **kwargs)
 
 
 # Detect duckdb for temporary workarounds -------------------------------------
@@ -104,6 +107,9 @@ def is_sqla_12():
 def is_sqla_13():
     return SQLA_VERSION[:-1] == (1, 3)
 
+def is_sqla_14():
+    return SQLA_VERSION[:-1] == (1, 4)
+
 
 def _sql_select(columns, *args, **kwargs):
     from sqlalchemy import sql
@@ -115,14 +121,25 @@ def _sql_select(columns, *args, **kwargs):
 
 
 def _sql_column_collection(columns):
-    from sqlalchemy.sql.base import ColumnCollection, ImmutableColumnCollection
+    # This function largely handles the removal of ImmutableColumnCollection in
+    # sqlalchemy, in favor of ColumnCollection being immutable.
 
     data = {col.key: col for col in columns}
 
     if is_sqla_12() or is_sqla_13():
+        from sqlalchemy.sql.base import ImmutableColumnCollection
+
         return ImmutableColumnCollection(data, columns)
 
-    return ColumnCollection(list(data.items())).as_immutable()
+    elif is_sqla_14():
+        from sqlalchemy.sql.base import ColumnCollection
+
+        return ColumnCollection(list(data.items())).as_immutable()
+
+    else:
+        from sqlalchemy.sql.base import ColumnCollection
+
+        return ColumnCollection(list(data.items()))
 
 
 def _sql_add_columns(select, columns):
@@ -147,12 +164,12 @@ def _sql_with_only_columns(select, columns):
     return out
 
 
-def _sql_case(*args, **kwargs):
+def _sql_case(whens, **kwargs):
     from sqlalchemy import sql
     if is_sqla_12() or is_sqla_13():
-        return sql.case(args, **kwargs)
+        return sql.case(whens, **kwargs)
 
-    return sql.case(*args, **kwargs)
+    return sql.case(*whens, **kwargs)
 
 
 # Simplify option in show_query -----------------------------------------------
