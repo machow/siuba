@@ -127,6 +127,20 @@ def sql_func_capitalize(_, col):
     rest = fn.right(col, fn.length(col) - 1)
     return sql.functions.concat(first_char, rest)
 
+def sql_str_cat(_, col, others=None, sep=None, na_rep=None, join=None):
+    if sep is not None:
+        raise NotImplementedError("sep argument not supported for sql cat")
+
+    if na_rep is not None:
+        raise NotImplementedError("na_rep argument not supported for sql cat")
+
+    if join is not None:
+        raise NotImplementedError("join argument not supported for sql cat")
+
+    if isinstance(others, (list, tuple)):
+        raise NotImplementedError("others argument must be a single column for sql cat")
+
+    return sql.functions.concat(col, others)
 
 # Numpy ufuncs ----------------------------------------------------------------
 # symbolic objects have a generic dispatch for when _.__array_ufunc__ is called,
@@ -252,6 +266,7 @@ extend_base(SqlColumn,
     **{
       # TODO: check generality of trim functions, since MYSQL overrides
       "str.capitalize"    : sql_func_capitalize,
+      "str.cat"           : sql_str_cat,
       #"str.center"        :,
       #"str.contains"      :,
       #"str.count"         :,
