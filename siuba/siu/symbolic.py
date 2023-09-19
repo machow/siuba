@@ -85,7 +85,7 @@ class Symbolic(object):
 
         if isinstance(stripped, Call):
             lhs_call = self.__source
-            return Call._construct_pipe(MetaArg("_"), lhs_call, stripped)
+            return self.__class__(Call._construct_pipe(lhs_call, stripped))
         # strip_symbolic(self)(x)
         # x is a symbolic
         raise NotImplementedError("Symbolic may only be used on right-hand side of >> operator.")

@@ -403,8 +403,9 @@ def pivot_wider_spec(
     # validate names and move id vars to columns ----
     # note: in pandas 1.5+ we can use the allow_duplicates option to reset, even
     # when index and column names overlap. for now, repair names, rename, then reset.
-    unique_names = vec_as_names([*id_vars, *wide.columns], repair="unique")
-    repaired_names = vec_as_names([*id_vars, *wide.columns], repair=names_repair)
+    _all_raw_names = list(map(str, [*id_vars, *wide.columns]))
+    unique_names = vec_as_names(_all_raw_names, repair="unique")
+    repaired_names = vec_as_names(_all_raw_names, repair=names_repair)
 
     uniq_id_vars = unique_names[:len(id_vars)]
     uniq_val_vars = unique_names[len(id_vars):]

@@ -1,10 +1,20 @@
 import pytest
 
+from siuba.siu.calls import PipeCall
 from siuba.siu.dispatchers import call
-from siuba.siu import _
+from siuba.siu import _, strip_symbolic, Symbolic
 
 # TODO: direct test of lazy elements
 # TODO: NSECall - no map subcalls
+
+
+def test_siu_pipe_call_is_flat():
+    pipe_expr = _ >> _.a >> _.b
+    pipe_call = strip_symbolic(pipe_expr)
+
+    assert isinstance(pipe_expr, Symbolic)
+    assert isinstance(pipe_call, PipeCall)
+    assert len(pipe_call.args) == 4
 
 def test_siu_call_no_args():
     assert 1 >> call(range) == range(1)

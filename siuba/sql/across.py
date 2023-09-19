@@ -51,8 +51,10 @@ def _across_sql_cols(
     lazy_tbl = ctx_verb_data.get()
     window = ctx_verb_window.get()
 
+    column_names = list(__data.keys())
+
     name_template = _get_name_template(fns, names)
-    selected_cols = var_select(__data, *var_create(cols), data=__data)
+    selected_cols = var_select(column_names, *var_create(cols), data=__data)
 
     fns_map = _across_setup_fns(fns)
     
