@@ -252,6 +252,7 @@ def wrap_annotate(f, **kwargs):
 #  Translator =================================================================
 
 from siuba.ops.translate import create_pandas_translator
+from functools import singledispatch
 
 
 def extend_base(cls, **kwargs):
@@ -323,7 +324,7 @@ class SqlTranslator:
             # verbs that can use strings as accessors, like group_by, or
             # arrange, need to convert those strings into a getitem call
             return str_to_getitem_call(call)
-        elif isinstance(call, sql.elements.ColumnClause):
+        elif isinstance(call, (sql.elements.ClauseElement)):
             return Lazy(call)
         elif callable(call):
             #TODO: should not happen here
@@ -332,7 +333,8 @@ class SqlTranslator:
         else:
             # verbs that use literal strings, need to convert them to a call
             # that returns a sqlalchemy "literal" object
-            return Lazy(sql.literal(call))
+            _lit = convert_literal(self.window.dispatch_cls(), call)
+            return Lazy(_lit)
 
         # raise informative error message if missing translation
         try:
@@ -367,3 +369,7 @@ class SqlTranslator:
                 aggregate = create_pandas_translator(ALL_OPS, AggCls, sql.elements.ClauseElement)
                 )
 
+
+@singledispatch
+def convert_literal(codata, lit):
+    return sql.literal(lit)

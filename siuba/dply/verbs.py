@@ -2614,7 +2614,9 @@ def _tbl_sqla(src: SqlaEngine, table_name, columns=None):
     # TODO: once we subclass LazyTbl per dialect (e.g. duckdb), we can move out
     # this dialect specific logic.
     if src.dialect.name == "duckdb" and isinstance(columns, (PdDataFrame, PlDataFrame)):
-        src.execute("register", (table_name, columns))
+        with src.begin() as conn:
+            conn.exec_driver_sql("register", (table_name, columns))
+        
         return LazyTbl(src, table_name)
     
     return LazyTbl(src, table_name, columns=columns)

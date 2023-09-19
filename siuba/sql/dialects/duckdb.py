@@ -13,7 +13,8 @@ from ..translate import (
     sql_not_impl,
     # wiring up translator
     extend_base,
-    SqlTranslator
+    SqlTranslator,
+    convert_literal
 )
 
 from .postgresql import (
@@ -44,6 +45,15 @@ def returns_int(func_names):
         f_annotated = wrap_annotate(f_concrete, result_type="int")
         generic.register(DuckdbColumn, f_annotated)
     
+# Literal Conversions =========================================================
+
+@convert_literal.register
+def _cl_duckdb(codata: DuckdbColumn, lit):
+    from sqlalchemy.dialects.postgresql import array
+    if isinstance(lit, list):
+        return array(lit)
+    
+    return sql.literal(lit)
 
 # Translations ================================================================
 
