@@ -14,16 +14,16 @@ except ImportError:
 
 LUBRIDATE_OFFSETS = {
         "second": "S",
-        "minute": "M",
+        "minute": "T",
         "hour": "H",
         "day": "D",
         "week": "W",
-        "month": "M",
-        "bimonth": "2M",
-        "quarter": "Q",
+        "month": "MS",
+        "bimonth": "2MS",
+        "quarter": "QS",
         "season": None,
         "halfyear": None,
-        "year": "Y"
+        "year": "YS"
         }
 
 # There's no class that clearly identifies all the Datetime op compatible classes,
