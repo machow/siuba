@@ -1,3 +1,5 @@
+"""Functions for working with categorical column data."""
+
 import pandas as pd
 import numpy as np
 

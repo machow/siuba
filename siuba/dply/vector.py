@@ -1,3 +1,5 @@
+"""Functions that implement dplyr vector operations."""
+
 import pandas as pd
 import numpy as np
 from functools import singledispatch
@@ -29,7 +31,7 @@ __ALL__ = [
 def _expand_bool(x, f):
     return x.expanding().apply(f, raw = True).astype(bool)
 
-def alias_series_agg(name):
+def _alias_series_agg(name):
     method = method_agg_op(name, is_property = False, accessor = False)
 
     def decorator(dispatcher):
@@ -47,12 +49,13 @@ def alias_series_agg(name):
 def cumall(x):
     """Return a same-length array. For each entry, indicates whether that entry and all previous are True-like.
 
-    Example:
-        >>> cumall(pd.Series([True, False, False]))
-        0     True
-        1    False
-        2    False
-        dtype: bool
+    Examples
+    --------
+    >>> cumall(pd.Series([True, False, False]))
+    0     True
+    1    False
+    2    False
+    dtype: bool
 
     """
     return _expand_bool(x, np.all)
@@ -64,12 +67,13 @@ def cumall(x):
 def cumany(x):
     """Return a same-length array. For each entry, indicates whether that entry or any previous are True-like.
 
-    Example:
-        >>> cumany(pd.Series([False, True, False]))
-        0    False
-        1     True
-        2     True
-        dtype: bool
+    Examples
+    --------
+    >>> cumany(pd.Series([False, True, False]))
+    0    False
+    1     True
+    2     True
+    dtype: bool
 
     """
     return _expand_bool(x, np.any)
@@ -110,14 +114,14 @@ def dense_rank(x, na_option = "keep"):
     This method of ranking returns values ranging from 1 to the number of unique entries.
     Ties are all given the same ranking.
 
-    Example:
-
-        >>> dense_rank(pd.Series([1,3,3,5]))
-        0    1.0
-        1    2.0
-        2    2.0
-        3    3.0
-        dtype: float64
+    Examples
+    --------
+    >>> dense_rank(pd.Series([1,3,3,5]))
+    0    1.0
+    1    2.0
+    2    2.0
+    3    3.0
+    dtype: float64
 
 
     """
@@ -130,25 +134,27 @@ def dense_rank(x, na_option = "keep"):
 def percent_rank(x, na_option = "keep"):
     """Return the percent rank.
 
-    Note:
-        Uses minimum rank, and reports the proportion of unique ranks each entry is greater than.
+    Notes
+    -----
+    Uses minimum rank, and reports the proportion of unique ranks each entry is greater than.
 
-    Examples:
-        >>> percent_rank(pd.Series([1, 2, 3]))
-        0    0.0
-        1    0.5
-        2    1.0
-        dtype: float64
+    Examples
+    --------
+    >>> percent_rank(pd.Series([1, 2, 3]))
+    0    0.0
+    1    0.5
+    2    1.0
+    dtype: float64
 
-        >>> percent_rank(pd.Series([1, 2, 2]))
-        0    0.0
-        1    0.5
-        2    0.5
-        dtype: float64
+    >>> percent_rank(pd.Series([1, 2, 2]))
+    0    0.0
+    1    0.5
+    2    0.5
+    dtype: float64
 
-        >>> percent_rank(pd.Series([1]))
-        0   NaN
-        dtype: float64
+    >>> percent_rank(pd.Series([1]))
+    0   NaN
+    dtype: float64
 
 
     """
@@ -183,22 +189,23 @@ def cume_dist(x, na_option = "keep"):
 def row_number(x):
     """Return the row number (position) for each value in x, beginning with 1.
 
-    Example:
-        >>> ser = pd.Series([7,8])
-        >>> row_number(ser)
-        0    1
-        1    2
-        dtype: int64
+    Examples
+    --------
+    >>> ser = pd.Series([7,8])
+    >>> row_number(ser)
+    0    1
+    1    2
+    dtype: int64
 
-        >>> row_number(pd.DataFrame({'a': ser}))
-        0    1
-        1    2
-        dtype: int64
+    >>> row_number(pd.DataFrame({'a': ser}))
+    0    1
+    1    2
+    dtype: int64
 
-        >>> row_number(pd.Series([7,8], index = [3, 4]))
-        3    1
-        4    2
-        dtype: int64
+    >>> row_number(pd.Series([7,8], index = [3, 4]))
+    3    1
+    4    2
+    dtype: int64
 
 
     """
@@ -241,15 +248,18 @@ def ntile(x, n):
 def between(x, left, right, default = False):
     """Return whether a value is between left and right (including either side).
 
-    Example:
-        >>> between(pd.Series([1,2,3]), 0, 2)
-        0     True
-        1     True
-        2    False
-        dtype: bool
+    Notes
+    -----
+    This is a thin wrapper around pd.Series.between(left, right)
 
-    Note:
-        This is a thin wrapper around pd.Series.between(left, right)
+    Examples
+    --------
+    >>> between(pd.Series([1,2,3]), 0, 2)
+    0     True
+    1     True
+    2    False
+    dtype: bool
+
     
     """
     # note: NA -> False, in tidyverse NA -> NA
@@ -305,23 +315,28 @@ def coalesce(x, *args):
 def lead(x, n = 1, default = None):
     """Return an array with each value replaced by the next (or further forward) value in the array.
 
-    Arguments:
-        x: a pandas Series object
-        n: number of next values forward to replace each value with
-        default: what to replace the n final values of the array with
+    Parameters
+    ----------
+    x:
+        a pandas Series object
+    n:
+        number of next values forward to replace each value with
+    default:
+        what to replace the n final values of the array with
 
-    Example:
-        >>> lead(pd.Series([1,2,3]), n=1)
-        0    2.0
-        1    3.0
-        2    NaN
-        dtype: float64
+    Examples
+    --------
+    >>> lead(pd.Series([1,2,3]), n=1)
+    0    2.0
+    1    3.0
+    2    NaN
+    dtype: float64
 
-        >>> lead(pd.Series([1,2,3]), n=1, default = 99)
-        0     2
-        1     3
-        2    99
-        dtype: int64
+    >>> lead(pd.Series([1,2,3]), n=1, default = 99)
+    0     2
+    1     3
+    2    99
+    dtype: int64
 
     """
     res = x.shift(-1*n, fill_value = default)
@@ -342,23 +357,28 @@ def _lead_grouped(x, n = 1, default = None):
 def lag(x, n = 1, default = None):
     """Return an array with each value replaced by the previous (or further backward) value in the array.
 
-    Arguments:
-        x: a pandas Series object
-        n: number of next values backward to replace each value with
-        default: what to replace the n final values of the array with
+    Parameters
+    ----------
+    x:
+        a pandas Series object
+    n:
+        number of next values backward to replace each value with
+    default:
+        what to replace the n final values of the array with
 
-    Example:
-        >>> lag(pd.Series([1,2,3]), n=1)
-        0    NaN
-        1    1.0
-        2    2.0
-        dtype: float64
+    Examples
+    --------
+    >>> lag(pd.Series([1,2,3]), n=1)
+    0    NaN
+    1    1.0
+    2    2.0
+    dtype: float64
 
-        >>> lag(pd.Series([1,2,3]), n=1, default = 99)
-        0    99.0
-        1     1.0
-        2     2.0
-        dtype: float64
+    >>> lag(pd.Series([1,2,3]), n=1, default = 99)
+    0    99.0
+    1     1.0
+    2     2.0
+    dtype: float64
 
 
     """
@@ -382,14 +402,16 @@ def _lag_grouped(x, n = 1, default = None):
 def n(x):
     """Return the total number of elements in the array (or rows in a DataFrame).
 
-    Example:
-        >>> ser = pd.Series([1,2,3])
-        >>> n(ser)
-        3
+    Examples
+    --------
 
-        >>> df = pd.DataFrame({'x': ser})
-        >>> n(df)
-        3
+    >>> ser = pd.Series([1,2,3])
+    >>> n(ser)
+    3
+
+    >>> df = pd.DataFrame({'x': ser})
+    >>> n(df)
+    3
 
     """
     if isinstance(x, pd.DataFrame):
@@ -405,14 +427,16 @@ def _n_grouped(x: GroupBy) -> GroupByAgg:
 
 # n_distinct ------------------------------------------------------------------
 
-@alias_series_agg('nunique')
+@_alias_series_agg('nunique')
 @symbolic_dispatch(cls = Series)
 def n_distinct(x):
     """Return the total number of distinct (i.e. unique) elements in an array.
     
-    Example:
-        >>> n_distinct(pd.Series([1,1,2,2]))
-        2
+    Examples
+    --------
+
+    >>> n_distinct(pd.Series([1,1,2,2]))
+    2
 
     """
     return x.nunique()
@@ -424,12 +448,14 @@ def n_distinct(x):
 def na_if(x, y):
     """Return a array like x, but with values in y replaced by NAs.
     
-    Examples:
-        >>> na_if(pd.Series([1,2,3]), [1,3])
-        0    NaN
-        1    2.0
-        2    NaN
-        dtype: float64
+    Examples
+    --------
+
+    >>> na_if(pd.Series([1,2,3]), [1,3])
+    0    NaN
+    1    2.0
+    2    NaN
+    dtype: float64
         
     """
     y = [y] if not np.ndim(y) else y
@@ -452,31 +478,40 @@ def near(x):
 
 @symbolic_dispatch(cls = Series)
 def nth(x, n, order_by = None, default = None):
-    """Return the nth entry of x. Similar to x[n].
+    """Return the nth entry of x. Similar to `x[n]`.
 
-    Note:
-        first(x) and last(x) are nth(x, 0) and nth(x, -1).
+    Parameters
+    ----------
+    x:
+        series to get entry from.
+    n:
+        position of entry to get from x (0 indicates first entry).
+    order_by:
+        optional Series used to reorder x.
+    default:
+        (not implemented) value to return if no entry at n.
 
-    Arguments:
-        x: series to get entry from.
-        n: position of entry to get from x (0 indicates first entry).
-        order_by: optional Series used to reorder x.
-        default: (not implemented) value to return if no entry at n.
+    Notes
+    -----
+    first(x) and last(x) are nth(x, 0) and nth(x, -1).
 
-    Examples:
-        >>> ser = pd.Series(['a', 'b', 'c'])
-        >>> nth(ser, 1)
-        'b'
 
-        >>> sorter = pd.Series([1, 2, 0])
-        >>> nth(ser, 1, order_by = sorter)
-        'a'
+    Examples
+    --------
 
-        >>> nth(ser, 0), nth(ser, -1)
-        ('a', 'c')
+    >>> ser = pd.Series(['a', 'b', 'c'])
+    >>> nth(ser, 1)
+    'b'
 
-        >>> first(ser), last(ser)
-        ('a', 'c')
+    >>> sorter = pd.Series([1, 2, 0])
+    >>> nth(ser, 1, order_by = sorter)
+    'a'
+
+    >>> nth(ser, 0), nth(ser, -1)
+    ('a', 'c')
+
+    >>> first(ser), last(ser)
+    ('a', 'c')
 
     """
 

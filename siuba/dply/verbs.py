@@ -16,7 +16,7 @@ from siuba.siu import (
 
 from .tidyselect import var_create, var_select, Var
 
-DPLY_FUNCTIONS = (
+__all__ = (
         # Dply ----
         "group_by", "ungroup", 
         "select", "rename",
@@ -35,10 +35,8 @@ DPLY_FUNCTIONS = (
         # TODO: move to vectors
         "if_else", "case_when",
         "collect", "show_query",
-        "tbl",
+        "tbl"
         )
-
-__all__ = [*DPLY_FUNCTIONS, "Pipeable", "pipe"]
 
 
 # General TODO ================================================================
@@ -52,7 +50,7 @@ def install_siu_methods(cls):
 
     """
     func_dict = globals()
-    for func_name in DPLY_FUNCTIONS:
+    for func_name in __all__:
         f = func_dict[func_name]
 
         method_name = "siu_{}".format(func_name)
@@ -61,7 +59,7 @@ def install_siu_methods(cls):
 def install_pd_siu():
     # https://github.com/coursera/pandas-ply/blob/master/pandas_ply/methods.py
     func_dict = globals()
-    for func_name in DPLY_FUNCTIONS:
+    for func_name in __all__:
         f = func_dict[func_name]
 
         method_name = "siu_{}".format(func_name)
@@ -1814,10 +1812,27 @@ def anti_join(left, right = None, on = None, *args, by = None):
     range_indx = pd.RangeIndex(len(left))
     return left.iloc[range_indx.difference(l_indx),:]
 
+
+# Define specific joins using partials ----
+# note that we include a docstring under the attribute, in order to generate
+# a summary of the partials in our API reference docs.
+
 left_join = partial(join, how = "left")
+"""Join two tables, and always keep the rows of the left hand table."""
+
 right_join = partial(join, how = "right")
+"""Join two tables, and always keep the rows of the right hand table."""
+
 full_join = partial(join, how = "full")
+"""Join two tables, and always keep the rows of both tables."""
+
 inner_join = partial(join, how = "inner")
+"""Join two tables, dropping rows with no matches between tables."""
+
+left_join.__doc__ = join.__doc__
+right_join.__doc__ = join.__doc__
+full_join.__doc__ = join.__doc__
+inner_join.__doc__ = join.__doc__
 
 
 # Head ========================================================================
