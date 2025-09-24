@@ -39,7 +39,7 @@ def _collect(__data, as_df = True):
                 # see https://github.com/pandas-dev/pandas/issues/45678
                 # going to handle here for now. address once LazyTbl gets
                 # subclassed per backend.
-                duckdb_con = conn.connection.c
+                duckdb_con = conn.connection
                 return duckdb_con.query(str(compiled)).to_df()
             else:
                 #
